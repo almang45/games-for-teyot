@@ -1,4 +1,4 @@
-# Rumah Teyot — Technical Architecture
+# Rumah Cici Theia — Technical Architecture
 
 Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`ASSETS.md`](ASSETS.md)
 (the visual contract with Gemini), [`AUDIO.md`](AUDIO.md) (voice recording pipeline).
@@ -62,7 +62,7 @@ There is no backend in phases 1–3. The Worker serves static assets only.
 ├── tests/                    # vitest unit + fixtures (recorded strokes), playwright e2e
 ├── public/                   # icons, web manifest, _headers
 ├── reference/                # GITIGNORED — raw photos of her / the house for Gemini
-├── recordings/               # GITIGNORED — raw WAVs from Ayah/Ibu
+├── recordings/               # GITIGNORED — raw WAVs from Papa/Mama
 └── wrangler.jsonc
 ```
 
@@ -191,8 +191,12 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 - **Voice queue**: one voice clip at a time. A new instruction cancels pending praise, never the
   reverse. Background music ducks to −12 dB while a voice clip plays.
 - Clips are referenced by **key** (`instr.tracing.follow`, `letter.name.A`). The narrator setting
-  (Ayah / Ibu / alternate) picks the variant at runtime, with a fallback to the other parent if a
+  (Papa / Mama / alternate) picks the variant at runtime, with a fallback to the other parent if a
   clip is missing.
+- **Speaker portrait**: each clip carries its speaker (`mama` | `papa`). In activity scenes the
+  matching portrait shows while the clip plays. An `AnalyserNode` on the voice bus maps RMS
+  loudness to the 3 `talk` frames (thresholds tuned once per voice), so lip-sync needs no
+  authoring.
 - Packaging: one audio sprite per room, in Opus (`.webm`). Pipeline in `AUDIO.md`.
 
 ## 8. Offline, hosting, and auth
@@ -212,7 +216,7 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 ```jsonc
 // wrangler.jsonc
 {
-  "name": "rumah-teyot",
+  "name": "rumah-cici-theia",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./dist",
@@ -308,7 +312,7 @@ interface StrokeAttempt {          // kept for the newest 20 per item, for repla
 interface Settings {
   childName: string;
   sessionMinutes: number;          // default 10
-  narrator: 'ayah' | 'ibu' | 'alternate';  // default 'ibu'
+  narrator: 'papa' | 'mama' | 'alternate';  // default 'mama'
   caseOrder: 'lower-first' | 'upper-first';  // default 'lower-first'
   corridorOverride?: number;
 }

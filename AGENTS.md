@@ -1,12 +1,12 @@
 # AGENTS.md: shared rules for Claude and Gemini
 
-This repo is built by two AI agents with a human (Ayah) reviewing every PR.
+This repo is built by two AI agents with a human (Papa) reviewing every PR.
 
 | Agent | Role | Owns |
 |---|---|---|
 | **Claude** (Claude Code) | Game logic, engine, content data, tooling, CI/CD, deployment | `src/`, `tools/`, `tests/`, `public/`, `content/`, `audio/` (generated), `wrangler.jsonc`, `.github/`, `package.json` |
 | **Gemini** (Antigravity) | Visuals: character, house, room art, coloring pages, UI art, icons | `assets/` (everything except the schema, which lives in `src/content/schema/manifest.ts`) |
-| **Ayah & Ibu** | Product decisions, playtesting, voice recordings, reference photos | `recordings/` and `reference/` (both gitignored), final review |
+| **Papa & Mama** | Product decisions, playtesting, voice recordings, reference photos | `recordings/` and `reference/` (both gitignored), final review |
 
 Shared, and changed only through a PR that both sides follow: `docs/`, `AGENTS.md`, and
 `assets/manifest.json` structure.

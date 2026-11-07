@@ -1,4 +1,4 @@
-# Rumah Teyot — Asset Contract
+# Rumah Cici Theia — Asset Contract
 
 Owner: **Gemini (Antigravity)**. Consumer: Claude's game logic.
 
@@ -18,11 +18,12 @@ These are stored in `reference/`, which is **gitignored and never committed**:
 | Input | Used for |
 |---|---|
 | 3–6 photos of her: face front and side, full body, typical hairstyle, favourite clothes | Character reference sheet |
+| 2–3 photos each of Mama and Papa: face and full body | Parents reference sheet |
 | Floor plan sketch: rough is fine, with room names and positions, stairs, doors | House layout |
 | A few photos per room: key furniture and colours | Room art |
 | Photos of the dolls **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny): front, side, back | Companion reference sheet |
 
-**Only stylized illustrations are committed.** No photo, and no photo-realistic render of her,
+**Only stylized illustrations are committed.** No photo, and no photo-realistic render of her or her parents,
 goes into git or the deployed site.
 
 ## 2. Art direction
@@ -100,6 +101,36 @@ traits (colour, ear shape, any stitching or accessories).
 
 Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optional, for later.
 
+### 3.4 Mama and Papa
+
+- They are adults, but drawn in the same chibi style as her. Recognisably them (hair, glasses,
+  everyday clothes), with a head about 30% of their height.
+- They are **taller than her** so the family scale reads correctly.
+- `assets/style/parents-sheet.png`: Mama, Papa, her, Bubu and Ocica lined up at relative scale.
+  It becomes the master consistency reference.
+
+**Portrait** (phase 1, used in activity scenes while a voice clip plays):
+- Bust in a soft circular frame, **384 × 384** per frame, transparent outside the frame.
+- Keys: `parent.mama.portrait`, `parent.papa.portrait`.
+
+| Animation | Frames | Loop | Notes |
+|---|---|---|---|
+| `idle` | 4 | yes | Blink |
+| `talk` | 3 | — | Mouth closed / half / open. The game picks the frame from the clip's live loudness, so no lip-sync authoring is needed. |
+| `smile` | 2 | no | After praise |
+| `encourage` | 4 | no | Nod, for hint clips |
+
+**Full body** (phase 2, house hub and bedtime ending):
+- **320 × 320** per frame, feet on baseline y = 300. Same rules as §3.2.
+- Keys: `parent.mama.body`, `parent.papa.body`.
+
+| Animation | Frames | Loop | Notes |
+|---|---|---|---|
+| `idle` | 4 | yes | |
+| `wave` | 6 | no | When she enters their room |
+| `clap` | 6 | no | At level mastery |
+| `tuck_in` | 8 | no | Bedtime ending. Bends over the bed. |
+
 ## 4. House
 
 ### 4.1 Images
@@ -123,7 +154,7 @@ Coordinates are in the 1920 × 1080 export space, with the origin at the top lef
   "size": [1920, 1080],
   "rooms": [
     {
-      "id": "kamar-teyot",                 // kebab-case, stable forever
+      "id": "kamar-theia",                 // kebab-case, stable forever
       "activity": "tracing",               // tracing | counting | coloring | reading | words | garden | bedtime
       "polygon": [[120, 80], [700, 80], [700, 480], [120, 480]],   // tap area
       "stand": [410, 470],                 // character feet position on arrival
@@ -135,7 +166,7 @@ Coordinates are in the 1920 × 1080 export space, with the origin at the top lef
     { "id": "stairs-top", "pos": [900, 470] },
     { "id": "stairs-bottom", "pos": [1100, 990] }
   ],
-  "edges": [["kamar-teyot", "door-kamar"], ["door-kamar", "stairs-top"], ["stairs-top", "stairs-bottom"]],
+  "edges": [["kamar-theia", "door-kamar"], ["door-kamar", "stairs-top"], ["stairs-top", "stairs-bottom"]],
   "start": "ruang-tamu"
 }
 ```
@@ -187,9 +218,9 @@ Pages use **raster line art with runtime flood fill**, so AI-generated art works
   "version": 1,
   "assets": [
     {
-      "key": "character.teyot.default",
+      "key": "character.theia.default",
       "type": "spritesheet",                 // image | spritesheet | coloring | layout | palette
-      "path": "character/teyot/default.png",
+      "path": "character/theia/default.png",
       "frame": [256, 256],
       "animations": { "idle": [0, 3], "walk": [4, 11] },
       "room": "global"                       // global | <room-id> — decides which bundle it ships in
@@ -213,13 +244,14 @@ schema go through a PR that touches both files.
 
 ## 9. Delivery order
 
-1. Palette + character reference sheet + Bubu and Ocica companion sheet
+1. Palette + character reference sheet + Bubu and Ocica companion sheet + Mama and Papa (`parents-sheet.png`)
 2. House layout (from the floor plan) + `layout.json` with 3 phase-1 rooms
 3. Character `idle`, `walk`, `celebrate`, `sleep`. Bubu and Ocica `idle`, `walk`, `point` (Bubu), `comfort` (Ocica).
 4. Phase-1 room art: tracing surface + pre-writing themes, counting objects 1–5 + bowl, 5 coloring
    pages
-5. App icons
-6. Phase-2 and later: stickers, outfits, remaining rooms, remaining Bubu and Ocica animations
+5. Mama and Papa portraits (`idle`, `talk`, `smile`, `encourage`)
+6. App icons
+7. Phase-2 and later: stickers, outfits, remaining rooms, remaining Bubu and Ocica animations, Mama and Papa full-body sprites
 
 Until each piece lands, the game runs on Claude's code-generated placeholders, which have the same
 keys and sizes.

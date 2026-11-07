@@ -1,6 +1,6 @@
-# Rumah Teyot — Product Plan
+# Rumah Cici Theia — Product Plan
 
-Working title. A browser game, installed on Android as an app, that helps a 3-year-old learn to trace,
+A browser game, installed on Android as an app, that helps a 3-year-old learn to trace,
 count, read, and color in Bahasa Indonesia. She plays as herself and walks around a drawing of her
 own house. Each room is an activity, and her parents' recorded voices guide her.
 
@@ -15,7 +15,7 @@ Status: **planning**. No code yet.
 | Player | Our daughter, 3 years old. Already knows numbers and some letters. Cannot read instructions. |
 | Devices | Android phone and Android tablet, landscape. Touch only, no stylus. Tablet is the main device. |
 | Language | Bahasa Indonesia for everything she sees and hears. The parent area may mix in English. |
-| Voice | Recorded by Ayah and Ibu. No text-to-speech in the kid-facing game. |
+| Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
 | World | Our real house layout, drawn as a cutaway "dollhouse" view. The character is a stylized version of her. |
 | Distribution | Standalone installable web app, hosted on Cloudflare Workers (static assets). |
 | Team | Claude: game logic, engine, content data, CI/CD. Gemini (Antigravity): visuals and assets. See [`../AGENTS.md`](../AGENTS.md). |
@@ -56,6 +56,18 @@ Status: **planning**. No code yet.
     Bubu holds up the color palette.
 - Rooms that are not unlocked yet stay dim, with a soft "zzz" or locked-door look. They never show
   a padlock or an error.
+- **Mama and Papa appear in the house too**, as characters attached to their voices. A 3-year-old
+  follows an instruction better when she can see who is talking.
+
+  | Where | What they do |
+  |---|---|
+  | Activity scenes | The narrator's **portrait** sits in a corner and its mouth moves while the clip plays. The portrait is Mama by default, Papa when he's the narrator or for his praise clips. |
+  | House hub | Each stands in "their" spot (e.g. Mama in the kitchen, Papa on the sofa) and waves when she enters the room |
+  | Bedtime ending | Mama (or Papa) tucks her in, with Bubu and Ocica beside her |
+
+  - They are guides only: not playable, and never shown being disappointed.
+  - **Mama** and **papa** are also the first reading words (ma + ma, pa + pa), and R6 shows their
+    portraits as the pictures to match.
 - The house fills with progress over time: letter stickers on her bedroom wall, finished coloring
   pages on the fridge, plants in the garden.
 
@@ -92,7 +104,7 @@ Uppercase comes later.
 | T2 Lowercase, lines and the "c" family | l i t, then c o a d g q | All of the c family start with the same counterclockwise "c" movement as T0's circle. Single-storey **a** and **g** (school style). |
 | T3 Lowercase, rest | Humps n m h r · cups and tails u y j · b p · e s f k v w x z | Shown on a simple baseline with x-height guide lines |
 | T4 Uppercase | Straight lines L T I H E F A K M N V W X Y Z, then curves O C G Q S U J D P B R | Starts once lowercase is mostly mastered |
-| Her name | The letters of her name are put first in every level | Most motivating word she knows. Her name is the **one exception** to lowercase-first: the capital first letter is taught early, inside her name only. |
+| Her name: **Theia** | t h e i a are put first in every level | Most motivating word she knows. Her name is the **one exception** to lowercase-first: the capital **T** is taught early, inside her name only. |
 
 Each glyph moves through these steps:
 
@@ -137,7 +149,7 @@ Notes:
 - Teach vowels **a i u e o** first, then consonants in this order: m b p s t k n l d g r j.
 - Indonesian **e** has two sounds: pepet /ə/ (*emas*) and taling /e/ (*ember*). Early word lists use
   only one per word and tag each word with which one. See `content/words.json` (to be created).
-- Words come from things in **our** house and family: Ayah, Ibu, **Bubu**, *meja*, *kursi*,
+- Words come from things in **our** house and family: Papa, Mama, **Bubu**, *meja*, *kursi*,
   *bola*. Bubu (bu + bu) is a perfect first two-syllable word. Ocica (o + ci + ca) comes later.
 
 ### 4.4 Coloring (Mewarnai)
@@ -171,7 +183,7 @@ Notes:
   - Lowercase-first (default) or uppercase-first
   - Child name
   - Tracing tolerance override
-  - Which parent's voice is the narrator: **Ibu (default)**, Ayah, or alternate
+  - Which parent's voice is the narrator: **Mama (default)**, Papa, or alternate
 - **Data**: export and import progress as JSON (backup against Android clearing browser storage).
   Reset progress.
 
@@ -189,7 +201,7 @@ document.
 ### Phase 0: Foundations (no art needed)
 - Repo scaffold, CI/CD to Cloudflare, installable offline app shell
 - Placeholder art generated in code
-- Asset manifest contract with Gemini, and the audio recording script for Ayah and Ibu
+- Asset manifest contract with Gemini, and the audio recording script for Papa and Mama
 - **Done when**: the app installs on the tablet, opens offline, and plays a test voice clip on the
   first tap.
 
@@ -251,11 +263,16 @@ The game uses her likeness, our house layout, and our voices.
 
 | Decision | Owner | Needed by |
 |---|---|---|
-| Final game name ("Rumah Teyot" is a placeholder) | Parents | Phase 1 (app icon/name) |
 | Floor plan + which room hosts which activity | Parents → Gemini | Phase 0 end |
 | Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Gemini | Phase 0 end |
+| Photos of Mama and Papa for their reference sheet. They stay in `reference/` and are never committed. | Parents → Gemini | Phase 0 end |
+| Where Mama and Papa stand in the house hub | Parents | Phase 2 |
+| What the voice lines call her: "Cici", "Theia", or "Cici Theia" (the examples use "Cici") | Parents | Phase 1 audio session |
 
 Decided (2026-11-07):
 - Companions are her two dolls, **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny).
-- The default narrator is **Ibu**.
 - Tracing is **lowercase-first**.
+- The parents are **Mama** and **Papa**, and Mama is the default narrator.
+- The game's name is **Rumah Cici Theia**.
+- Mama and Papa get **their own characters**: portraits from phase 1, full house sprites in
+  phase 2.

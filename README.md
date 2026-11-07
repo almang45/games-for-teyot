@@ -1,6 +1,6 @@
 # games-for-teyot
 
-**Rumah Teyot** (working title) is an installable browser game for our 3-year-old, in Bahasa
+**Rumah Cici Theia** is an installable browser game for our 3-year-old, in Bahasa
 Indonesia. She plays as herself and walks around our house. Each room is a learning activity:
 
 - tracing pre-writing strokes, numbers, and letters
@@ -8,7 +8,7 @@ Indonesia. She plays as herself and walks around our house. Each room is a learn
 - letter and early reading practice
 - coloring
 
-Ayah and Ibu's recorded voices guide her through everything.
+Papa and Mama's recorded voices guide her through everything.
 
 - Runs on Android phone and tablet, landscape, touch only, and works offline.
 - Hosted on Cloudflare Workers (static assets) behind Cloudflare Access.

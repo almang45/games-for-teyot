@@ -1,4 +1,4 @@
-# Rumah Teyot — Voice Recording Guide
+# Rumah Cici Theia — Voice Recording Guide
 
 The parents record every voice clip. This document covers what to record, how to record it, and
 what the pipeline does with the files.
@@ -9,16 +9,16 @@ what the pipeline does with the files.
 
 | Setting | Behaviour |
 |---|---|
-| `narrator = ibu` (**default**) / `ayah` | That parent gives all instructions. Both parents' praise clips are mixed in. |
-| `narrator = alternate` | Instructions alternate by room. For example, Ibu in the kitchen, Ayah in the bedroom. |
+| `narrator = mama` (**default**) / `papa` | That parent gives all instructions. Both parents' praise clips are mixed in. |
+| `narrator = alternate` | Instructions alternate by room. For example, Mama in the kitchen, Papa in the bedroom. |
 | Missing clip | Falls back to the other parent's version of the same key, then to a soft chime. The game never goes silent. |
 
-Ideally both parents record the whole script. The minimum for phase 1 is **Ibu recording
-everything**, and Ayah recording the **praise** and **greeting** sections.
+Ideally both parents record the whole script. The minimum for phase 1 is **Mama recording
+everything**, and Papa recording the **praise** and **greeting** sections.
 
 Bubu and Ocica don't speak. They use short sound effects (boing, squeak, giggle, snore), which are
 handled with the game sounds, not recorded here. Instruction lines may mention them by name: "Lihat
-Bubu dulu ya", "Ocica peluk Teyot".
+Bubu dulu ya", "Ocica peluk Cici".
 
 ## 2. What to record
 
@@ -27,10 +27,10 @@ The script is **generated from the game content** by `npm run audio:script` and 
 
 ```
 key,section,text,note
-greet.welcome,01-sistem,"Halo Teyot! Ayo main!",ceria
+greet.welcome,01-sistem,"Halo Cici Theia! Ayo main!",ceria
 room.dapur.enter,02-ruangan,"Kita di dapur. Ayo berhitung!",
 instr.tracing.watch,03-menulis,"Lihat Bubu dulu ya.",pelan
-instr.tracing.follow,03-menulis,"Sekarang Teyot ikuti bolanya.",
+instr.tracing.follow,03-menulis,"Sekarang Cici ikuti bolanya.",
 stroke.vertical,03-menulis,"Garis tegak. Seperti hujan turun.",
 num.4,04-angka,"Empat.",datar — dipakai saat menghitung
 count.howmany,05-hitung,"Berapa semuanya?",nada bertanya
@@ -39,7 +39,7 @@ obj.telur,05-hitung,"telur",
 color.merah,06-warna,"Merah!",
 praise.01,07-pujian,"Hebat!",
 hint.tryagain.01,08-bantuan,"Hampir! Coba lagi ya.",lembut
-bedtime.01,09-tidur,"Sudah malam. Waktunya bobo. Sampai besok, Teyot!",pelan, berbisik
+bedtime.01,09-tidur,"Sudah malam. Waktunya bobo. Sampai besok, Cici!",pelan, berbisik
 ```
 
 Phase 1 is about **110 clips per voice**:
@@ -88,7 +88,7 @@ joins sound smooth.
   with **about 2 seconds of silence** between lines.
 - If you make a mistake, stop and re-record **the whole section**. Sections are short (10–20 lines)
   on purpose, which is simpler than fixing a single clip.
-- Name files `<voice>-<section>.wav`, for example `ibu-03-menulis.wav`, and drop them into
+- Name files `<voice>-<section>.wav`, for example `mama-03-menulis.wav`, and drop them into
   `recordings/`. That folder is gitignored.
 
 ## 4. Pipeline (`npm run audio:build`)
