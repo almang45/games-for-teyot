@@ -9,12 +9,16 @@ what the pipeline does with the files.
 
 | Setting | Behaviour |
 |---|---|
-| `narrator = ibu` / `ayah` | That parent gives all instructions. Both parents' praise clips are mixed in. |
+| `narrator = ibu` (**default**) / `ayah` | That parent gives all instructions. Both parents' praise clips are mixed in. |
 | `narrator = alternate` | Instructions alternate by room. For example, Ibu in the kitchen, Ayah in the bedroom. |
 | Missing clip | Falls back to the other parent's version of the same key, then to a soft chime. The game never goes silent. |
 
-Ideally both parents record the whole script. The minimum for phase 1 is one parent recording
-everything and the other recording the **praise** and **greeting** sections.
+Ideally both parents record the whole script. The minimum for phase 1 is **Ibu recording
+everything**, and Ayah recording the **praise** and **greeting** sections.
+
+Bubu and Ocica don't speak. They use short sound effects (boing, squeak, giggle, snore), which are
+handled with the game sounds, not recorded here. Instruction lines may mention them by name: "Lihat
+Bubu dulu ya", "Ocica peluk Teyot".
 
 ## 2. What to record
 
@@ -25,7 +29,7 @@ The script is **generated from the game content** by `npm run audio:script` and 
 key,section,text,note
 greet.welcome,01-sistem,"Halo Teyot! Ayo main!",ceria
 room.dapur.enter,02-ruangan,"Kita di dapur. Ayo berhitung!",
-instr.tracing.watch,03-menulis,"Lihat dulu ya.",pelan
+instr.tracing.watch,03-menulis,"Lihat Bubu dulu ya.",pelan
 instr.tracing.follow,03-menulis,"Sekarang Teyot ikuti bolanya.",
 stroke.vertical,03-menulis,"Garis tegak. Seperti hujan turun.",
 num.4,04-angka,"Empat.",datar — dipakai saat menghitung

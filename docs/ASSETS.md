@@ -20,7 +20,7 @@ These are stored in `reference/`, which is **gitignored and never committed**:
 | 3–6 photos of her: face front and side, full body, typical hairstyle, favourite clothes | Character reference sheet |
 | Floor plan sketch: rough is fine, with room names and positions, stairs, doors | House layout |
 | A few photos per room: key furniture and colours | Room art |
-| Photos of the family pet or a favourite toy (optional) | Companion |
+| Photos of the dolls **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny): front, side, back | Companion reference sheet |
 
 **Only stylized illustrations are committed.** No photo, and no photo-realistic render of her,
 goes into git or the deployed site.
@@ -40,7 +40,7 @@ goes into git or the deployed site.
 - **Consistency gate**: each new asset is reviewed side by side with `assets/style/reference-sheet.png`
   before merge (§8).
 
-## 3. Character (her) and companion
+## 3. Character (her) and companions
 
 ### 3.1 Reference sheet (first deliverable)
 
@@ -72,8 +72,33 @@ Every later character asset must match this sheet.
 **Outfits** (unlockable rewards) are full re-renders of all animations using the same frame
 grid, not overlays. That keeps the art simple and the rendering cheap.
 
-The **companion** follows the same rules with frame size **128 × 128** and animations `idle`,
-`walk`, `point`, `celebrate`.
+### 3.3 Companions: Bubu and Ocica
+
+Both are based on her real dolls, stylized the same way as she is. Keep each doll's recognisable
+traits (colour, ear shape, any stitching or accessories).
+
+- `assets/style/companions-sheet.png`: both bunnies side by side with her, at the correct
+  relative scale. Each about 40–50% of her height.
+- **Silhouettes must be distinct at a glance**:
+  - **Bubu**: pink, slim, tall ears
+  - **Ocica**: white, round, wide body
+  - Ocica's white needs a warm off-white fill plus the standard outline so she doesn't vanish on
+    light walls.
+- Same rules as §3.2: facing right only, transparent PNG. Frame size **160 × 160**, feet on
+  baseline y = 150.
+
+| Animation key | Bubu | Ocica | Frames | Loop | Notes |
+|---|---|---|---|---|---|
+| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches her ears, Ocica sways |
+| `walk` | ✓ hop | ✓ waddle | 8 | yes | In place |
+| `point` | ✓ | — | 4 | no | Paw toward a room or item, holds the pose |
+| `demo` | ✓ | — | 6 | yes | Paw "drawing" motion for the Lihat step |
+| `comfort` | — | ✓ | 6 | no | Hug or pat, after a miss |
+| `celebrate` | ✓ | ✓ | 6 | no | Jump. Ocica's jump is a small bounce. |
+| `eat` | — | ✓ | 4 | no | Munches a counted cookie (counting scene) |
+| `sleep` | ✓ | ✓ | 4 | yes | Curled up beside her in bed |
+
+Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optional, for later.
 
 ## 4. House
 
@@ -188,13 +213,13 @@ schema go through a PR that touches both files.
 
 ## 9. Delivery order
 
-1. Palette + character reference sheet + companion concept
+1. Palette + character reference sheet + Bubu and Ocica companion sheet
 2. House layout (from the floor plan) + `layout.json` with 3 phase-1 rooms
-3. Character `idle`, `walk`, `celebrate`, `sleep`
+3. Character `idle`, `walk`, `celebrate`, `sleep`. Bubu and Ocica `idle`, `walk`, `point` (Bubu), `comfort` (Ocica).
 4. Phase-1 room art: tracing surface + pre-writing themes, counting objects 1–5 + bowl, 5 coloring
    pages
 5. App icons
-6. Phase-2 and later: stickers, outfits, remaining rooms, companion animations
+6. Phase-2 and later: stickers, outfits, remaining rooms, remaining Bubu and Ocica animations
 
 Until each piece lands, the game runs on Claude's code-generated placeholders, which have the same
 keys and sizes.

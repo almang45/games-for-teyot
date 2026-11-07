@@ -35,7 +35,7 @@ There is no backend in phases 1–3. The Worker serves static assets only.
 │   ├── main.ts               # Phaser boot, PWA registration, persistent-storage request
 │   ├── scenes/
 │   │   ├── BootScene.ts      # "Mulai" tap screen (WebAudio unlock), load manifest
-│   │   ├── HouseScene.ts     # hub: cutaway house, character, companion, day/night
+│   │   ├── HouseScene.ts     # hub: cutaway house, character, Bubu + Ocica, day/night
 │   │   ├── TracingScene.ts
 │   │   ├── CountingScene.ts
 │   │   ├── ColoringScene.ts
@@ -134,7 +134,7 @@ All distances are relative to glyph height `H`.
 | Start | Distance from first touch to stroke start | ≤ 0.15 H |
 | Coverage | Fraction of path samples within corridor `w` of any user point | ≥ 0.70 |
 | Off-path | Fraction of user points farther than `w` from the path | ≤ 0.35 |
-| Direction | Projected arc-length progress is mostly monotonic (backtrack ≤ 0.1 of length) | Enforced from T2 on |
+| Direction | Projected arc-length progress is mostly monotonic (backtrack ≤ 0.1 of length) | Enforced from T2 on. Matters most for the c family (c o a d g q all start counterclockwise). |
 | Corridor `w` | Tolerance band | 0.12 H (adaptive range 0.08–0.18) |
 
 When a stroke passes, the drawn line **morphs onto the ideal path** and sparkles. A failed stroke
@@ -169,7 +169,7 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   2. The next new item in curriculum order (her name's letters first).
   3. One **already-mastered** item as an easy win.
 - A level unlocks when 80% of the previous level's items reach box ≥ 3.
-- The House hub asks the scheduler which rooms have due items, and the companion points at those.
+- The House hub asks the scheduler which rooms have due items, and **Bubu** points at those.
 
 ## 6. Navigation (house hub)
 
@@ -308,8 +308,8 @@ interface StrokeAttempt {          // kept for the newest 20 per item, for repla
 interface Settings {
   childName: string;
   sessionMinutes: number;          // default 10
-  narrator: 'ayah' | 'ibu' | 'alternate';
-  caseOrder: 'upper-first' | 'lower-first';
+  narrator: 'ayah' | 'ibu' | 'alternate';  // default 'ibu'
+  caseOrder: 'lower-first' | 'upper-first';  // default 'lower-first'
   corridorOverride?: number;
 }
 

@@ -42,8 +42,18 @@ Status: **planning**. No code yet.
 - A side-view cutaway of our house. The front wall is removed so she sees every room at once.
 - She **taps a room** and her character walks there: through doors, up the stairs. No joystick, no
   free roaming.
-- A small companion (pet or toy, to be decided) follows her and points at rooms that have something
-  new or something to review.
+- Her two favourite dolls come along as **companions**. They never talk (only the parents' voices
+  speak) and react with cute sound effects and animation instead:
+
+  | Companion | Looks | Personality and job |
+  |---|---|---|
+  | **Bubu** | Pink, slim bunny | Quick and curious. Hops ahead and **points** at rooms with something new or due for review. Demonstrates a new activity first, for example drawing the "Lihat" stroke with her paw. |
+  | **Ocica** | White, fat bunny | Calm and cuddly. Waddles behind and **comforts** her after a miss with a hug and a soft "coba lagi". Cheers at successes and sleeps next to her in the bedtime ending. |
+
+  - The two parts are deliberate. Bubu draws her toward what's next, Ocica makes a mistake feel
+    safe.
+  - Both appear in the counting and coloring scenes as extras: Ocica "eats" the cookies she counts,
+    Bubu holds up the color palette.
 - Rooms that are not unlocked yet stay dim, with a soft "zzz" or locked-door look. They never show
   a padlock or an error.
 - The house fills with progress over time: letter stickers on her bedroom wall, finished coloring
@@ -71,16 +81,18 @@ sounds → open syllables (suku kata) → words.
 
 ### 4.1 Tracing (Menulis)
 
-Motor skills come before letters, so tracing moves through these levels:
+Motor skills come before letters, so tracing moves through these levels. **Lowercase comes
+first**, because that's what she reads in books and how Indonesian TK/SD teaches writing.
+Uppercase comes later.
 
 | Level | Content | Notes |
 |---|---|---|
 | T0 Pre-writing strokes | Vertical line (hujan turun), horizontal (jalan), circle (bola), diagonal, cross, zigzag (petir), wave (ombak) | Builds the strokes every letter uses. Always available as a warm-up. |
 | T1 Digits 0–9 | Stroke-ordered digits | She already knows numbers, so early wins come fast. |
-| T2 Uppercase, straight lines | L T I H E F A K M N V W X Y Z | Grouped by stroke type |
-| T3 Uppercase, curves | O C G Q S U J D P B R | |
-| T4 Lowercase | Grouped by shape: c o a d g q / l i t / n m h r / u y / b p / e s f k v w x z j | Single-storey **a** and **g** (school style) |
-| Her name | The letters of her name are put first in every level | Most motivating word she knows |
+| T2 Lowercase, lines and the "c" family | l i t, then c o a d g q | All of the c family start with the same counterclockwise "c" movement as T0's circle. Single-storey **a** and **g** (school style). |
+| T3 Lowercase, rest | Humps n m h r · cups and tails u y j · b p · e s f k v w x z | Shown on a simple baseline with x-height guide lines |
+| T4 Uppercase | Straight lines L T I H E F A K M N V W X Y Z, then curves O C G Q S U J D P B R | Starts once lowercase is mostly mastered |
+| Her name | The letters of her name are put first in every level | Most motivating word she knows. Her name is the **one exception** to lowercase-first: the capital first letter is taught early, inside her name only. |
 
 Each glyph moves through these steps:
 
@@ -125,8 +137,8 @@ Notes:
 - Teach vowels **a i u e o** first, then consonants in this order: m b p s t k n l d g r j.
 - Indonesian **e** has two sounds: pepet /ə/ (*emas*) and taling /e/ (*ember*). Early word lists use
   only one per word and tag each word with which one. See `content/words.json` (to be created).
-- Words come from things in **our** house and family: Ayah, Ibu, the pet's name, *meja*, *kursi*,
-  *bola*.
+- Words come from things in **our** house and family: Ayah, Ibu, **Bubu**, *meja*, *kursi*,
+  *bola*. Bubu (bu + bu) is a perfect first two-syllable word. Ocica (o + ci + ca) comes later.
 
 ### 4.4 Coloring (Mewarnai)
 
@@ -140,8 +152,9 @@ Notes:
 ## 5. Rewards and progression
 
 - **Stickers**: one per mastered glyph or number, placed on her bedroom wall in the house.
+- **Bubu and Ocica react**: a special celebration dance when she masters a whole level.
 - **Unlocks**: new coloring pages, outfits for her character, new rooms when a curriculum level opens.
-- **Review**: rooms with items due for review get the companion's attention, chosen by spaced
+- **Review**: rooms with items due for review get Bubu's attention, chosen by spaced
   repetition (see `ARCHITECTURE.md` §5). She never sees a "due" list.
 
 ## 6. Parent area
@@ -155,10 +168,10 @@ Notes:
 - **Settings**:
   - Session length
   - Unlocked levels
-  - Uppercase-first or lowercase-first
+  - Lowercase-first (default) or uppercase-first
   - Child name
   - Tracing tolerance override
-  - Which parent's voice is the narrator (Ayah / Ibu / alternate)
+  - Which parent's voice is the narrator: **Ibu (default)**, Ayah, or alternate
 - **Data**: export and import progress as JSON (backup against Android clearing browser storage).
   Reset progress.
 
@@ -191,9 +204,9 @@ document.
 - **Done when**: she plays one 10-minute session on her own, apart from the parent starting it.
 
 ### Phase 2: Letters
-- Tracing T2–T4 (all uppercase and lowercase, her name first)
+- Tracing T2–T4 (lowercase, then uppercase, her name first)
 - Letter recognition and sounds R1–R3
-- Stickers, outfits, the companion
+- Stickers, outfits, Bubu and Ocica's full animation set
 - Parent dashboard with stroke replays
 - Spaced-repetition review
 
@@ -240,6 +253,9 @@ The game uses her likeness, our house layout, and our voices.
 |---|---|---|
 | Final game name ("Rumah Teyot" is a placeholder) | Parents | Phase 1 (app icon/name) |
 | Floor plan + which room hosts which activity | Parents → Gemini | Phase 0 end |
-| Companion: family pet, favourite toy, or new character | Parents | Phase 1 |
-| Default narrator (Ayah / Ibu / alternate) | Parents | Phase 1 audio session |
-| Uppercase-first or lowercase-first for T2–T4 (her playgroup/TK may already have a preference) | Parents | Phase 2 |
+| Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Gemini | Phase 0 end |
+
+Decided (2026-11-07):
+- Companions are her two dolls, **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny).
+- The default narrator is **Ibu**.
+- Tracing is **lowercase-first**.
