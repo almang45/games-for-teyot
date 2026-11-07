@@ -1,0 +1,18 @@
+# Private source material — never commit (see docs/PLAN.md §9)
+reference/
+recordings/
+
+# Build / tooling
+node_modules/
+dist/
+dev-dist/
+.wrangler/
+coverage/
+playwright-report/
+test-results/
+
+# Local
+.env
+.env.*
+.DS_Store
+.claude/worktrees/
