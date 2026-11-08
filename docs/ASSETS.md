@@ -121,7 +121,7 @@ traits (colour, ear shape, any stitching or accessories).
 
 | Animation key | Bubu | Ocica | Frames | Loop | Notes |
 |---|---|---|---|---|---|
-| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches her ears, Ocica sways |
+| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches its ears, Ocica sways |
 | `walk` | ✓ hop | ✓ waddle | 8 | yes | In place |
 | `point` | ✓ | — | 4 | no | Paw toward a room or item, holds the pose |
 | `demo` | ✓ | — | 6 | yes | Paw "drawing" motion for the Lihat step |

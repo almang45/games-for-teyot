@@ -47,7 +47,7 @@ Status: **planning**. No code yet.
 
   | Companion | Looks | Personality and job |
   |---|---|---|
-  | **Bubu** | Pink, slim bunny | Quick and curious. Hops ahead and **points** at rooms with something new or due for review. Demonstrates a new activity first, for example drawing the "Lihat" stroke with her paw. |
+  | **Bubu** | Pink, slim bunny | Quick and curious. Hops ahead and **points** at rooms with something new or due for review. Demonstrates a new activity first, for example drawing the "Lihat" stroke with its paw. |
   | **Ocica** | White, fat bunny | Calm and cuddly. Waddles behind and **comforts** her after a miss with a hug and a soft "coba lagi". Cheers at successes and sleeps next to her in the bedtime ending. |
 
   - The two parts are deliberate. Bubu draws her toward what's next, Ocica makes a mistake feel
