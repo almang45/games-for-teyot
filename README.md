@@ -21,4 +21,5 @@ Status: **planning**.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, repo layout, tracing engine, scheduler, nav, audio, offline/hosting/auth, CI/CD |
 | [docs/ASSETS.md](docs/ASSETS.md) | Asset contract for the art agent: style, sprite specs, house layout schema, coloring pages |
 | [docs/AUDIO.md](docs/AUDIO.md) | Voice recording guide and processing pipeline |
-| [AGENTS.md](AGENTS.md) | How Claude (logic) and Gemini/Antigravity (assets) split the work |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | 5-phase delivery workflow per milestone: PRD → design → integration → testing → review, with gates and handoffs |
+| [AGENTS.md](AGENTS.md) | Day-to-day rules for Claude (architect/core dev) and Antigravity (UI/UX designer/prototyper) |

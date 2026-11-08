@@ -13,7 +13,7 @@ what the pipeline does with the files.
 | `narrator = alternate` | Instructions alternate by room. For example, Mama in the kitchen, Papa in the bedroom. |
 | Missing clip | Falls back to the other parent's version of the same key, then to a soft chime. The game never goes silent. |
 
-Ideally both parents record the whole script. The minimum for phase 1 is **Mama recording
+Ideally both parents record the whole script. The minimum for M1 is **Mama recording
 everything**, and Papa recording the **praise** and **greeting** sections.
 
 Bubu and Ocica don't speak. They use short sound effects (boing, squeak, giggle, snore), which are
@@ -42,7 +42,7 @@ hint.tryagain.01,08-bantuan,"Hampir! Coba lagi ya.",lembut
 bedtime.01,09-tidur,"Sudah malam. Waktunya bobo. Sampai besok, Cici!",pelan, berbisik
 ```
 
-Phase 1 is about **110 clips per voice**:
+M1 is about **110 clips per voice**:
 - greetings and rooms: 10
 - tracing instructions and the 7 pre-writing strokes: 15
 - digits 0–10: 11

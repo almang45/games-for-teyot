@@ -18,7 +18,7 @@ Status: **planning**. No code yet.
 | Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
 | World | Our real house layout, drawn as a cutaway "dollhouse" view. The character is a stylized version of her. |
 | Distribution | Standalone installable web app, hosted on Cloudflare Workers (static assets). |
-| Team | Claude: game logic, engine, content data, CI/CD. Gemini (Antigravity): visuals and assets. See [`../AGENTS.md`](../AGENTS.md). |
+| Team | Claude: architect and core developer. Antigravity: UI/UX designer and prototyper. Papa approves every gate. See [`WORKFLOW.md`](WORKFLOW.md) and [`../AGENTS.md`](../AGENTS.md). |
 
 ## 2. Design principles for a 3-year-old
 
@@ -82,8 +82,8 @@ naturally happen in real life.
 | Counting | Kitchen | Put eggs in the bowl, share cookies onto plates, count fruit |
 | Coloring | Living room / play corner | Easel, finished pages hang on the fridge |
 | Letter and name recognition | Living room bookshelf | Picture book that "reads aloud" |
-| Syllables and words (phase 3) | Dining table | Shopping list, labels on jars |
-| Shapes, colors, memory game (phase 4) | Garden / terrace | Flowers, butterflies, stepping stones |
+| Syllables and words (M3) | Dining table | Shopping list, labels on jars |
+| Shapes, colors, memory game (M4) | Garden / terrace | Flowers, butterflies, stepping stones |
 | Session end | Her bedroom | Character goes to sleep |
 
 ## 4. Curriculum
@@ -130,7 +130,7 @@ She already says numbers, so the focus is **number sense**, not reciting:
 | C4 | Number → quantity | "Masukkan 4 telur ke mangkuk" |
 | C5 | Quantity → number | Pick the numeral that matches the group |
 | C6 | More / less | "Mana yang lebih banyak?" |
-| C7 | Add with objects (phase 3) | 2 cookies + 1 cookie |
+| C7 | Add with objects (M3) | 2 cookies + 1 cookie |
 
 Range is 1–5 first, then 1–10. 11–20 only after the parent dashboard shows 1–10 is solid.
 
@@ -195,17 +195,18 @@ Notes:
 
 ## 8. Roadmap
 
-Each phase ends with a playtest with her. Her reaction decides what changes next, not this
-document.
+The roadmap is split into milestones **M0–M4**. Each milestone goes through the 5-phase workflow
+in [`WORKFLOW.md`](WORKFLOW.md): PRD → design → integration → testing → review. Each one ends with
+a playtest with her. Her reaction decides what changes next, not this document.
 
-### Phase 0: Foundations (no art needed)
+### M0: Foundations (no art needed)
 - Repo scaffold, CI/CD to Cloudflare, installable offline app shell
 - Placeholder art generated in code
-- Asset manifest contract with Gemini, and the audio recording script for Papa and Mama
+- Asset manifest contract with Antigravity, and the audio recording script for Papa and Mama
 - **Done when**: the app installs on the tablet, opens offline, and plays a test voice clip on the
   first tap.
 
-### Phase 1: First playable version (about 3 rooms)
+### M1: First playable version (about 3 rooms)
 - House hub with tap-to-walk between 3 rooms
 - Tracing T0 + T1 (pre-writing strokes and digits 0–9)
 - Counting C1–C4 for 1–5
@@ -215,19 +216,19 @@ document.
 - Progress saved on the device, plus JSON export
 - **Done when**: she plays one 10-minute session on her own, apart from the parent starting it.
 
-### Phase 2: Letters
+### M2: Letters
 - Tracing T2–T4 (lowercase, then uppercase, her name first)
 - Letter recognition and sounds R1–R3
 - Stickers, outfits, Bubu and Ocica's full animation set
 - Parent dashboard with stroke replays
 - Spaced-repetition review
 
-### Phase 3: Reading and more counting
+### M3: Reading and more counting
 - Syllables and words R4–R6
 - Counting C5–C7, range up to 10
 - Remaining rooms and full house art
 
-### Phase 4: Extras
+### M4: Extras
 - Garden: shapes, colors, memory game
 - Brush mode for coloring
 - Printable worksheets for each letter (writing on paper and on glass are different skills)
@@ -245,34 +246,35 @@ The game uses her likeness, our house layout, and our voices.
   still works offline once installed, because the service worker serves the cached copy (see
   `ARCHITECTURE.md` §8).
 - No analytics, no third-party scripts, no remote fonts. All data stays on the device unless
-  phase-4 sync is turned on.
+  M4 sync is turned on.
 
 ## 10. Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Tracing too strict or too loose | Frustration, or no learning | Tolerance adapts to her success rate. Parent override. Snap-to-path. Real playtests from phase 1. |
+| Tracing too strict or too loose | Frustration, or no learning | Tolerance adapts to her success rate. Parent override. Snap-to-path. Real playtests from M1. |
 | Small phone screen | Tracing area cramped | Tablet is the main device. On the phone, tracing fills the full height, house view zooms and pans. |
 | Chrome clears stored data | Progress lost | Ask the browser for persistent storage. JSON export. Optional D1 sync. |
 | AI-generated art inconsistent across rooms | World looks patchy | Style guide plus a locked character reference sheet. Every asset reviewed against the reference sheet before merge. See `ASSETS.md`. |
 | AI line art has gaps | Tap-to-fill leaks color | Gap-closing pass when the page loads, plus validation in CI (`ASSETS.md` §6) |
-| Recording more than 300 voice clips is tedious | Phase slips | The script is generated from content and grouped by session. Record per phase, not all at once. |
-| Too much screen time | Health | Session limit and bedtime ending built in. Printable worksheets in phase 4. |
+| Recording more than 300 voice clips is tedious | Milestone slips | The script is generated from content and grouped by session. Record per milestone, not all at once. |
+| Too much screen time | Health | Session limit and bedtime ending built in. Printable worksheets in M4. |
 
 ## 11. Open decisions
 
 | Decision | Owner | Needed by |
 |---|---|---|
-| Floor plan + which room hosts which activity | Parents → Gemini | Phase 0 end |
-| Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Gemini | Phase 0 end |
-| Photos of Mama and Papa for their reference sheet. They stay in `reference/` and are never committed. | Parents → Gemini | Phase 0 end |
-| Where Mama and Papa stand in the house hub | Parents | Phase 2 |
-| What the voice lines call her: "Cici", "Theia", or "Cici Theia" (the examples use "Cici") | Parents | Phase 1 audio session |
+| Floor plan + which room hosts which activity | Parents → Antigravity | M0 end |
+| Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Antigravity | M0 end |
+| Photos of Mama and Papa for their reference sheet. They stay in `reference/` and are never committed. | Parents → Antigravity | M0 end |
+| Where Mama and Papa stand in the house hub | Parents | M2 |
+| Sound effects (Bubu and Ocica sounds, UI, music): who sources them. Default proposal: Claude curates CC0 sounds with a license log, Antigravity approves the fit. | Parents | M1 |
+| What the voice lines call her: "Cici", "Theia", or "Cici Theia" (the examples use "Cici") | Parents | M1 audio session |
 
 Decided (2026-11-07):
 - Companions are her two dolls, **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny).
 - Tracing is **lowercase-first**.
 - The parents are **Mama** and **Papa**, and Mama is the default narrator.
 - The game's name is **Rumah Cici Theia**.
-- Mama and Papa get **their own characters**: portraits from phase 1, full house sprites in
-  phase 2.
+- Mama and Papa get **their own characters**: portraits from M1, full house sprites in
+  M2.

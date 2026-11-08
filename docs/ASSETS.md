@@ -1,6 +1,8 @@
 # Rumah Cici Theia — Asset Contract
 
-Owner: **Gemini (Antigravity)**. Consumer: Claude's game logic.
+Owner: **Antigravity** (UI/UX designer and prototyper). Consumer: Claude's game logic.
+This file covers `assets/`. Design tokens, screen layouts, motion, `ui/` components, and the
+prototype are defined in [`WORKFLOW.md`](WORKFLOW.md) §3.
 
 This file is the interface between the two agents. If the art needs something this spec does not
 allow, change this file in a PR first. Do not quietly break the format.
@@ -109,7 +111,7 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 - `assets/style/parents-sheet.png`: Mama, Papa, her, Bubu and Ocica lined up at relative scale.
   It becomes the master consistency reference.
 
-**Portrait** (phase 1, used in activity scenes while a voice clip plays):
+**Portrait** (M1, used in activity scenes while a voice clip plays):
 - Bust in a soft circular frame, **384 × 384** per frame, transparent outside the frame.
 - Keys: `parent.mama.portrait`, `parent.papa.portrait`.
 
@@ -120,7 +122,7 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 | `smile` | 2 | no | After praise |
 | `encourage` | 4 | no | Nod, for hint clips |
 
-**Full body** (phase 2, house hub and bedtime ending):
+**Full body** (M2, house hub and bedtime ending):
 - **320 × 320** per frame, feet on baseline y = 300. Same rules as §3.2.
 - Keys: `parent.mama.body`, `parent.papa.body`.
 
@@ -229,7 +231,7 @@ Pages use **raster line art with runtime flood fill**, so AI-generated art works
 }
 ```
 
-Claude owns the zod schema for this manifest in `src/content/schema/manifest.ts`. Additions to the
+Claude owns the zod schema for this manifest in `contracts/manifest.ts`. Additions to the
 schema go through a PR that touches both files.
 
 ## 8. Review checklist (before merging an asset PR)
@@ -245,13 +247,13 @@ schema go through a PR that touches both files.
 ## 9. Delivery order
 
 1. Palette + character reference sheet + Bubu and Ocica companion sheet + Mama and Papa (`parents-sheet.png`)
-2. House layout (from the floor plan) + `layout.json` with 3 phase-1 rooms
+2. House layout (from the floor plan) + `layout.json` with 3 M1 rooms
 3. Character `idle`, `walk`, `celebrate`, `sleep`. Bubu and Ocica `idle`, `walk`, `point` (Bubu), `comfort` (Ocica).
-4. Phase-1 room art: tracing surface + pre-writing themes, counting objects 1–5 + bowl, 5 coloring
+4. M1 room art: tracing surface + pre-writing themes, counting objects 1–5 + bowl, 5 coloring
    pages
 5. Mama and Papa portraits (`idle`, `talk`, `smile`, `encourage`)
 6. App icons
-7. Phase-2 and later: stickers, outfits, remaining rooms, remaining Bubu and Ocica animations, Mama and Papa full-body sprites
+7. M2 and later: stickers, outfits, remaining rooms, remaining Bubu and Ocica animations, Mama and Papa full-body sprites
 
 Until each piece lands, the game runs on Claude's code-generated placeholders, which have the same
 keys and sizes.
