@@ -353,6 +353,32 @@ Music ducks while a voice clip plays.
   activity.
 - Holding it walks her back to the house.
 
+#### Laptop (MacBook, Windows, no touchscreen)
+**US-LAPTOP-01: Mouse and trackpad play.**
+- The house, counting, coloring, the HUD, and the parent area all work with click, click-hold, and
+  drag.
+- Interactive elements show a hover state, and the cursor is a child-friendly pointer (a hand or a
+  star). No keyboard is needed for Theia.
+- `HUD-HOME` and the parent-gate corner work with click-and-hold.
+
+**US-LAPTOP-02: Tracing without touch.**
+- When the active pointer is a mouse or trackpad (`pointerType: "mouse"`), tracing runs **only in
+  Follow mode**, with the widest tolerance.
+- These attempts are stored as `practice` and **don't change mastery boxes**. Pen and paper motor
+  skill is practised on touch devices only.
+- The parent dashboard shows mouse practice separately.
+- No voice or visual signals to Theia that it "doesn't count".
+
+**US-LAPTOP-03: Laptop screens.**
+- At 16:10 (1440 × 900, 1920 × 1200, MacBook 2560 × 1600) and 16:9, the 16:9 design area stays
+  centred and unscaled in shape. The extra height is filled with decoration.
+- Nothing is cut off, and there are no scrollbars.
+
+**US-LAPTOP-04: Browsers.**
+- Supported on current Chrome and Edge (Windows, macOS) and Safari on macOS 14+.
+- Opening it in a plain Safari tab (not *Add to Dock*) shows a parent-facing warning that progress
+  can be deleted after 7 days. Same pattern as `SCR-INSTALL`.
+
 #### Parent area (basic)
 **US-PARENT-01: Gate.**
 - Holding the corner icon for 3 s opens a keypad with a text prompt: "Ketuk 7, 2, 9", with the
@@ -400,7 +426,7 @@ Music ducks while a voice clip plays.
 | NFR-REL-01 | No blank or frozen screen. Every error is logged as structured JSON and recovered from (§7.5). |
 | NFR-DATA-01 | Progress survives app updates and rollbacks (additive schema). Export and import round-trip without loss. |
 | NFR-PRIV-01 | No third-party requests. No photos or raw recordings in git or in the build. Access-protected hosting. Strict CSP. |
-| NFR-COMPAT-01 | Current stable Chrome on the family's Android tablet and phone (models to confirm, §13). Landscape only, installed fullscreen. |
+| NFR-COMPAT-01 | **Primary**: current stable Chrome on the family's Android tablet and phone (models to confirm, §13), landscape, installed fullscreen. **Secondary**: MacBook (Chrome, Safari 17+ via Add to Dock) and Windows laptop (Chrome, Edge), no touchscreen, installed app fullscreen. |
 | NFR-UX-01 | Touch targets ≥ 72 dp (≥ 96 dp for primary actions). No text-only instructions for Theia. No failure sounds. No timers she can see. |
 | NFR-MAINT-01 | Engine code has unit tests. Every acceptance criterion has an E2E test. Design artifacts are validated against `contracts/`. |
 
@@ -445,13 +471,17 @@ Music ducks while a voice clip plays.
 6. Should the parent be able to turn off the bedtime cooldown entirely, for a holiday or a long car
    ride?
 7. Coloring page subjects for M1: any favourites (her own toys, family pets, foods)?
+8. Progress is stored **per device**, so with a tablet, a phone, and 2 laptops, her counting and
+   coloring progress splits across devices. Is manual export/import between devices fine for
+   M1–M2, or should optional sync (Cloudflare D1, currently M4) move up to M2?
 
 ## 14. Out of scope (all milestones)
 
 - Accounts, multiple children, or any public distribution (Play Store, public URL)
 - Generated content at runtime (TTS, AI images, AI chat)
 - Leaderboards, competition, timers she can see, or any "fail" state
-- Devices other than the family's Android phone and tablet. iOS and desktop are not tested.
+- Devices other than the family's Android phone and tablet, MacBook, and Windows laptop. iOS and
+  Linux are not tested.
 
 ## 15. Approval (Gate 1)
 

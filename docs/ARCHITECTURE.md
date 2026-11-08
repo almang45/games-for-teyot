@@ -126,6 +126,9 @@ Glyphs are **centerline strokes**, not font outlines. Each one is hand-authored 
 | **Score** | Steps 3–4 | She draws freely, and the finished stroke is scored as in §4.3 |
 
 Input handling:
+- `pointerType === 'mouse'` (laptops without touchscreens) forces Follow mode with the widest
+  corridor. The attempt is stored as practice and skipped by the scheduler's box updates
+  (PRD US-LAPTOP-02).
 - Pointer Events. Only the **first** active `pointerId` counts, so extra fingers and palms are
   ignored.
 - `touch-action: none` on the canvas.
@@ -272,7 +275,7 @@ lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-
 | Stage | Contents |
 |---|---|
 | lint | `tsc --noEmit`, ESLint, Prettier check |
-| test | Vitest with coverage. Playwright smoke run on tablet and phone viewports. |
+| test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
 | build | `vite build`. Fails if the size budget (§10) is exceeded. |
 | validate-assets | `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
 | SAST | CodeQL (javascript-typescript), `osv-scanner` on the lockfile |
@@ -321,6 +324,7 @@ interface StrokeAttempt {          // kept for the newest 20 per item, for repla
   strokeIndex: number;
   points: Array<[x: number, y: number, t: number]>;
   verdict: 'pass' | 'fail';
+  input: 'touch' | 'mouse';        // mouse attempts are practice-only: never change ItemProgress.box
   corridor: number;
   ts: string;
 }

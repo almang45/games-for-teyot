@@ -5,7 +5,7 @@
 | From → To | Claude → Antigravity |
 | Gate | 1 (end of Phase 1). Starts Phase 2 for M1. |
 | Inputs | [`../PRD.md`](../PRD.md) §6–§9, [`../ASSETS.md`](../ASSETS.md), [`../WORKFLOW.md`](../WORKFLOW.md) §3–§4, `reference/` (local symlink to the family's Google Drive folder) |
-| Devices | **Tablet** 1920 × 1080 design space (primary). **Phone** 2400 × 1080 (wider: the house view pans, activity screens get extra side margins). Landscape only. |
+| Devices | **Tablet** 1920 × 1080 design space (primary). **Phone** 2400 × 1080 (wider: the house view pans, activity screens get extra side margins). **Laptop** 16:10, e.g. 1920 × 1200 / MacBook (taller: the 16:9 area stays centred, extra height is decoration), mouse/trackpad, no touch. Landscape only. |
 
 This brief says **what** each screen must achieve and what it contains. **How it looks** is
 Antigravity's call, within the art direction in `ASSETS.md` §2 and the design rules in `PLAN.md` §2.
@@ -24,8 +24,11 @@ Antigravity's call, within the art direction in `ASSETS.md` §2 and the design r
   - `HUD-HOME`: bottom left
   - `HUD-SPEAKER`: top left
   - parent-gate corner: top right, small and visually quiet
-- **States** to design for every interactive element: `idle`, `pressed`, `active/selected`,
-  `success`, `hint` (glow or pulse), `disabled/locked` (sleepy, never a padlock).
+- **States** to design for every interactive element: `idle`, `hover` (laptop only), `pressed`,
+  `active/selected`, `success`, `hint` (glow or pulse), `disabled/locked` (sleepy, never a
+  padlock).
+- **Laptop cursor**: a child-friendly pointer (a hand or a star) and its pressed variant. 32 × 32
+  and 64 × 64 for high-DPI, with the hotspot defined.
 - **No failure visuals.** No red X, no shake, no frowning faces. A miss is shown with Ocica's
   comfort animation and a hint glow.
 - **Motion**: every movement gets an entry in `design/motion.json` (duration, easing). Keep things
@@ -240,7 +243,7 @@ The keys follow `ASSETS.md`. Until the real art lands, the placeholders use the 
 | `tracing.surface`, `tracing.theme.<stroke-id>` × 7 | Surface + theme decorations | §5 |
 | `counting.objects.<id>` × 5, `counting.containers.<id>` × 2, `counting.dots.<n>` × 5 | Objects (counted/uncounted), containers with drop zones, dot cards | §5 |
 | `coloring.<id>` × 5 | Line-art pages | §6 |
-| `ui.*` | HUD icons, hold ring, swatch frame, keypad, tiles | §5 |
+| `ui.*` | HUD icons, hold ring, swatch frame, keypad, tiles, laptop cursor (normal + pressed) | §5 |
 | `bedtime.*` | Bedroom at night, bed, moon and stars | — |
 | `icons.app` | 512 maskable + 192 | §5 |
 

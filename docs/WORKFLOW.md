@@ -192,11 +192,11 @@ Unit tests are written alongside.
 |---|---|---|
 | Unit | Engine: tracing scorer (recorded-stroke fixtures), scheduler, nav, flood fill, session timer, storage migrations | Vitest |
 | Component | `ui/` components in every state, events fire with the right payloads | Vitest + Svelte Testing Library |
-| E2E | **At least one test for each acceptance criterion**, using the story ID as the test ID. Includes first launch, session to bedtime, parent gate, export/import. | Playwright, tablet and phone viewports, touch |
+| E2E | **At least one test for each acceptance criterion**, using the story ID as the test ID. Includes first launch, session to bedtime, parent gate, export/import. | Playwright: tablet and phone viewports with touch, plus laptop viewports (1440 × 900, 1920 × 1200) with mouse, on Chromium and WebKit |
 | Visual regression | Screenshot of every screen and state, compared to the baselines approved in Phase 5 | Playwright `toHaveScreenshot` |
 | Offline & update | Install, go offline, play a full session, push an update, apply it on next launch only | Playwright + Workbox test mode |
 | Privacy | Assert **zero** requests to any origin besides our own. No photos or raw recordings in the build output. | Playwright request log, build-output scan |
-| Device | Real tablet and phone: fps, tracing input latency, memory, audio unlock, install, app pinning | Chrome remote debugging, checklist in `docs/handoff/M<n>-device-test.md` |
+| Device | Real tablet and phone: fps, tracing input latency, memory, audio unlock, install, app pinning. Real MacBook (Safari Dock app + Chrome) and Windows laptop (Chrome/Edge): install, audio, mouse play, practice-only tracing. | Chrome remote debugging, checklist in `docs/handoff/M<n>-device-test.md` |
 | Playtest | Theia plays, and a parent observes using the PRD success metrics (protocol in the PRD) | Parent notes in `docs/handoff/M<n>-playtest.md` |
 
 There is a **traceability matrix** (`docs/handoff/M<n>-traceability.md`): story → acceptance

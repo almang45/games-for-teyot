@@ -13,7 +13,7 @@ Status: **planning**. No code yet.
 | Item | Decision |
 |---|---|
 | Player | Our daughter, 3 years old. Already knows numbers and some letters. Cannot read instructions. |
-| Devices | Android phone and Android tablet, landscape. Touch only, no stylus. Tablet is the main device. |
+| Devices | Android tablet (**main device**) and Android phone, landscape, touch only, no stylus. **Secondary**: MacBook and Windows laptop, **no touchscreen** (mouse or trackpad). Tracing practice only counts on touch devices. |
 | Language | Bahasa Indonesia for everything she sees and hears. The parent area may mix in English. |
 | Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
 | World | Our real house layout, drawn as an **isometric cutaway diorama** in the style of the sticker-book dollhouses she loves. The character is a stylized version of her. |
@@ -189,7 +189,18 @@ Notes:
 - **Data**: export and import progress as JSON (backup against Android clearing browser storage).
   Reset progress.
 
-## 7. Android usage tips (parent-facing, goes in the README later)
+## 7. Device usage tips (parent-facing, goes in the README later)
+
+Laptops (MacBook, Windows):
+- Install it as an app so it opens fullscreen without browser tabs:
+  - Chrome or Edge: the install icon in the address bar.
+  - Safari on macOS 14+: File → Add to Dock. On a Mac, play **only** from the Dock app or from
+    Chrome. In a plain Safari tab, Safari deletes stored data after 7 days without a visit, and
+    progress would disappear.
+- There is no App pinning. Use the installed app fullscreen, and optionally a separate macOS or
+  Windows user account for her.
+
+Android:
 
 - Install from Chrome → "Add to Home screen". It opens fullscreen in landscape.
 - Turn on **App pinning** (Settings → Security → App pinning) so she cannot leave the game.
