@@ -184,11 +184,21 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   - a standing spot for each room
   - waypoints (doors, stair top and bottom) with edges
 - BFS over the waypoint graph (a few dozen nodes, so A* is unnecessary). The character tweens along
-  the polyline at constant speed, uses the walk animation, and flips horizontally for direction.
+  the polyline at constant speed.
+- **Isometric facing**: each segment's screen direction picks `fr` or `br` (toward or away from
+  the viewer) plus a horizontal flip, which gives 4 directions from 2 drawn facings.
+- **Depth sorting**: characters and props sort by feet y. `occluders` from `layout.json` are drawn
+  above any character whose feet are above their `sortY`, so Theia walks *behind* railings and
+  sofas correctly.
 - Tapping a room while walking **retargets** the path from the current position.
 - Arriving at the room plays the room greeting voice clip, then starts the activity scene.
-- Phone: the house is wider than the screen, so the camera follows the character and allows a
-  drag-to-pan with inertia. Tablet: the whole house fits on screen.
+- **Camera**:
+  - **Overview**: the whole diorama. Default on the tablet.
+  - **On arrival**: a smooth zoom (about 600 ms) into the room's `focus` rect. The room fills the
+    screen like one of the sticker-book scenes, then the activity starts.
+  - **Leaving**: zooms back out.
+  - **Phone**: the overview opens zoomed to the current room. Drag to pan with inertia,
+    pinch-out shows the whole house.
 
 ## 7. Audio engine
 

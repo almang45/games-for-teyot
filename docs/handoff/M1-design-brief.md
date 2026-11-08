@@ -31,6 +31,19 @@ Antigravity's call, within the art direction in `ASSETS.md` §2 and the design r
 - **Motion**: every movement gets an entry in `design/motion.json` (duration, easing). Keep things
   calm. Celebrations ≤ 1.5 s, transitions ≤ 600 ms.
 
+## 1a. Style anchor: isometric diorama
+
+Theia loves isometric cutaway "dollhouse" sticker books. The photos are in `reference/style/`,
+local only and never committed, since they are copyrighted.
+- **Take from them**: the isometric cutaway diorama, the warm outlined flat-color look, the cosy
+  props, the multi-storey stairs, the zoomed-in "one room as a scene" framing.
+- **Never take**: their actual artwork, compositions, or props one-to-one. They're for mood only.
+- **Adapt for a 3-year-old**: fewer and bigger props around anything she can tap. Decoration is
+  quieter than interactive items.
+- **Activity screens stay flat and front-facing.** Tracing, counting, and coloring need an
+  undistorted surface. They are *framed* in the room's isometric style: for example the desk edge
+  in the corners, room props at the sides, and the same palette and line weight.
+
 ## 2. Deliverables for M1 (Phase 2)
 
 Follows `WORKFLOW.md` §4, Phase 2. Concepts are a **PR to `design/concepts/M1/`**. Papa and Mama
@@ -38,9 +51,9 @@ review them in GitHub.
 
 | # | Deliverable | Path | Review |
 |---|---|---|---|
-| 1 | 2–3 style directions: a mood board plus `SCR-HOUSE` and `SCR-TRACE` mockups per direction | `design/concepts/M1/01-style-*.png` + `README.md` | Papa picks one |
+| 1 | 2–3 style directions, **all isometric cutaway dioramas** (see §1a), varying palette, line weight, and detail density. A mood board plus `SCR-HOUSE` and `SCR-TRACE` mockups per direction. | `design/concepts/M1/01-style-*.png` + `README.md` | Papa picks one |
 | 2 | Family sheet: Theia, Mama, Papa, Bubu, Ocica at relative scale, front / three-quarter / side | `design/concepts/M1/02-family-sheet.png` → final `assets/style/` | Papa and Mama |
-| 3 | House cutaway concept from the floor plan, with the 3 M1 rooms marked | `design/concepts/M1/03-house.png` | Papa and Mama |
+| 3 | Isometric house concept painted over Claude's blockout (`npm run house:blockout`), with the 3 M1 rooms marked | `design/concepts/M1/03-house.png` | Papa and Mama |
 | 4 | Design tokens + `ui/` components (§5) | `design/tokens.json`, `ui/` | Claude checks contracts |
 | 5 | Mockups for every screen in §3, every state, tablet and phone | `design/mockups/<screen-id>/` | Papa |
 | 6 | Layout JSON per game screen | `design/layouts/<screen-id>.json` | Claude checks contracts |
@@ -62,7 +75,8 @@ review them in GitHub.
 ### `SCR-HOUSE`: house hub
 - **Purpose**: Theia chooses where to go. The house also shows her progress.
 - **Elements**:
-  - The cutaway house (layers per `ASSETS.md` §4).
+  - The isometric cutaway house (layers and occluders per `ASSETS.md` §4), plus a zoomed
+    "scene" framing for each room.
   - 3 active rooms: bedroom/tracing, kitchen/counting, living room/coloring. Final rooms come
     from the floor plan.
   - Other rooms shown dim and sleepy.
@@ -72,7 +86,8 @@ review them in GitHub.
     M1, placed for M2).
 - **States per room**: `idle`, `has-new` (Bubu points, soft sparkle), `due-review` (lighter
   sparkle), `locked` (dim, "zzz"), `tapped` (a short highlight).
-- **Interactions**: tap a room → walk. Phone only: drag to pan.
+- **Interactions**: tap a room → walk → the camera zooms into the room. Phone: opens zoomed to the
+  current room, drag to pan, pinch-out to see the whole house.
 - **Layout JSON**:
   - room polygons, the standing spot for each room, waypoints and edges
   - positions for the fridge display and the wall-sticker spot
@@ -175,7 +190,8 @@ review them in GitHub.
 | Moment | Notes |
 |---|---|
 | Walk start / stop | Ease in and out. Bubu leaves 150 ms earlier, Ocica follows 200 ms later. |
-| Stairs | Switch the walk cycle to `stairs_up`. Speed stays the same. |
+| Stairs | Switch to `stairs` (`br` going up, `fr` going down). Speed stays the same. |
+| Room zoom in / out | Camera eases into the room's `focus` rect in ≤ 600 ms, and back out when she leaves. Characters keep animating during the zoom. |
 | Stroke snap | The ink morphs onto the path in about 250 ms, then a sparkle runs along the stroke. |
 | Stroke miss | The ink fades out in about 400 ms. Ocica `comfort`. The demo replays. |
 | Count tap | Object bounce 120 ms + highlight. The number pops briefly above it. |
@@ -216,11 +232,11 @@ The keys follow `ASSETS.md`. Until the real art lands, the placeholders use the 
 
 | Key (prefix) | Asset | Spec |
 |---|---|---|
-| `character.theia.default` | `idle` `walk` `stairs_up` `celebrate` `point` `think` `sleep` | `ASSETS.md` §3.2 |
-| `companion.bubu.default` | `idle` `walk` `point` `demo` `celebrate` `sleep` | §3.3 |
-| `companion.ocica.default` | `idle` `walk` `comfort` `celebrate` `eat` `sleep` | §3.3 |
+| `character.theia.default` | `idle` `walk` `stairs` in `fr` + `br`. `celebrate` `point` `think` `sleep` in `fr` only. | `ASSETS.md` §3.2 |
+| `companion.bubu.default` | `idle` `walk` in `fr` + `br`. `point` `demo` `celebrate` `sleep` in `fr` only. | §3.3 |
+| `companion.ocica.default` | `idle` `walk` in `fr` + `br`. `comfort` `celebrate` `eat` `sleep` in `fr` only. | §3.3 |
 | `parent.mama.portrait`, `parent.papa.portrait` | `idle` `talk` `smile` `encourage` | §3.4 |
-| `house.*` | `bg` (+ 4 sky looks), `structure`, 3 rooms + their `_dim` versions, fridge display, wall-sticker spot | §4 |
+| `house.*` | `bg` (+ 4 sky looks), `structure`, 3 rooms + their `_dim` versions, `occluders.*`, fridge display, wall-sticker spot. Isometric, painted over the blockout. | §4 |
 | `tracing.surface`, `tracing.theme.<stroke-id>` × 7 | Surface + theme decorations | §5 |
 | `counting.objects.<id>` × 5, `counting.containers.<id>` × 2, `counting.dots.<n>` × 5 | Objects (counted/uncounted), containers with drop zones, dot cards | §5 |
 | `coloring.<id>` × 5 | Line-art pages | §6 |
@@ -239,7 +255,9 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 3. Day/night: are 4 sky looks plus tint values enough, or should rooms also get light layers (lamps
    switching on at dusk)?
 4. Which rooms does the floor plan suggest for the 3 M1 activities?
-5. Anything in the contracts (`ASSETS.md`, upcoming `contracts/`) that blocks your preferred
+5. Isometric pipeline: is painting over the SVG blockout workable with your image tools, or would
+   you prefer another structure guide (for example a depth map rendered from the blockout)?
+6. Anything in the contracts (`ASSETS.md`, upcoming `contracts/`) that blocks your preferred
    workflow or tools?
 
 ## 8. Sign-off

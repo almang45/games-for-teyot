@@ -16,7 +16,7 @@ Status: **planning**. No code yet.
 | Devices | Android phone and Android tablet, landscape. Touch only, no stylus. Tablet is the main device. |
 | Language | Bahasa Indonesia for everything she sees and hears. The parent area may mix in English. |
 | Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
-| World | Our real house layout, drawn as a cutaway "dollhouse" view. The character is a stylized version of her. |
+| World | Our real house layout, drawn as an **isometric cutaway diorama** in the style of the sticker-book dollhouses she loves. The character is a stylized version of her. |
 | Distribution | Standalone installable web app, hosted on Cloudflare Workers (static assets). |
 | Team | Claude: architect and core developer. Antigravity: UI/UX designer and prototyper. Papa approves every gate. See [`WORKFLOW.md`](WORKFLOW.md) and [`../AGENTS.md`](../AGENTS.md). |
 
@@ -39,7 +39,9 @@ Status: **planning**. No code yet.
 
 ## 3. World: the house hub
 
-- A side-view cutaway of our house. The front wall is removed so she sees every room at once.
+- An **isometric cutaway diorama** of our house, like her favourite sticker-book dollhouses. The
+  front walls are removed so she sees every room at once. Tapping a room zooms the camera into it,
+  so each room becomes its own little diorama scene.
 - She **taps a room** and her character walks there: through doors, up the stairs. No joystick, no
   free roaming.
 - Her two favourite dolls come along as **companions**. They never talk (only the parents' voices

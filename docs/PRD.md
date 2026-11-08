@@ -92,7 +92,7 @@ analytics.
 |---|---|---|---|
 | `SCR-INSTALL` | "Install this app" help shown when opened in a browser tab instead of the installed app | Parent | M0 |
 | `SCR-BOOT` | Big "Mulai" button. Unlocks audio, then the welcome. | Theia | M0 shell, M1 art |
-| `SCR-HOUSE` | Cutaway house hub: rooms, Theia, Bubu, Ocica, day and night | Theia | M1 |
+| `SCR-HOUSE` | Isometric cutaway house hub: rooms, Theia, Bubu, Ocica, day and night, zoom into rooms | Theia | M1 |
 | `SCR-TRACE` | Tracing activity: Lihat → Ikuti → Titik-titik steps | Theia | M0 spike, M1 |
 | `SCR-COUNT` | Counting activity: variants C1–C4 | Theia | M1 |
 | `SCR-COLOR-PICK` | Choose a coloring page (2–3 big thumbnails) | Theia | M1 |
@@ -204,6 +204,13 @@ feels right before any art is drawn.
 - `npm run reference:check` lists missing reference items against `ASSETS.md` §1.2.
 - `npm run reference:frames` extracts key frames from videos into `reference/frames/`.
 
+**US-REF-02: Isometric house blockout.** As Antigravity, I paint the house over exact geometry so
+every room shares one perspective.
+- `npm run house:blockout` reads the floor plan dimensions (a small JSON: rooms, sizes in metres,
+  storeys, doors, stairs).
+- It writes a 2:1 isometric SVG blockout at 3840 × 2160, plus a draft `layout.json` (walkable
+  polygons, stands, waypoints, focus rects) that matches the SVG exactly.
+
 ### 8.2 M1: First playable
 
 #### House hub
@@ -211,6 +218,9 @@ feels right before any art is drawn.
 - When Theia taps anywhere inside an unlocked room's area, then her character walks there along
   the waypoint path (through doors, up stairs) and the room's activity starts on arrival.
 - A tap on another room while walking re-routes from her current position.
+- On arrival, the camera zooms smoothly into the room (≤ 600 ms) before the activity starts.
+  Leaving zooms back out.
+- She walks *behind* front furniture and railings: depth order is always correct.
 - A tap outside every room does nothing, and Bubu tilts its head.
 - Tap areas are ≥ 72 dp everywhere.
 
@@ -229,8 +239,8 @@ feels right before any art is drawn.
 - The last 2 minutes are dusk, which gives Theia a visual heads-up before bedtime.
 
 **US-HOUSE-05: Phone layout.**
-- On the phone (2400 × 1080), the house is wider than the screen: the camera follows Theia and
-  she can drag to pan.
+- On the phone (2400 × 1080), the hub opens zoomed to Theia's current room. She can drag to pan,
+  and pinch-out shows the whole house.
 - On the tablet the whole house fits on screen.
 - Tap areas never shrink below 72 dp on either device.
 
