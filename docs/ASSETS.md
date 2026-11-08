@@ -35,6 +35,7 @@ reference/
 ├── papa/       front/  side/  full-body/
 ├── bubu/       front/  side/  back/  video/      ← 360° turn video recommended
 ├── ocica/      front/  side/  back/  video/
+├── style/      inspiration images (e.g. the isometric sticker-book dioramas Theia likes)
 ├── rumah/      denah/  <room-id>/                ← room-id matches layout.json, e.g. kamar-theia
 └── frames/     (generated)
 ```
@@ -59,8 +60,20 @@ goes into git or the deployed site.
 
 ## 2. Art direction
 
-- **Look**: flat 2D illustration, soft rounded shapes, thick warm-dark outlines (not pure black),
-  gentle shading at most one tone deep, no gradients on characters.
+- **Look**: an **isometric cutaway diorama**, like the sticker-book dollhouses Theia loves (in
+  `reference/style/`):
+  - Pre-rendered **2D** art drawn in isometric projection, not real-time 3D.
+  - Clean warm-dark outlines (not pure black), flat colors with one soft shade tone, cosy props.
+  - Characters use the same projection and line weight.
+  - The references are **inspiration for the style only**. Never trace or copy their artwork, and
+    never commit them, because they are copyrighted.
+- **Detail budget**: the references are dense with tiny props, but she plays on a phone too:
+  - **Interactive items** (room entrances, the fridge, the bed, activity props) are larger, with
+    higher contrast and saturation.
+  - **Decoration** is lower contrast and lower detail.
+  - Nothing tappable is smaller than 72 dp at phone scale.
+- **Projection**: 2:1 pixel isometric (dimetric, about 26.57° lines). The same angle everywhere
+  (house, props, characters), so pieces from different files fit together.
 - **Mood**: warm, cosy, calm. This is a home, not a theme park. Low saturation for backgrounds,
   higher saturation for things she can interact with, so tappable items stand out.
 - **Character**: chibi proportions (head ≈ 40% of height), large eyes, recognisably *her* (hair,
@@ -86,20 +99,25 @@ Every later character asset must match this sheet.
 
 ### 3.2 Sprite sheet
 
-- Facing **right only**. The game flips the sprite for left.
+- **Two facings**, the minimum for isometric movement:
+  - `fr`: front-right, walking toward the viewer
+  - `br`: back-right, walking away from the viewer
+
+  The game flips each horizontally to get front-left and back-left, which gives all 4 isometric
+  directions. Animations marked *fr only* are drawn just facing front-right.
 - Frame size **256 × 256 px**. Feet on a fixed baseline at y = 240, with her body centred
   horizontally.
 - Transparent background, PNG, premultiplied alpha off.
 
 | Animation key | Frames | FPS | Loop | Notes |
 |---|---|---|---|---|
-| `idle` | 4 | 6 | yes | Subtle breathing or blink |
-| `walk` | 8 | 12 | yes | In-place walk cycle, no horizontal drift |
-| `stairs_up` | 8 | 10 | yes | Side view on stairs |
-| `celebrate` | 6 | 12 | no | Jump with arms up |
-| `point` | 4 | 8 | no | Points forward, ends holding the pose |
-| `think` | 4 | 6 | yes | Hand on chin, used while waiting for her answer |
-| `sleep` | 4 | 4 | yes | In bed. Used by BedtimeScene. |
+| `idle` | 4 | 6 | yes | `fr` + `br`. Subtle breathing or blink. |
+| `walk` | 8 | 12 | yes | `fr` + `br`. In-place walk cycle, no drift. |
+| `stairs` | 8 | 10 | yes | `fr` (down) + `br` (up), climbing along the stair axis |
+| `celebrate` | 6 | 12 | no | *fr only*. Jump with arms up. |
+| `point` | 4 | 8 | no | *fr only*. Points, ends holding the pose. |
+| `think` | 4 | 6 | yes | *fr only*. Hand on chin, used while waiting for her answer. |
+| `sleep` | 4 | 4 | yes | *fr only*. In bed. Used by BedtimeScene. |
 
 **Outfits** (unlockable rewards) are full re-renders of all animations using the same frame
 grid, not overlays. That keeps the art simple and the rendering cheap.
@@ -116,12 +134,12 @@ traits (colour, ear shape, any stitching or accessories).
   - **Ocica**: white, round, wide body
   - Ocica's white needs a warm off-white fill plus the standard outline so she doesn't vanish on
     light walls.
-- Same rules as §3.2: facing right only, transparent PNG. Frame size **160 × 160**, feet on
-  baseline y = 150.
+- Same rules as §3.2: `walk` and `idle` in `fr` + `br`, everything else *fr only*, transparent
+  PNG. Frame size **160 × 160**, feet on baseline y = 150.
 
 | Animation key | Bubu | Ocica | Frames | Loop | Notes |
 |---|---|---|---|---|---|
-| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches her ears, Ocica sways |
+| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches its ears, Ocica sways |
 | `walk` | ✓ hop | ✓ waddle | 8 | yes | In place |
 | `point` | ✓ | — | 4 | no | Paw toward a room or item, holds the pose |
 | `demo` | ✓ | — | 6 | yes | Paw "drawing" motion for the Lihat step |
@@ -166,31 +184,48 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 
 ### 4.1 Images
 
-- Side-view cutaway, front wall removed, our real floor plan, simplified.
-- Design canvas **3840 × 2160 px** (16:9). Export at 50% (1920 × 1080) for the game and keep the
-  source at full size.
+- An **isometric cutaway** of our real house, simplified:
+  - the two back walls and the floor of each room are visible, and the front walls are removed,
+    like a dollhouse
+  - floors are stacked, with stairs between them
+  - a garden or outside around it, following the reference style
+- **Start from a blockout.** Image models drift in perspective from one room to the next. Claude's
+  `npm run house:blockout` turns the floor plan dimensions (`reference/rumah/denah/`, entered as a
+  small JSON) into an isometric **SVG blockout**: floors, walls, stairs, and door openings at the
+  exact projection. Antigravity paints over it (structure guide or img2img), so every room shares
+  one geometry and `layout.json` lines up with the art.
+- Design canvas **3840 × 2400 px** (16:10, matching Theia's Galaxy Tab S10+ and the laptops).
+  Export at 50% (1920 × 1200) for the game and keep the source at full size. Rooms are also exported at **full source resolution**, because the camera
+  zooms into a room on arrival (§4.3).
 - Layers, each a separate PNG at the same canvas size:
   - `house/bg.png`: sky and outside. The game tints it for day and night.
-  - `house/structure.png`: walls, floors, stairs
-  - `house/rooms/<room-id>.png`: furniture for each room
+  - `house/structure.png`: walls, floors, stairs, everything *behind* the characters
+  - `house/rooms/<room-id>.png`: furniture in each room that stands behind the characters
   - `house/rooms/<room-id>_dim.png`: the locked look for each room
-- Every walkable floor is a **flat horizontal line**. Stairs are a single straight diagonal.
+  - `house/occluders/<id>.png`: anything that must be drawn **in front of** a character walking
+    behind it (railings, a sofa back, a front table edge). Each has a sort line in `layout.json`.
+- Walkable areas are **floor polygons** on each storey. Stairs run along one isometric axis.
 
 ### 4.2 `assets/house/layout.json`
 
-Coordinates are in the 1920 × 1080 export space, with the origin at the top left.
+Coordinates are in the 1920 × 1200 export space, with the origin at the top left.
 
 ```jsonc
 {
-  "size": [1920, 1080],
+  "size": [1920, 1200],
   "rooms": [
     {
       "id": "kamar-theia",                 // kebab-case, stable forever
       "activity": "tracing",               // tracing | counting | coloring | reading | words | garden | bedtime
-      "polygon": [[120, 80], [700, 80], [700, 480], [120, 480]],   // tap area
+      "polygon": [[120, 80], [700, 80], [700, 480], [120, 480]],   // tap area (screen space)
+      "walk": [[180, 420], [520, 250], [700, 340], [360, 510]],    // walkable floor polygon (iso diamond)
       "stand": [410, 470],                 // character feet position on arrival
-      "floor": 470                         // y of this room's floor line
+      "storey": 1,                         // 0 = ground floor
+      "focus": [100, 60, 640, 460]         // camera zoom rect for this room (x, y, w, h)
     }
+  ],
+  "occluders": [
+    { "key": "house.occluders.railing-loft", "sortY": 488 }   // drawn in front of characters with feet y < sortY
   ],
   "waypoints": [
     { "id": "door-kamar", "pos": [700, 470] },
@@ -205,7 +240,9 @@ Coordinates are in the 1920 × 1080 export space, with the origin at the top lef
 Rules:
 - Room ids and waypoint ids together are unique.
 - Every room is reachable from `start`.
-- Every edge between waypoints is either horizontal (on a floor) or the stair diagonal.
+- Every waypoint lies inside a walkable polygon, or on a stair.
+- Every edge stays inside one storey's walkable area, or runs along a stair.
+- Every room's `stand` lies inside its `walk` polygon.
 
 The `tools/assets` validator checks all of these.
 
@@ -213,12 +250,15 @@ The `tools/assets` validator checks all of these.
 
 | Asset | Path | Spec |
 |---|---|---|
-| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1080, centre safe area 1080 × 900 kept plain |
+| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1200, centre safe area 1080 × 1000 kept plain |
 | Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
 | Countable objects | `counting/objects/<id>.png` | 192 × 192, clear silhouette, each readable at 96 px. Ids: `apel`, `telur`, `kue`, `bola`, `ikan`, `bunga`… |
 | Containers | `counting/containers/<id>.png` | Bowl, plate, basket, 512 × 384, with the drop zone marked in `counting/containers.json` |
 | Stickers | `rewards/stickers/<item-id>.png` | 256 × 256, one per learnable item, no letters baked in (the game overlays the glyph) |
 | Coloring pages | `coloring/<id>.png` | See §6 |
+| Tidy-up toys | `tidy/toys/<id>.png` | 192 × 192, same rules as countable objects |
+| Toy box | `tidy/toybox.png` | 512 × 384, drop zone marked in `tidy/toybox.json` |
+| Mess overlays | `house/mess/<room-id>.png` | Same canvas as the house layers. Drawn on top of the room while it's messy. |
 | UI | `ui/*.png` | Back (home) button, parent-gate corner icon, color swatches frame. All ≥ 144 × 144 px source. |
 | App icons | `icons/` | 512 × 512 maskable plus 192 × 192, safe zone respected |
 
@@ -226,9 +266,9 @@ The `tools/assets` validator checks all of these.
 
 Pages use **raster line art with runtime flood fill**, so AI-generated art works as is:
 
-- 1920 × 1080 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
+- 1920 × 1200 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
   grey in large patches**. Light anti-aliasing on the line edges is fine.
-- Lines **≥ 6 px** thick at 1920 × 1080.
+- Lines **≥ 6 px** thick at 1920 × 1200.
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
   pass when the page loads, so bigger gaps leak.
 - Regions **≥ 40 × 40 px**. Smaller details are just drawn lines, not fillable areas.

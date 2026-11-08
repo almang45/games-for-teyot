@@ -13,10 +13,10 @@ Status: **planning**. No code yet.
 | Item | Decision |
 |---|---|
 | Player | Our daughter, 3 years old. Already knows numbers and some letters. Cannot read instructions. |
-| Devices | Android phone and Android tablet, landscape. Touch only, no stylus. Tablet is the main device. |
+| Devices | Android tablet (**main device**) and Android phone, landscape, touch only, no stylus. **Secondary**: MacBook and Windows laptop, **no touchscreen** (mouse or trackpad). Tracing practice only counts on touch devices. |
 | Language | Bahasa Indonesia for everything she sees and hears. The parent area may mix in English. |
 | Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
-| World | Our real house layout, drawn as a cutaway "dollhouse" view. The character is a stylized version of her. |
+| World | Our real house layout, drawn as an **isometric cutaway diorama** in the style of the sticker-book dollhouses she loves. The character is a stylized version of her. |
 | Distribution | Standalone installable web app, hosted on Cloudflare Workers (static assets). |
 | Team | Claude: architect and core developer. Antigravity: UI/UX designer and prototyper. Papa approves every gate. See [`WORKFLOW.md`](WORKFLOW.md) and [`../AGENTS.md`](../AGENTS.md). |
 
@@ -39,7 +39,9 @@ Status: **planning**. No code yet.
 
 ## 3. World: the house hub
 
-- A side-view cutaway of our house. The front wall is removed so she sees every room at once.
+- An **isometric cutaway diorama** of our house, like her favourite sticker-book dollhouses. The
+  front walls are removed so she sees every room at once. Tapping a room zooms the camera into it,
+  so each room becomes its own little diorama scene.
 - She **taps a room** and her character walks there: through doors, up the stairs. No joystick, no
   free roaming.
 - Her two favourite dolls come along as **companions**. They never talk (only the parents' voices
@@ -47,7 +49,7 @@ Status: **planning**. No code yet.
 
   | Companion | Looks | Personality and job |
   |---|---|---|
-  | **Bubu** | Pink, slim bunny | Quick and curious. Hops ahead and **points** at rooms with something new or due for review. Demonstrates a new activity first, for example drawing the "Lihat" stroke with her paw. |
+  | **Bubu** | Pink, slim bunny | Quick and curious. Hops ahead and **points** at rooms with something new or due for review. Demonstrates a new activity first, for example drawing the "Lihat" stroke with its paw. |
   | **Ocica** | White, fat bunny | Calm and cuddly. Waddles behind and **comforts** her after a miss with a hug and a soft "coba lagi". Cheers at successes and sleeps next to her in the bedtime ending. |
 
   - The two parts are deliberate. Bubu draws her toward what's next, Ocica makes a mistake feel
@@ -84,6 +86,7 @@ naturally happen in real life.
 | Letter and name recognition | Living room bookshelf | Picture book that "reads aloud" |
 | Syllables and words (M3) | Dining table | Shopping list, labels on jars |
 | Shapes, colors, memory game (M4) | Garden / terrace | Flowers, butterflies, stepping stones |
+| Tidy-up breaks ("Beberes") | Wherever Bubu and Ocica made a mess | Tidy the toys (M1). Make the bed, wipe spilled water, pair the shoes, sort the toys (M2). |
 | Session end | Her bedroom | Character goes to sleep |
 
 ## 4. Curriculum
@@ -187,7 +190,18 @@ Notes:
 - **Data**: export and import progress as JSON (backup against Android clearing browser storage).
   Reset progress.
 
-## 7. Android usage tips (parent-facing, goes in the README later)
+## 7. Device usage tips (parent-facing, goes in the README later)
+
+Laptops (MacBook, Windows):
+- Install it as an app so it opens fullscreen without browser tabs:
+  - Chrome or Edge: the install icon in the address bar.
+  - Safari on macOS 14+: File → Add to Dock. On a Mac, play **only** from the Dock app or from
+    Chrome. In a plain Safari tab, Safari deletes stored data after 7 days without a visit, and
+    progress would disappear.
+- There is no App pinning. Use the installed app fullscreen, and optionally a separate macOS or
+  Windows user account for her.
+
+Android:
 
 - Install from Chrome → "Add to Home screen". It opens fullscreen in landscape.
 - Turn on **App pinning** (Settings → Security → App pinning) so she cannot leave the game.
@@ -210,7 +224,8 @@ a playtest with her. Her reaction decides what changes next, not this document.
 - House hub with tap-to-walk between 3 rooms
 - Tracing T0 + T1 (pre-writing strokes and digits 0–9)
 - Counting C1–C4 for 1–5
-- Tap-to-fill coloring with 5 pages
+- Tap-to-fill coloring with 5 pages (Bubu, Ocica, a dinosaur, a flower, a cat)
+- One tidy-up break: tidy the toys
 - Recorded voice clips for everything above
 - Session timer with day-to-night fade and bedtime ending
 - Progress saved on the device, plus JSON export
@@ -219,6 +234,7 @@ a playtest with her. Her reaction decides what changes next, not this document.
 ### M2: Letters
 - Tracing T2–T4 (lowercase, then uppercase, her name first)
 - Letter recognition and sounds R1–R3
+- More tidy-up breaks: make the bed, wipe spilled water, pair the shoes, sort the toys
 - Stickers, outfits, Bubu and Ocica's full animation set
 - Parent dashboard with stroke replays
 - Spaced-repetition review
@@ -268,13 +284,18 @@ The game uses her likeness, our house layout, and our voices.
 | Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Antigravity | M0 end |
 | Photos of Mama and Papa for their reference sheet. They stay in `reference/` and are never committed. | Parents → Antigravity | M0 end |
 | Where Mama and Papa stand in the house hub | Parents | M2 |
-| Sound effects (Bubu and Ocica sounds, UI, music): who sources them. Default proposal: Claude curates CC0 sounds with a license log, Antigravity approves the fit. | Parents | M1 |
-| What the voice lines call her: "Cici", "Theia", or "Cici Theia" (the examples use "Cici") | Parents | M1 audio session |
 
 Decided (2026-11-07):
 - Companions are her two dolls, **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny).
 - Tracing is **lowercase-first**.
 - The parents are **Mama** and **Papa**, and Mama is the default narrator.
 - The game's name is **Rumah Cici Theia**.
+- (2026-11-09, PR #2 review) The voice lines call her **"Theia"**.
+  - Devices: Galaxy Tab S10+ (primary), Pixel 6, Galaxy A52s, MacBook M4, Lenovo 14".
+  - Domain: `rct.amns.my.id`.
+  - Sound effects: CC0, curated by Claude.
+  - Cooldown can be turned off by a parent.
+  - Progress stays per device.
+  - Tidy-up breaks added.
 - Mama and Papa get **their own characters**: portraits from M1, full house sprites in
   M2.

@@ -126,6 +126,10 @@ Glyphs are **centerline strokes**, not font outlines. Each one is hand-authored 
 | **Score** | Steps 3–4 | She draws freely, and the finished stroke is scored as in §4.3 |
 
 Input handling:
+- `pointerType === 'pen'` (the Tab S10+ S Pen) is handled exactly like touch.
+- `pointerType === 'mouse'` (laptops without touchscreens) forces Follow mode with the widest
+  corridor. The attempt is stored as practice and skipped by the scheduler's box updates
+  (PRD US-LAPTOP-02).
 - Pointer Events. Only the **first** active `pointerId` counts, so extra fingers and palms are
   ignored.
 - `touch-action: none` on the canvas.
@@ -184,11 +188,21 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   - a standing spot for each room
   - waypoints (doors, stair top and bottom) with edges
 - BFS over the waypoint graph (a few dozen nodes, so A* is unnecessary). The character tweens along
-  the polyline at constant speed, uses the walk animation, and flips horizontally for direction.
+  the polyline at constant speed.
+- **Isometric facing**: each segment's screen direction picks `fr` or `br` (toward or away from
+  the viewer) plus a horizontal flip, which gives 4 directions from 2 drawn facings.
+- **Depth sorting**: characters and props sort by feet y. `occluders` from `layout.json` are drawn
+  above any character whose feet are above their `sortY`, so Theia walks *behind* railings and
+  sofas correctly.
 - Tapping a room while walking **retargets** the path from the current position.
 - Arriving at the room plays the room greeting voice clip, then starts the activity scene.
-- Phone: the house is wider than the screen, so the camera follows the character and allows a
-  drag-to-pan with inertia. Tablet: the whole house fits on screen.
+- **Camera**:
+  - **Overview**: the whole diorama. Default on the tablet.
+  - **On arrival**: a smooth zoom (about 600 ms) into the room's `focus` rect. The room fills the
+    screen like one of the sticker-book scenes, then the activity starts.
+  - **Leaving**: zooms back out.
+  - **Phone**: the overview opens zoomed to the current room. Drag to pan with inertia,
+    pinch-out shows the whole house.
 
 ## 7. Audio engine
 
@@ -224,6 +238,7 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 {
   "name": "rumah-cici-theia",
   "compatibility_date": "2026-11-01",
+  "routes": [{ "pattern": "rct.amns.my.id", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
@@ -238,7 +253,8 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   `Permissions-Policy` that denies camera, mic, and geolocation.
 
 ### 8.3 Cloudflare Access
-- An Access application covers the whole hostname. The policy allows the family Google accounts.
+- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's
+  `workers.dev` preview URLs. The policy allows the family Google accounts.
   Session duration: 1 month.
 - Offline and on expired sessions, the service worker serves the cached shell, so she can always
   play. An update fetch that gets an Access redirect counts as "no update". The service worker
@@ -262,7 +278,7 @@ lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-
 | Stage | Contents |
 |---|---|
 | lint | `tsc --noEmit`, ESLint, Prettier check |
-| test | Vitest with coverage. Playwright smoke run on tablet and phone viewports. |
+| test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
 | build | `vite build`. Fails if the size budget (§10) is exceeded. |
 | validate-assets | `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
 | SAST | CodeQL (javascript-typescript), `osv-scanner` on the lockfile |
@@ -311,6 +327,7 @@ interface StrokeAttempt {          // kept for the newest 20 per item, for repla
   strokeIndex: number;
   points: Array<[x: number, y: number, t: number]>;
   verdict: 'pass' | 'fail';
+  input: 'touch' | 'mouse';        // mouse attempts are practice-only: never change ItemProgress.box
   corridor: number;
   ts: string;
 }

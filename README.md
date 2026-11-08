@@ -17,6 +17,8 @@ Status: **planning**.
 
 | Doc | Contents |
 |---|---|
+| [docs/PRD.md](docs/PRD.md) | Requirements: goals, personas, success metrics, screen inventory, flows, user stories + acceptance criteria (M0, M1), NFRs |
+| [docs/handoff/](docs/handoff/) | Handoff docs per milestone (M1 design brief first) |
 | [docs/PLAN.md](docs/PLAN.md) | Product plan: design principles, house hub, curriculum, rewards, parent area, roadmap, risks |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, repo layout, tracing engine, scheduler, nav, audio, offline/hosting/auth, CI/CD |
 | [docs/ASSETS.md](docs/ASSETS.md) | Asset contract for the art agent: style, sprite specs, house layout schema, coloring pages |
