@@ -13,7 +13,7 @@ Papa and Mama's recorded voices guide her through everything.
 - Runs on Android phone and tablet, landscape, touch only, and works offline.
 - Hosted on Cloudflare Workers (static assets) behind Cloudflare Access.
 
-Status: **planning**.
+Status: **M0, Phase 1**: app shell, CI/CD, and placeholders.
 
 | Doc | Contents |
 |---|---|
@@ -25,3 +25,36 @@ Status: **planning**.
 | [docs/AUDIO.md](docs/AUDIO.md) | Voice recording guide and processing pipeline |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | 5-phase delivery workflow per milestone: PRD → design → integration → testing → review, with gates and handoffs |
 | [AGENTS.md](AGENTS.md) | Day-to-day rules for Claude (architect/core dev) and Antigravity (UI/UX designer/prototyper) |
+
+## Development
+
+Requires Node 26 (see `.nvmrc`).
+
+```sh
+npm ci
+npm run dev          # http://localhost:5173/?browser=1 skips SCR-INSTALL in a plain tab
+npm run check        # typecheck + lint + unit tests with coverage
+npm run build        # production build + size budget + privacy check
+npx playwright install chromium webkit   # once
+npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKit
+```
+
+| Path | Contents |
+|---|---|
+| `src/` | Game shell: Phaser scenes, engine modules, structured log, placeholders |
+| `content/` | Indonesian copy and curriculum data |
+| `tools/build/` | Placeholder icons, `_headers` parsing, budget and privacy checks |
+| `tests/unit/`, `tests/e2e/` | Vitest and Playwright. E2E tests are named after PRD story IDs. |
+| `public/` | `_headers` (CSP, caching), `robots.txt` |
+| `.github/workflows/ci.yml` | lint → test + e2e → build → CodeQL + osv-scanner → SonarQube Cloud → deploy |
+
+### CI secrets
+
+| Secret | Used by |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Deploy jobs. Scope: *Workers Scripts: Edit* on one account. |
+| `CLOUDFLARE_ACCOUNT_ID` | Deploy jobs |
+| `SONAR_TOKEN` | Quality gate (skipped with a warning until set) |
+
+Deploys: each PR uploads a preview version (`pr-<n>` alias on `workers.dev`); `master` deploys to
+`rct.amns.my.id`. Roll back with `npx wrangler rollback <version-id>`.

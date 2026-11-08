@@ -1,0 +1,34 @@
+import * as Phaser from 'phaser';
+import { BootScene } from '../scenes/BootScene';
+import { HouseScene } from '../scenes/HouseScene';
+import { provideServices, type GameServices } from './services';
+
+/** Design frame (PRD NFR-COMPAT-01): 16:10, matching the Tab S10+ and both laptops. */
+export const DESIGN_WIDTH = 1920;
+export const DESIGN_HEIGHT = 1200;
+
+export function createGame(parent: HTMLElement, services: GameServices): Phaser.Game {
+  return new Phaser.Game({
+    type: Phaser.AUTO,
+    parent,
+    backgroundColor: '#fff4e6',
+    banner: false,
+    // EXPAND keeps the whole 1920×1200 frame visible and adds side area on wider screens (phones).
+    scale: {
+      mode: Phaser.Scale.EXPAND,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+      width: DESIGN_WIDTH,
+      height: DESIGN_HEIGHT,
+    },
+    audio: { context: services.audio },
+    input: { activePointers: 3 },
+    render: { antialias: true, powerPreference: 'high-performance' },
+    scene: [BootScene, HouseScene],
+    callbacks: {
+      // Before boot, so every scene's create() can rely on the services being present.
+      preBoot: (game) => {
+        provideServices(game, services);
+      },
+    },
+  });
+}

@@ -1,0 +1,6 @@
+# Accepted findings. Each entry needs a reason and an expiry so it gets re-reviewed.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-02-09
+reason = "deepmerge <=4.3.1 (latest; no fixed release). Build-time only, via vite-plugin-pwa → workbox-build, merging our own trusted config. Never shipped to the client."
