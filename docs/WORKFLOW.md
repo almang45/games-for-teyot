@@ -138,7 +138,7 @@ Rules for `ui/` components, enforced by lint and reviewed by Claude for code qua
      progress display, parent-gate keypad
    - a component gallery in `prototype/`
 5. **Screen designs**: a mockup for every screen in the milestone, in every state, at tablet
-   (1920 × 1080) and phone (2400 × 1080) sizes. Exported to `design/mockups/<screen-id>/`.
+   (1920 × 1200, 16:10, also used by the laptops) and phone (2400 × 1080) sizes. Exported to `design/mockups/<screen-id>/`.
 6. **Motion spec**: `motion.json` plus short reference videos or GIFs for the key moments (walk
    start and stop, stroke snap, celebration, Ocica comfort, day-to-night fade).
 7. **Clickable prototype** (`prototype/`): runs with `npm run proto`. Covers the milestone's main

@@ -86,6 +86,7 @@ naturally happen in real life.
 | Letter and name recognition | Living room bookshelf | Picture book that "reads aloud" |
 | Syllables and words (M3) | Dining table | Shopping list, labels on jars |
 | Shapes, colors, memory game (M4) | Garden / terrace | Flowers, butterflies, stepping stones |
+| Tidy-up breaks ("Beberes") | Wherever Bubu and Ocica made a mess | Tidy the toys (M1). Make the bed, wipe spilled water, pair the shoes, sort the toys (M2). |
 | Session end | Her bedroom | Character goes to sleep |
 
 ## 4. Curriculum
@@ -223,7 +224,8 @@ a playtest with her. Her reaction decides what changes next, not this document.
 - House hub with tap-to-walk between 3 rooms
 - Tracing T0 + T1 (pre-writing strokes and digits 0–9)
 - Counting C1–C4 for 1–5
-- Tap-to-fill coloring with 5 pages
+- Tap-to-fill coloring with 5 pages (Bubu, Ocica, a dinosaur, a flower, a cat)
+- One tidy-up break: tidy the toys
 - Recorded voice clips for everything above
 - Session timer with day-to-night fade and bedtime ending
 - Progress saved on the device, plus JSON export
@@ -232,6 +234,7 @@ a playtest with her. Her reaction decides what changes next, not this document.
 ### M2: Letters
 - Tracing T2–T4 (lowercase, then uppercase, her name first)
 - Letter recognition and sounds R1–R3
+- More tidy-up breaks: make the bed, wipe spilled water, pair the shoes, sort the toys
 - Stickers, outfits, Bubu and Ocica's full animation set
 - Parent dashboard with stroke replays
 - Spaced-repetition review
@@ -281,13 +284,18 @@ The game uses her likeness, our house layout, and our voices.
 | Photos of Bubu and Ocica (the real dolls) for the companion reference sheet | Parents → Antigravity | M0 end |
 | Photos of Mama and Papa for their reference sheet. They stay in `reference/` and are never committed. | Parents → Antigravity | M0 end |
 | Where Mama and Papa stand in the house hub | Parents | M2 |
-| Sound effects (Bubu and Ocica sounds, UI, music): who sources them. Default proposal: Claude curates CC0 sounds with a license log, Antigravity approves the fit. | Parents | M1 |
-| What the voice lines call her: "Cici", "Theia", or "Cici Theia" (the examples use "Cici") | Parents | M1 audio session |
 
 Decided (2026-11-07):
 - Companions are her two dolls, **Bubu** (pink, slim bunny) and **Ocica** (white, fat bunny).
 - Tracing is **lowercase-first**.
 - The parents are **Mama** and **Papa**, and Mama is the default narrator.
 - The game's name is **Rumah Cici Theia**.
+- (2026-11-09, PR #2 review) The voice lines call her **"Theia"**.
+  - Devices: Galaxy Tab S10+ (primary), Pixel 6, Galaxy A52s, MacBook M4, Lenovo 14".
+  - Domain: `rct.amns.my.id`.
+  - Sound effects: CC0, curated by Claude.
+  - Cooldown can be turned off by a parent.
+  - Progress stays per device.
+  - Tidy-up breaks added.
 - Mama and Papa get **their own characters**: portraits from M1, full house sprites in
   M2.

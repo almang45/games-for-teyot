@@ -126,6 +126,7 @@ Glyphs are **centerline strokes**, not font outlines. Each one is hand-authored 
 | **Score** | Steps 3–4 | She draws freely, and the finished stroke is scored as in §4.3 |
 
 Input handling:
+- `pointerType === 'pen'` (the Tab S10+ S Pen) is handled exactly like touch.
 - `pointerType === 'mouse'` (laptops without touchscreens) forces Follow mode with the widest
   corridor. The attempt is stored as practice and skipped by the scheduler's box updates
   (PRD US-LAPTOP-02).
@@ -237,6 +238,7 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 {
   "name": "rumah-cici-theia",
   "compatibility_date": "2026-11-01",
+  "routes": [{ "pattern": "rct.amns.my.id", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
@@ -251,7 +253,8 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   `Permissions-Policy` that denies camera, mic, and geolocation.
 
 ### 8.3 Cloudflare Access
-- An Access application covers the whole hostname. The policy allows the family Google accounts.
+- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's
+  `workers.dev` preview URLs. The policy allows the family Google accounts.
   Session duration: 1 month.
 - Offline and on expired sessions, the service worker serves the cached shell, so she can always
   play. An update fetch that gets an Access redirect counts as "no update". The service worker

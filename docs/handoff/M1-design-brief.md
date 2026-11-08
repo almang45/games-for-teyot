@@ -5,7 +5,7 @@
 | From → To | Claude → Antigravity |
 | Gate | 1 (end of Phase 1). Starts Phase 2 for M1. |
 | Inputs | [`../PRD.md`](../PRD.md) §6–§9, [`../ASSETS.md`](../ASSETS.md), [`../WORKFLOW.md`](../WORKFLOW.md) §3–§4, `reference/` (local symlink to the family's Google Drive folder) |
-| Devices | **Tablet** 1920 × 1080 design space (primary). **Phone** 2400 × 1080 (wider: the house view pans, activity screens get extra side margins). **Laptop** 16:10, e.g. 1920 × 1200 / MacBook (taller: the 16:9 area stays centred, extra height is decoration), mouse/trackpad, no touch. Landscape only. |
+| Devices | **Design frame 1920 × 1200 (16:10)**, matching Theia's **Samsung Galaxy Tab S10+** (primary, 2800 × 1752) and both laptops (MacBook M4, Lenovo 14", mouse/trackpad, no touch). **Phones** (Pixel 6, Galaxy A52s, 2400 × 1080, 20:9): the whole frame is scaled to the screen height, and the extra width on each side is decoration only. The house view opens zoomed to a room. Landscape only. |
 
 This brief says **what** each screen must achieve and what it contains. **How it looks** is
 Antigravity's call, within the art direction in `ASSETS.md` §2 and the design rules in `PLAN.md` §2.
@@ -18,8 +18,9 @@ Antigravity's call, within the art direction in `ASSETS.md` §2 and the design r
   Every instruction is a voice clip plus a visual cue.
 - **Touch targets**: ≥ 72 dp, and ≥ 96 dp for primary actions. On the phone, nothing interactive
   sits within 48 px of the left or right edge, to stay clear of gesture navigation.
-- **Safe areas**: activity content stays inside a centred 1600 × 900 area on the tablet. On the
-  phone, the same area is centred, and the extra width is decoration only.
+- **Safe areas**: interactive content stays inside a centred 1760 × 1080 area of the 1920 × 1200
+  frame. Every device always shows the whole frame. Wider screens (phones, 16:9 laptops) add
+  decoration at the sides and never crop.
 - **Fixed HUD positions**, the same on every activity screen:
   - `HUD-HOME`: bottom left
   - `HUD-SPEAKER`: top left
@@ -145,8 +146,25 @@ review them in GitHub.
   - the "oops" undo button (≥ 96 dp)
   - a "done" moment when ≥ 80% of the page is filled
 - **Swatch colors** are tokens. Fill colors must look good on white and cover the full lines.
-- **M1 pages (5)**: proposed `ayam`, `bola`, `ikan`, `kucing`, `susu`, to be confirmed by the
-  parents (PRD §13 Q7). Each has 6–15 regions.
+- **M1 pages (5)**, her favourites: `bubu` (the pink bunny doll), `ocica` (the white bunny doll),
+  `dinosaurus`, `bunga`, `kucing`. Each has 6–15 regions. Bubu and Ocica pages must match the
+  family sheet.
+
+### `SCR-TIDY`: tidy-up break ("Beberes"), M1 variant: tidy the toys
+- **Purpose**: a ~1-minute playful break between learning rounds (PRD US-TIDY-01/02).
+- **In the hub**: a "mess moment". Bubu and Ocica knock over the toy basket with a funny animation,
+  toys scatter, and the room sparkles. Design the messy look of the room as an overlay layer on top
+  of the normal room.
+- **Elements**:
+  - the living room floor, zoomed in
+  - 5–8 toys: `bola`, `balok`, `mobil`, `boneka`, `dinosaurus`, … Each ≥ 96 dp, with clear
+    silhouettes.
+  - the toy box (drop zone marked)
+  - Bubu and Ocica looking sheepish, then apologising with a hug
+- **States**: toy `idle`, `dragging` (lifted, with a shadow), `in-box` (pops in with a bounce),
+  `returning` (slides back); box `idle`, `receiving`, `full`; room `messy` → `tidy`.
+- **Tone**: funny and warm. Never messy-as-in-dirty or guilt-inducing.
+- **M2 preview** (no art needed yet): messy bed, spilled water puddle plus a cloth, scattered shoes.
 
 ### `SCR-BEDTIME`: ending
 - **Purpose**: a warm, final ending that she accepts.
@@ -199,6 +217,8 @@ review them in GitHub.
 | Stroke miss | The ink fades out in about 400 ms. Ocica `comfort`. The demo replays. |
 | Count tap | Object bounce 120 ms + highlight. The number pops briefly above it. |
 | Bowl drop / hop out | Drop squash 150 ms. The extra object arcs back to its slot in 500 ms. |
+| Mess moment | Basket tips, toys scatter in ≤ 1 s with a bounce. Bubu and Ocica freeze in an "oops" pose. |
+| Toy into box | Arc into the box, ≤ 300 ms, with a small pop. A missed drop slides back in 400 ms. |
 | Fill | A radial reveal from the tap point, ≤ 200 ms. |
 | Celebration | ≤ 1.5 s. All three characters jump in a staggered sequence. |
 | Day → dusk | Continuous blend over the session. Dusk is clearly visible in the last 2 minutes. |
@@ -245,6 +265,7 @@ The keys follow `ASSETS.md`. Until the real art lands, the placeholders use the 
 | `coloring.<id>` × 5 | Line-art pages | §6 |
 | `ui.*` | HUD icons, hold ring, swatch frame, keypad, tiles, laptop cursor (normal + pressed) | §5 |
 | `bedtime.*` | Bedroom at night, bed, moon and stars | — |
+| `tidy.toys.<id>` × 5–8, `tidy.toybox`, `house.mess.<room-id>` | Toys, toy box with drop zone, messy-room overlay for the living room | §5 |
 | `icons.app` | 512 maskable + 192 | §5 |
 
 ## 7. Questions for Antigravity

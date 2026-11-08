@@ -18,7 +18,7 @@ everything**, and Papa recording the **praise** and **greeting** sections.
 
 Bubu and Ocica don't speak. They use short sound effects (boing, squeak, giggle, snore), which are
 handled with the game sounds, not recorded here. Instruction lines may mention them by name: "Lihat
-Bubu dulu ya", "Ocica peluk Cici".
+Bubu dulu ya", "Ocica peluk Theia".
 
 ## 2. What to record
 
@@ -27,10 +27,10 @@ The script is **generated from the game content** by `npm run audio:script` and 
 
 ```
 key,section,text,note
-greet.welcome,01-sistem,"Halo Cici Theia! Ayo main!",ceria
+greet.welcome,01-sistem,"Halo Theia! Ayo main!",ceria
 room.dapur.enter,02-ruangan,"Kita di dapur. Ayo berhitung!",
 instr.tracing.watch,03-menulis,"Lihat Bubu dulu ya.",pelan
-instr.tracing.follow,03-menulis,"Sekarang Cici ikuti bolanya.",
+instr.tracing.follow,03-menulis,"Sekarang Theia ikuti bolanya.",
 stroke.vertical,03-menulis,"Garis tegak. Seperti hujan turun.",
 num.4,04-angka,"Empat.",datar — dipakai saat menghitung
 count.howmany,05-hitung,"Berapa semuanya?",nada bertanya
@@ -39,7 +39,7 @@ obj.telur,05-hitung,"telur",
 color.merah,06-warna,"Merah!",
 praise.01,07-pujian,"Hebat!",
 hint.tryagain.01,08-bantuan,"Hampir! Coba lagi ya.",lembut
-bedtime.01,09-tidur,"Sudah malam. Waktunya bobo. Sampai besok, Cici!",pelan, berbisik
+bedtime.01,09-tidur,"Sudah malam. Waktunya bobo. Sampai besok, Theia!",pelan, berbisik
 ```
 
 M1 is about **110 clips per voice**:

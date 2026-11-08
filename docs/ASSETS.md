@@ -194,8 +194,8 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   small JSON) into an isometric **SVG blockout**: floors, walls, stairs, and door openings at the
   exact projection. Antigravity paints over it (structure guide or img2img), so every room shares
   one geometry and `layout.json` lines up with the art.
-- Design canvas **3840 × 2160 px** (16:9). Export at 50% (1920 × 1080) for the game and keep the
-  source at full size. Rooms are also exported at **full source resolution**, because the camera
+- Design canvas **3840 × 2400 px** (16:10, matching Theia's Galaxy Tab S10+ and the laptops).
+  Export at 50% (1920 × 1200) for the game and keep the source at full size. Rooms are also exported at **full source resolution**, because the camera
   zooms into a room on arrival (§4.3).
 - Layers, each a separate PNG at the same canvas size:
   - `house/bg.png`: sky and outside. The game tints it for day and night.
@@ -208,11 +208,11 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 
 ### 4.2 `assets/house/layout.json`
 
-Coordinates are in the 1920 × 1080 export space, with the origin at the top left.
+Coordinates are in the 1920 × 1200 export space, with the origin at the top left.
 
 ```jsonc
 {
-  "size": [1920, 1080],
+  "size": [1920, 1200],
   "rooms": [
     {
       "id": "kamar-theia",                 // kebab-case, stable forever
@@ -250,12 +250,15 @@ The `tools/assets` validator checks all of these.
 
 | Asset | Path | Spec |
 |---|---|---|
-| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1080, centre safe area 1080 × 900 kept plain |
+| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1200, centre safe area 1080 × 1000 kept plain |
 | Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
 | Countable objects | `counting/objects/<id>.png` | 192 × 192, clear silhouette, each readable at 96 px. Ids: `apel`, `telur`, `kue`, `bola`, `ikan`, `bunga`… |
 | Containers | `counting/containers/<id>.png` | Bowl, plate, basket, 512 × 384, with the drop zone marked in `counting/containers.json` |
 | Stickers | `rewards/stickers/<item-id>.png` | 256 × 256, one per learnable item, no letters baked in (the game overlays the glyph) |
 | Coloring pages | `coloring/<id>.png` | See §6 |
+| Tidy-up toys | `tidy/toys/<id>.png` | 192 × 192, same rules as countable objects |
+| Toy box | `tidy/toybox.png` | 512 × 384, drop zone marked in `tidy/toybox.json` |
+| Mess overlays | `house/mess/<room-id>.png` | Same canvas as the house layers. Drawn on top of the room while it's messy. |
 | UI | `ui/*.png` | Back (home) button, parent-gate corner icon, color swatches frame. All ≥ 144 × 144 px source. |
 | App icons | `icons/` | 512 × 512 maskable plus 192 × 192, safe zone respected |
 
@@ -263,9 +266,9 @@ The `tools/assets` validator checks all of these.
 
 Pages use **raster line art with runtime flood fill**, so AI-generated art works as is:
 
-- 1920 × 1080 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
+- 1920 × 1200 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
   grey in large patches**. Light anti-aliasing on the line edges is fine.
-- Lines **≥ 6 px** thick at 1920 × 1080.
+- Lines **≥ 6 px** thick at 1920 × 1200.
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
   pass when the page loads, so bigger gaps leak.
 - Regions **≥ 40 × 40 px**. Smaller details are just drawn lines, not fillable areas.

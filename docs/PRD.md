@@ -81,8 +81,8 @@ analytics.
 | Milestone | Scope | Detail in |
 |---|---|---|
 | **M0 Foundations** | Repo, CI/CD, Cloudflare Workers + Access, installable offline shell, audio unlock, placeholder renderer, contracts v1, **tracing spike on the tablet**, reference tooling | §8.1 |
-| **M1 First playable** | House hub with 3 rooms. Tap-to-walk. Bubu and Ocica follow. Tracing T0 (pre-writing strokes) and T1 (digits 0–9). Counting C1–C4 for 1–5. Tap-to-fill coloring with 5 pages. Speaker portraits. Voice clips. Session timer and bedtime. Basic parent area. Storage and export. | §8.2 |
-| M2 Letters | Lowercase then uppercase tracing (Theia's letters first), letter recognition and sounds, stickers, outfits, full parent dashboard, spaced repetition | `docs/prd/M2.md` (later) |
+| **M1 First playable** | House hub with 3 rooms. Tap-to-walk. Bubu and Ocica follow. Tracing T0 (pre-writing strokes) and T1 (digits 0–9). Counting C1–C4 for 1–5. Tap-to-fill coloring with 5 pages. **One tidy-up break: tidy the toys.** Speaker portraits. Voice clips. Session timer and bedtime. Basic parent area. Storage and export. | §8.2 |
+| M2 Letters | Lowercase then uppercase tracing (Theia's letters first), letter recognition and sounds, stickers, outfits, full parent dashboard, spaced repetition, **more tidy-up breaks** (make the bed, wipe spilled water, pair the shoes) | `docs/prd/M2.md` (later) |
 | M3 Reading | Syllables and words, counting to 10 and adding, remaining rooms, Mama and Papa full-body sprites | `docs/prd/M3.md` (later) |
 | M4 Extras | Garden (shapes, colors, memory), brush coloring, printable worksheets, optional sync | `docs/prd/M4.md` (later) |
 
@@ -97,6 +97,7 @@ analytics.
 | `SCR-COUNT` | Counting activity: variants C1–C4 | Theia | M1 |
 | `SCR-COLOR-PICK` | Choose a coloring page (2–3 big thumbnails) | Theia | M1 |
 | `SCR-COLOR` | Tap-to-fill coloring | Theia | M1 |
+| `SCR-TIDY` | Tidy-up break ("Beberes"). M1 has one variant: tidy the toys. | Theia | M1 (toys), M2 (more) |
 | `SCR-BEDTIME` | Session-end ending: Theia, Bubu, and Ocica go to sleep | Theia | M1 |
 | `HUD-HOME` | Hold-to-go-home button, shown in every activity | Theia | M1 |
 | `HUD-SPEAKER` | Speaker portrait (Mama or Papa) with a talking mouth while a clip plays | Theia | M1 |
@@ -133,6 +134,10 @@ flowchart TD
   C --> A
   A -- 2–4 min or rounds done --> H
   A -- hold HUD-HOME 1 s --> H
+  H -- after every 2 activity rounds --> M[Bubu & Ocica make a playful mess in a room · sparkle]
+  M -- tap that room --> T[SCR-TIDY break]
+  T -- tidy done --> H
+  M -- ignore it --> H
   H -- session timer near end --> D[House fades to dusk]
   D -- timer ends, after current round --> B[SCR-BEDTIME]
 ```
@@ -187,7 +192,10 @@ play without internet.
 - The build output contains no file from `reference/` or `recordings/`. CI checks this.
 
 **US-DEP-01: Private deployment and rollback.**
-- The production URL and every preview URL require a family Google account (Cloudflare Access).
+- Production runs at **`rct.amns.my.id`**, a Workers custom domain in the `amns.my.id` Cloudflare
+  zone.
+- Production and every preview URL (`*.workers.dev`) require a family Google account (Cloudflare
+  Access).
 - `wrangler rollback` restores the previous version. The installed app runs it after its next cold
   start, and existing progress still loads.
 
@@ -208,7 +216,7 @@ feels right before any art is drawn.
 every room shares one perspective.
 - `npm run house:blockout` reads the floor plan dimensions (a small JSON: rooms, sizes in metres,
   storeys, doors, stairs).
-- It writes a 2:1 isometric SVG blockout at 3840 × 2160, plus a draft `layout.json` (walkable
+- It writes a 2:1 isometric SVG blockout at 3840 × 2400, plus a draft `layout.json` (walkable
   polygons, stands, waypoints, focus rects) that matches the SVG exactly.
 
 ### 8.2 M1: First playable
@@ -241,7 +249,7 @@ every room shares one perspective.
 **US-HOUSE-05: Phone layout.**
 - On the phone (2400 × 1080), the hub opens zoomed to Theia's current room. She can drag to pan,
   and pinch-out shows the whole house.
-- On the tablet the whole house fits on screen.
+- On the tablet (Galaxy Tab S10+, 16:10) and the laptops, the whole house fits on screen.
 - Tap areas never shrink below 72 dp on either device.
 
 #### Tracing (bedroom, T0 + T1)
@@ -321,6 +329,38 @@ Tapping one opens it.
 - M1 ships 5 pages. 2 are unlocked at the start.
 - One more unlocks each time a tracing item reaches box ≥ 3, until all 5 are open.
 
+#### Tidy-up breaks ("Beberes")
+A playful pause between learning rounds that also builds everyday habits and motor skills. The
+mess is always **Bubu's and Ocica's fault** (a toy avalanche, a tipped cup), never Theia's. Tidying
+up is a game, and never a chore or a punishment.
+
+**US-TIDY-01: The mess appears.**
+- After every 2 learning rounds, Bubu and Ocica make a playful mess in one room, with a funny sound
+  and animation. The room sparkles in the hub.
+- Tidying is **optional**. If she ignores it, the mess quietly disappears at the end of the session.
+- At most one mess at a time. It never appears during the last 2 minutes of dusk.
+
+**US-TIDY-02: Tidy the toys (M1).**
+- 5–8 toys are scattered on the floor. She drags or taps each one into the toy box, and the voice
+  counts each toy as it goes in ("satu, dua, …").
+- A toy dropped outside the box slides gently back to where it was.
+- When the floor is clear: celebration, Bubu and Ocica say sorry with a hug, and the room is tidy
+  again.
+- Takes about 1 minute and counts toward the session time.
+- No mastery tracking in M1. Counting along reinforces C1.
+
+**US-TIDY-03: More tidy-ups (M2, outlined).**
+
+| Variant | Room | Motion and skill |
+|---|---|---|
+| Rapikan tempat tidur (make the bed) | Bedroom | Drag the blanket corners flat, put the pillow and Bubu back. Big arm movements, order of steps. |
+| Lap air tumpah (wipe spilled water) | Kitchen | Rub the puddle with a cloth in circles until it disappears. The circular motion is pre-writing practice (stroke T0 circle). |
+| Pasangkan sepatu (pair the shoes) | Front door | Drag matching shoes together. Visual matching. |
+| Pilah mainan (sort the toys) | Living room | Toys go into boxes by color, then by type. Classification, a pre-math skill. |
+
+**US-TIDY-04: Parent control.** The parent settings have a tidy-up breaks on/off switch (default
+on). The parent area shows how many tidy-ups she has done (no score).
+
 #### Voice and characters
 **US-VOICE-01: Narrator.**
 - Instructions use the narrator setting: **Mama by default**, Papa, or alternating by room.
@@ -347,6 +387,9 @@ Music ducks while a voice clip plays.
 - After that, a calm idle screen has nothing for Theia to tap.
 - The next playable session needs a new app launch ≥ 30 minutes later, or a new day, or a parent
   granting 5 more minutes.
+- A parent can **turn the cooldown off** in settings (holidays, long car rides). When it's off,
+  "Mulai" is available again straight after the bedtime ending. The session limit and the bedtime
+  ending still apply.
 
 **US-SESSION-03: Go home.**
 - `HUD-HOME` must be **held for 1 s**, with a filling ring, so a stray tap doesn't leave the
@@ -370,8 +413,9 @@ Music ducks while a voice clip plays.
 - No voice or visual signals to Theia that it "doesn't count".
 
 **US-LAPTOP-03: Laptop screens.**
-- At 16:10 (1440 × 900, 1920 × 1200, MacBook 2560 × 1600) and 16:9, the 16:9 design area stays
-  centred and unscaled in shape. The extra height is filled with decoration.
+- The 1920 × 1200 (16:10) design frame matches the MacBook M4 and the Lenovo 14" natively.
+- On 16:9 screens, the frame is scaled to the screen height, and the extra width at the sides is
+  decoration.
 - Nothing is cut off, and there are no scrollbars.
 
 **US-LAPTOP-04: Browsers.**
@@ -397,6 +441,7 @@ Music ducks while a voice clip plays.
 - tracing tolerance override
 - case order (lowercase-first is the default, used from M2)
 - manual unlock of T1
+- bedtime cooldown on or off (default on)
 
 **US-PARENT-04: Data.**
 - Export progress as JSON. Importing validates the JSON and refuses invalid files with a clear
@@ -412,7 +457,8 @@ Music ducks while a voice clip plays.
 | Strokes (T0) | `stroke.vertical` (hujan), `stroke.horizontal` (jalan), `stroke.circle` (bola), `stroke.diagonal` (perosotan), `stroke.cross` (tanda tambah), `stroke.zigzag` (petir), `stroke.wave` (ombak) |
 | Digits (T1) | `num.0`–`num.9`, stroke order per Indonesian school practice |
 | Counting | Objects: `telur`, `apel`, `kue`, `bola`, `ikan`. Containers: `mangkuk`, `piring`. Range 1–5. |
-| Coloring | 5 pages, each one subject tied to a future letter word: e.g. `ayam`, `bola`, `ikan`, `kucing`, `susu` (final list in the design brief) |
+| Coloring | 5 pages from her favourites (dolls, dinosaurs, flowers, animals): `bubu`, `ocica`, `dinosaurus`, `bunga`, `kucing` |
+| Tidy-up (M1) | Tidy the toys: 5–8 toys (`bola`, `balok`, `mobil`, `boneka`, `dinosaurus`, …) and 1 toy box |
 | Rooms | 3 rooms. Draft mapping: Theia's bedroom → tracing, kitchen → counting, living room → coloring. Final mapping once the floor plan is in. |
 | Voice | About 110 clips per voice (`AUDIO.md` §2). Mama records the whole set. Papa records praise and greetings at minimum. |
 
@@ -426,7 +472,7 @@ Music ducks while a voice clip plays.
 | NFR-REL-01 | No blank or frozen screen. Every error is logged as structured JSON and recovered from (§7.5). |
 | NFR-DATA-01 | Progress survives app updates and rollbacks (additive schema). Export and import round-trip without loss. |
 | NFR-PRIV-01 | No third-party requests. No photos or raw recordings in git or in the build. Access-protected hosting. Strict CSP. |
-| NFR-COMPAT-01 | **Primary**: current stable Chrome on the family's Android tablet and phone (models to confirm, §13), landscape, installed fullscreen. **Secondary**: MacBook (Chrome, Safari 17+ via Add to Dock) and Windows laptop (Chrome, Edge), no touchscreen, installed app fullscreen. |
+| NFR-COMPAT-01 | **Primary**: Theia's **Samsung Galaxy Tab S10+** (2800 × 1752, 16:10), current Chrome, landscape, installed fullscreen. **Phones**: Google Pixel 6 and Samsung Galaxy A52s (2400 × 1080), current Chrome. **Laptops** (no touchscreen): MacBook M4 (Chrome, Safari 17+ via Add to Dock) and Lenovo 14" Windows (Chrome, Edge), installed app fullscreen. **S Pen** (included with the Tab S10+): `pointerType: "pen"` is treated exactly like touch and counts toward mastery. |
 | NFR-UX-01 | Touch targets ≥ 72 dp (≥ 96 dp for primary actions). No text-only instructions for Theia. No failure sounds. No timers she can see. |
 | NFR-MAINT-01 | Engine code has unit tests. Every acceptance criterion has an E2E test. Design artifacts are validated against `contracts/`. |
 
@@ -454,26 +500,27 @@ Music ducks while a voice clip plays.
 | Google Drive reference folder set up and mirrored. `reference` symlink created. | Everything visual | Start of M0 |
 | Floor plan sketch + room photos | House layout, room mapping | Before M1 Phase 2 |
 | Photos of Theia, Mama, and Papa. Photos and 360° videos of Bubu and Ocica. | Character and family sheet | Before M1 Phase 2 |
-| Family tablet and phone models + Android versions | NFR-COMPAT-01, device tests | M0 |
+| ~~Family device models~~ **Done**: Theia: Galaxy Tab S10+. Papa: Pixel 6, MacBook M4. Mama: Galaxy A52s, Lenovo 14" (Windows). | NFR-COMPAT-01, device tests | M0 |
 | Voice recording sessions (Mama full set, Papa praise and greetings) | M1 audio | During M1 Phase 3 |
-| Cloudflare account + domain decision | US-DEP-01 | M0 |
+| Cloudflare account. Domain decided: **`rct.amns.my.id`**. The `amns.my.id` zone must be on Cloudflare DNS. | US-DEP-01 | M0 |
 
-## 13. Open questions
+## 13. Decisions from review (2026-11-09)
 
-1. What do the voice lines call her: "Cici", "Theia", or "Cici Theia"? The examples use "Cici".
-2. Which exact tablet and phone models (and Android versions) does the family use?
-3. Domain: a subdomain of an existing personal domain, or the default `*.workers.dev`? Access works
-   with both.
-4. Sound effects (Bubu and Ocica sounds, UI, music): is the proposal OK? Claude curates CC0 sounds
-   with a license log, and Antigravity approves the fit.
-5. Is 10 minutes the right default session length, and is the 30-minute cooldown before the next
-   session right?
-6. Should the parent be able to turn off the bedtime cooldown entirely, for a holiday or a long car
-   ride?
-7. Coloring page subjects for M1: any favourites (her own toys, family pets, foods)?
-8. Progress is stored **per device**, so with a tablet, a phone, and 2 laptops, her counting and
-   coloring progress splits across devices. Is manual export/import between devices fine for
-   M1–M2, or should optional sync (Cloudflare D1, currently M4) move up to M2?
+| # | Question | Decision |
+|---|---|---|
+| 1 | What do the voice lines call her? | **"Theia"** |
+| 2 | Device models | Theia: **Galaxy Tab S10+** (primary). Papa: Pixel 6, MacBook M4. Mama: Galaxy A52s, Lenovo 14" Windows. The design frame becomes 16:10 (1920 × 1200). See NFR-COMPAT-01. |
+| 3 | Domain | **`rct.amns.my.id`**, a custom domain in the `amns.my.id` Cloudflare zone, behind Access |
+| 4 | Sound effects | OK: Claude curates CC0 sounds with a license log, and Antigravity approves the fit |
+| 5 | Session length and cooldown | OK: 10 minutes default, 30-minute cooldown |
+| 6 | Turning the cooldown off | Yes: a parent setting (US-SESSION-02) |
+| 7 | Coloring subjects | Dolls, dinosaurs, flowers, animals. M1: `bubu`, `ocica`, `dinosaurus`, `bunga`, `kucing`. |
+| 8 | Progress per device | OK to keep it per device. JSON export/import stays the way to move progress. Sync stays an optional M4 item. |
+| — | New request: tidy-up "refreshment" activities | Added as tidy-up breaks ("Beberes"): tidy the toys in M1, the rest in M2 (US-TIDY-01..04) |
+
+### Still open
+1. The S Pen comes with the Tab S10+. Should tracing also *encourage* the S Pen later (M2+), since
+   it's closer to holding a pencil? Pen input already works and counts like touch.
 
 ## 14. Out of scope (all milestones)
 
