@@ -67,7 +67,7 @@ There is no backend in M1–M3. The Worker serves static assets only.
 │   └── script/               # generates the recording script from content/
 ├── tests/                    # vitest unit + fixtures (recorded strokes), playwright e2e
 ├── public/                   # icons, web manifest, _headers
-├── reference/                # GITIGNORED — raw photos of her / the house for Antigravity
+├── reference                 # GITIGNORED symlink → Google Drive mirror (photos/videos, ASSETS.md §1.1)
 ├── recordings/               # GITIGNORED — raw WAVs from Papa/Mama
 └── wrangler.jsonc
 ```

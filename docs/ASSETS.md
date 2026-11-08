@@ -15,7 +15,36 @@ All assets live under `assets/`. Nothing in `src/` is edited by the asset agent,
 
 ## 1. Inputs from the parents
 
-These are stored in `reference/`, which is **gitignored and never committed**:
+### 1.1 Where they live
+
+The originals sit in a **private Google Drive folder, "Rumah Cici Theia – Referensi"**. It is
+shared only between Mama's and Papa's accounts, and both upload from their Android phones.
+- **Google Drive for desktop** (Mirror mode) keeps a local copy on the Mac.
+- `reference` in the repo root is a **symlink** to that mirrored folder. It is gitignored, so
+  agents read plain local files, and nothing is fetched at runtime or through MCP.
+- `npm run reference:frames` (Claude's tool) extracts key frames from videos into
+  `reference/frames/<subject>/` with ffmpeg. Agents work from the frames, not the raw video.
+- `npm run reference:check` lists what is missing against the table below.
+
+Folder structure. The folder names tell the agents what each file shows:
+
+```
+reference/
+├── theia/      front/  side/  back/  full-body/  video/
+├── mama/       front/  side/  full-body/
+├── papa/       front/  side/  full-body/
+├── bubu/       front/  side/  back/  video/      ← 360° turn video recommended
+├── ocica/      front/  side/  back/  video/
+├── rumah/      denah/  <room-id>/                ← room-id matches layout.json, e.g. kamar-theia
+└── frames/     (generated)
+```
+
+Alternative if the family prefers no cloud: Syncthing between the phones and the Mac, with the
+same structure and the same symlink.
+
+### 1.2 What to provide
+
+All of this is **gitignored and never committed**:
 
 | Input | Used for |
 |---|---|

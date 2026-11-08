@@ -1,6 +1,7 @@
 # Private source material — never commit (see docs/PLAN.md §9)
-reference/
-recordings/
+# no trailing slash: reference is a symlink to the Google Drive mirror, and "dir/" patterns skip symlinks
+reference
+recordings
 
 # Build / tooling
 node_modules/

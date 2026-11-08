@@ -126,8 +126,9 @@ Rules for `ui/` components, enforced by lint and reviewed by Claude for code qua
 - `reference/` photos: Theia, Mama, Papa, Bubu, Ocica, the house and the floor plan
 
 **Steps**. The first time through, in M1, every step runs. Later milestones extend what exists.
-1. **Style exploration**: 2–3 visual directions (a mood board plus one sample screen each). Papa
-   picks one. *(M1 only.)*
+1. **Style exploration**: 2–3 visual directions (a mood board plus one sample screen each) in
+   `design/concepts/M<n>/`, with a `README.md` giving the reasoning for each and open questions.
+   Opened as a PR. Papa and Mama comment there, and Papa picks one. *(M1 only.)*
 2. **Character and family sheet**: Theia, Mama, Papa, Bubu, and Ocica at relative scale
    (`ASSETS.md` §3).
 3. **House**: the cutaway house art plus `layout.json` (`ASSETS.md` §4).
@@ -229,7 +230,17 @@ Both reviews go into `docs/handoff/M<n>-review.md`:
 up on its next cold start. Progress data survives because the schema only changes additively
 (`ARCHITECTURE.md` §8.4).
 
-## 5. Tracking
+## 5. Tracking and review tooling
+
+**Everything is reviewed in GitHub.** There is no separate document or design tool.
+
+| What | Where | How it's reviewed |
+|---|---|---|
+| PRD, design brief, handoffs, reviews | Markdown in `docs/`, one PR each | Line comments from Papa and Mama (GitHub mobile app works). The author revises in the same PR. **Approve = gate passed.** |
+| Concepts, mockups, assets | Images in `design/concepts/`, `design/mockups/`, `assets/`. Stylized art only. | Images render inline in the PR. Comment per image. |
+| Prototype and integrated build | Preview deploy (PR) or `npm run proto` | Papa tries it on the tablet and the phone, then leaves feedback as a PR comment |
+| Original photos and videos | Private Google Drive folder → `reference/` symlink (`ASSETS.md` §1.1) | Never in git, never in a PR |
+
 
 - **GitHub milestone** for each M. One **tracking issue** per milestone, containing every gate
   checklist above.
