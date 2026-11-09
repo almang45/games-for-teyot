@@ -118,9 +118,9 @@ review them in GitHub.
 - **Phone**: the trace area uses the full height, and the decoration moves to the sides.
 
 ### `SCR-COUNT`: counting (kitchen)
-- **Purpose**: the 4 counting variants on one kitchen counter backdrop.
+- **Purpose**: the 4 counting variants, with no painted backdrop: the objects sit on
+  `color.backdrop` with the engine's soft vignette (ASSETS.md §5).
 - **Elements**:
-  - the counter backdrop
   - objects (`telur`, `apel`, `kue`, `bola`, `ikan`) in counted and uncounted looks
   - containers (`mangkuk`, `piring`) with a marked drop zone
   - 3 numeral choice tiles (digits rendered by the game, tile art by Antigravity)
