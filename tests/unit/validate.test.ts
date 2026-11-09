@@ -151,6 +151,7 @@ describe('validateAssets', () => {
     expect(errors(validateAssets(root))[0]).toMatch(/^assets\/house\/layout\.json size: /);
   });
 
+  // ~0.6 s plain, but v8 coverage instruments the per-pixel loops: ~8 s on CI runners.
   it('decodes coloring pages and checks their line art', () => {
     deliverAssets();
     const m = manifestFixture();
@@ -172,7 +173,7 @@ describe('validateAssets', () => {
     expect(errors(validateAssets(root))).toEqual([
       expect.stringMatching(/^assets\/coloring\/ayam\.png : 1 fillable regions/) as string,
     ]);
-  });
+  }, 30_000);
 
   it('rejects symlinks', () => {
     deliverAssets();
