@@ -3,14 +3,26 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { ROOM_PREFIXES, ROOM_URL_PATTERN } from './tools/build/budget.mjs';
 import { COVERAGE_EXCLUDE, COVERAGE_INCLUDE } from './tools/build/coverage.ts';
 import { readGlobalHeaders } from './tools/build/headers.ts';
+import { cssHex, placeholderPalette } from './src/placeholder/palette.ts';
 import { INSTALLED_START_URL } from './src/platform/launch.ts';
 import { NETWORK_ONLY_NAVIGATIONS } from './src/platform/swRouting.ts';
 import { placeholderIcons } from './tools/build/placeholder-icons.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
+const SHELL_COLOR = cssHex(placeholderPalette.sky);
+
+/** index.html cannot import the palette, so its theme-color is filled in here. */
+function shellColor(): Plugin {
+  return {
+    name: 'rct-shell-color',
+    transformIndexHtml: (html) => html.replaceAll('__SHELL_COLOR__', SHELL_COLOR),
+  };
+}
 const pkg = JSON.parse(readFileSync(new URL('package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
@@ -43,6 +55,7 @@ export default defineConfig({
   },
   plugins: [
     svelte(),
+    shellColor(),
     placeholderIcons(root),
     VitePWA({
       registerType: 'prompt',
@@ -60,8 +73,8 @@ export default defineConfig({
         display: 'fullscreen',
         display_override: ['fullscreen', 'standalone'],
         orientation: 'landscape',
-        background_color: '#fff4e6',
-        theme_color: '#fff4e6',
+        background_color: SHELL_COLOR,
+        theme_color: SHELL_COLOR,
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -76,6 +89,21 @@ export default defineConfig({
       workbox: {
         // No webmanifest here: vite-plugin-pwa adds the manifest to the precache itself.
         globPatterns: ['**/*.{js,css,html,png,svg,webp,webm,json}'],
+        // ARCHITECTURE §8.1: the shell, hub, and boot audio are precached; a room is cached the
+        // first time Theia enters it, so the first install stays within the 3 MB budget.
+        globIgnores: ROOM_PREFIXES.map((prefix) => `${prefix}**`),
+        runtimeCaching: [
+          {
+            urlPattern: ROOM_URL_PATTERN,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'rct-rooms',
+              // An Access login redirect to another origin comes back opaque (status 0) or fails
+              // CORS, so allowing only 200 keeps it out of the room cache.
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
         navigateFallback: '/index.html',
         // Access login/callback and the re-auth path must reach Cloudflare, not the cached shell.
         navigateFallbackDenylist: [...NETWORK_ONLY_NAVIGATIONS],

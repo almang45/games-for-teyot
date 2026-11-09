@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getStrings } from '../../src/content/strings';
+import { strings } from '../../src/content/strings';
 
-const strings = getStrings();
 import { renderInstallScreen } from '../../src/install/installScreen';
 
 describe('SCR-INSTALL (US-OFF-01)', () => {

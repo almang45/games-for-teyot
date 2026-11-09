@@ -1,38 +1,20 @@
-import { z } from 'zod';
+import type { InstallPlatform } from '../platform/launch';
 import raw from '../../content/strings.id.json';
 
-const StepsSchema = z.array(z.string().min(1)).min(1);
-
-const StringsSchema = z.object({
-  boot: z.object({ start: z.string().min(1) }),
-  install: z.object({
-    title: z.string().min(1),
-    lead: z.string().min(1),
-    steps: z.object({
-      android: StepsSchema,
-      ios: StepsSchema,
-      'safari-mac': StepsSchema,
-      'desktop-chromium': StepsSchema,
-      other: StepsSchema,
-    }),
-    continueInBrowser: z.string().min(1),
-    browserWarning: z.string().min(1),
-  }),
-});
-
-export type Strings = z.infer<typeof StringsSchema>;
-
-export function parseStrings(input: unknown): Strings {
-  return StringsSchema.parse(input);
+export interface Strings {
+  readonly boot: { readonly start: string };
+  readonly install: {
+    readonly title: string;
+    readonly lead: string;
+    readonly steps: Readonly<Record<InstallPlatform, readonly string[]>>;
+    readonly continueInBrowser: string;
+    readonly browserWarning: string;
+  };
 }
-
-let cached: Strings | undefined;
 
 /**
- * Parsed on first use, not at import, so a malformed file throws after the global error capture is
- * installed and lands in the structured log. main() calls this during boot, so it still fails early.
+ * The file is bundled, so it cannot change at runtime: the compiler checks its shape here, and
+ * tests/unit/strings.test.ts rejects empty or unknown keys. No schema library ships in the entry
+ * chunk that SCR-INSTALL loads.
  */
-export function getStrings(): Strings {
-  cached ??= parseStrings(raw);
-  return cached;
-}
+export const strings: Strings = raw;

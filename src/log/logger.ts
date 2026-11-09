@@ -89,7 +89,13 @@ export class Logger {
             ...entry,
             level: 'error',
             event: 'log.sink_failed',
-            data: { error: serializeError(sinkErr) },
+            // Keep what was being logged: this line is the only record of it.
+            data: {
+              error: serializeError(sinkErr),
+              sink: sink.constructor.name,
+              failedEvent: entry.event,
+              failedLevel: entry.level,
+            },
           }),
         );
       }

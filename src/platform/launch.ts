@@ -30,24 +30,22 @@ export function resolveLaunchMode(signals: LaunchSignals): LaunchMode {
  */
 export function readLaunchSignals(
   win: Window,
+  platform: InstallPlatform,
   onStorageError: (err: unknown) => void,
 ): LaunchSignals {
   const params = new URLSearchParams(win.location.search);
   const matches = (mode: string): boolean => win.matchMedia(`(display-mode: ${mode})`).matches;
   const fromStartUrl = params.get(LAUNCH_SOURCE_PARAM) === LAUNCH_SOURCE_INSTALLED;
-  // A browser tab in F11/full-screen view also matches "fullscreen", so fullscreen alone proves
-  // nothing. It counts when launched from the start_url, or when an earlier launch from it set the
-  // flag (an in-scope link or a reload to "/" opens the installed app without the param). On
-  // Android the WebAPK shares storage with Chrome, so an F11-style tab on a device that already has
-  // the app installed also gets the game; that is acceptable.
+  // On desktop a browser tab in F11 / full-screen view also matches "fullscreen", so there it
+  // counts only when launched from the start_url, or when an earlier launch from it set the flag
+  // (an in-scope link or a reload to "/" opens the installed app without the param). Android Chrome
+  // has no full-screen browser view, so there fullscreen means the installed app, even on a first
+  // launch from a link or after site data was cleared.
   let fullscreenInstalled = false;
   if (matches('fullscreen')) {
-    if (fromStartUrl) {
-      writeInstalledFlag(win, onStorageError);
-      fullscreenInstalled = true;
-    } else {
-      fullscreenInstalled = readInstalledFlag(win, onStorageError);
-    }
+    if (fromStartUrl) writeInstalledFlag(win, onStorageError);
+    fullscreenInstalled =
+      fromStartUrl || platform === 'android' || readInstalledFlag(win, onStorageError);
   }
   const standalone =
     matches('standalone') ||

@@ -229,7 +229,9 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   maskable icons.
 - Workbox:
   - **Precache** the app shell, the house hub, and the boot audio.
-  - **Runtime cache-first** for hashed room bundles and atlases.
+  - **Runtime cache-first** for room bundles (`rooms/**`, `audio/rooms/**`): kept out of the
+    precache and cached the first time she enters the room. `tools/build/budget.mjs` defines the
+    prefixes for both the service worker and the size check; only `200` responses are cached.
 - `navigator.storage.persist()` requested on first launch. The result is shown in the parent area.
 - Updates use `registerType: 'prompt'`. The new version activates on the **next** cold start, never
   in the middle of a session.
@@ -267,6 +269,11 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   other navigation (including `/`) from the cached shell, so Access would never get to redirect.
   `/masuk` and Access's own `/cdn-cgi/` endpoints are on the navigation denylist
   (`src/platform/swRouting.ts`) and always reach the network.
+- **Known gap: the macOS Safari Dock app.** It has no address bar, and it keeps its own cookies
+  apart from Safari, so a parent cannot open `/masuk` inside it. Once its Access session expires
+  it keeps playing the cached build but stops receiving updates. The fix is a "masuk lagi" button
+  in the parent area that navigates to `/masuk` (issue #6). Until
+  then, remove the Dock app and add it to the Dock again from Safari after logging in there.
 
 ### 8.4 Rollback
 - Every deploy is a Worker version. Rollback with `wrangler rollback <version-id>`.
@@ -285,9 +292,10 @@ lint ─▶ test ─▶ build ─▶ validate + e2e ─▶ SAST ─▶ quality-g
 | Stage | Contents |
 |---|---|
 | lint | `tsc --noEmit`, ESLint, Prettier check |
-| test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
-| build | `vite build`. Fails if the size budget (§10) is exceeded. |
+| test | Vitest with coverage. |
+| build | `vite build`. Fails if the size budget (§10) is exceeded. Uploads `dist` for the next stages. |
 | validate | Until contracts v1: fails closed if `design/` or `assets/` has any file (`tools/validate/check-lanes.mjs`). Then `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
+| e2e | Playwright against the built `dist` (`vite preview`): tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. Runs next to validate. |
 | SAST | Semgrep CE (`p/default`, `p/typescript`; CodeQL's licence excludes private repos without GitHub Code Security), `osv-scanner` on the lockfile |
 | quality-gate | SonarQube Cloud. The gate blocks the pipeline. |
 | deploy | `master`: `wrangler deploy` through the `production` environment (deployment branch: `master` only). PR: `wrangler versions upload` (preview URL, behind Access), off unless `vars.PREVIEW_DEPLOYS == 'enabled'`. |
@@ -305,7 +313,7 @@ Secrets:
 | Budget | Target |
 |---|---|
 | First load (shell + house + boot audio) | ≤ 3 MB |
-| Each room bundle (atlas + audio sprite) | ≤ 4 MB |
+| Each room bundle (atlas + audio sprite, all files under its `rooms/<id>` and `audio/rooms/<id>`) | ≤ 4 MB |
 | Total offline cache, M3 | ≤ 60 MB |
 | Texture atlas | ≤ 2048 × 2048 (low-end Android GPUs) |
 | Frame rate | 60 fps on a mid-range Android tablet. Tracing input latency < 30 ms. |
@@ -317,7 +325,11 @@ Secrets:
 - Uncaught errors and unhandled rejections are captured there with their stack traces.
 - The parent area shows the log and can export it.
 - Nothing leaves the device.
-- A scene error returns her to the House hub with a neutral animation, never a blank screen.
+- Every uncaught error and unhandled rejection is fatal (except the benign `ResizeObserver loop`
+  notice): the game is torn down at once, the recovery screen shows for about 2 s, and the app
+  reloads to SCR-BOOT (PRD §7.5). One automatic reload per 30 s (`src/shell/recovery.ts`); a
+  failure that comes back waits on the icon retry button. Once rooms exist, a scene error returns
+  her to the House hub through OVL-RECOVER instead.
 
 ## 12. Data model (sketch)
 

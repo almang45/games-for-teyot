@@ -19,11 +19,18 @@ describe('failure screen (PRD §7.5: never a blank screen)', () => {
     expect(document.body.dataset.scene).toBe(FAILURE_SCENE);
   });
 
+  it('gives Theia an icon button, not text (NFR-UX-01), labelled for assistive tech', () => {
+    renderFailureScreen(root, () => undefined);
+    const button = root.querySelector<HTMLButtonElement>('button.failure__retry');
+    expect(button?.textContent).toBe('');
+    expect(button?.querySelector('svg path')).not.toBeNull();
+    expect(button?.getAttribute('aria-label')).toBe(FAILURE_COPY.retry);
+  });
+
   it('reloads once when the retry button is tapped', () => {
     const reload = vi.fn();
     renderFailureScreen(root, reload);
     const button = root.querySelector<HTMLButtonElement>('button.failure__retry');
-    expect(button?.textContent).toBe(FAILURE_COPY.retry);
     button?.click();
     button?.click();
     expect(reload).toHaveBeenCalledOnce();

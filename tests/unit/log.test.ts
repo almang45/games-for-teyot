@@ -53,7 +53,14 @@ describe('Logger', () => {
       new Logger([broken, good], 's', null, fixedClock).warn('w');
       expect(good.entries).toHaveLength(1);
       expect(consoleError).toHaveBeenCalledOnce();
-      expect(String(consoleError.mock.calls[0]?.[0])).toContain('log.sink_failed');
+      const fallback = JSON.parse(String(consoleError.mock.calls[0]?.[0])) as LogEntry;
+      expect(fallback.event).toBe('log.sink_failed');
+      expect(fallback.data).toMatchObject({
+        sink: 'Object',
+        failedEvent: 'w',
+        failedLevel: 'warn',
+        error: { message: 'quota' },
+      });
     } finally {
       consoleError.mockRestore();
     }
@@ -136,24 +143,31 @@ describe('captureGlobalErrors', () => {
     expect(sink.entries[0]?.data).toMatchObject({ source: 'a.js', line: 1, column: 2 });
   });
 
-  it('calls onFatal for uncaught Errors only, after logging them', () => {
+  it('calls onFatal after logging, for every error and rejection except benign notices', () => {
     const listeners = new Map<string, (e: unknown) => void>();
     const target = {
       addEventListener: (type: string, fn: (e: unknown) => void) => listeners.set(type, fn),
     } as unknown as Window;
     const sink = new CollectingSink();
-    const fatal: Error[] = [];
-    captureGlobalErrors(target, new Logger([sink], 's', null, fixedClock), (err) => {
-      expect(sink.entries).toHaveLength(1);
-      fatal.push(err);
+    const fatal: unknown[] = [];
+    const loggedBefore: number[] = [];
+    captureGlobalErrors(target, new Logger([sink], 's', null, fixedClock), (reason) => {
+      loggedBefore.push(sink.entries.length);
+      fatal.push(reason);
     });
 
     const boom = new Error('boom');
+    const later = new Error('later');
     listeners.get('error')?.({ error: boom, message: 'boom' });
     listeners.get('error')?.({ error: null, message: 'ResizeObserver loop completed' });
-    listeners.get('unhandledrejection')?.({ reason: new Error('later') });
+    // A thrown string still leaves the game half torn down.
+    listeners.get('error')?.({ error: 'stringly', message: 'Uncaught stringly' });
+    listeners.get('error')?.({ error: null, message: 'Script error.' });
+    listeners.get('unhandledrejection')?.({ reason: later });
+    listeners.get('unhandledrejection')?.({ reason: undefined });
 
-    expect(fatal).toEqual([boom]);
-    expect(sink.entries).toHaveLength(3);
+    expect(fatal).toEqual([boom, 'stringly', 'Script error.', later, undefined]);
+    expect(loggedBefore).toEqual([1, 3, 4, 5, 6]);
+    expect(sink.entries).toHaveLength(6);
   });
 });

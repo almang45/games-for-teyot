@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   INSTALLED_FLAG_KEY,
+  type InstallPlatform,
   detectInstallPlatform,
   readLaunchSignals,
   resolveLaunchMode,
@@ -70,7 +71,8 @@ describe('readLaunchSignals', () => {
   const noStorageError = (err: unknown): never => {
     throw new Error(`unexpected storage error: ${String(err)}`);
   };
-  const read = (win: Window) => readLaunchSignals(win, noStorageError);
+  const read = (win: Window, platform: InstallPlatform = 'desktop-chromium') =>
+    readLaunchSignals(win, platform, noStorageError);
 
   it('detects standalone and minimal-ui display modes', () => {
     expect(read(fakeWindow(['(display-mode: standalone)'], '')).standalone).toBe(true);
@@ -101,11 +103,29 @@ describe('readLaunchSignals', () => {
     const onError = (err: unknown): void => {
       errors.push(err);
     };
-    const launched = readLaunchSignals(fakeWindow(fullscreen, '?source=pwa', { storage }), onError);
+    const launched = readLaunchSignals(
+      fakeWindow(fullscreen, '?source=pwa', { storage }),
+      'desktop-chromium',
+      onError,
+    );
     expect(launched.standalone).toBe(true);
-    const relaunched = readLaunchSignals(fakeWindow(fullscreen, '', { storage }), onError);
+    const relaunched = readLaunchSignals(
+      fakeWindow(fullscreen, '', { storage }),
+      'desktop-chromium',
+      onError,
+    );
     expect(relaunched.standalone).toBe(false);
     expect(errors).toEqual([storage, storage]);
+  });
+
+  it('on Android, trusts fullscreen without the start_url or the flag', () => {
+    const storage = new MemoryStorage();
+    // First launch of the installed app from a captured link, or after site data was cleared.
+    expect(read(fakeWindow(fullscreen, '', { storage }), 'android').standalone).toBe(true);
+    expect(read(fakeWindow([], '', { storage }), 'android').standalone).toBe(false);
+    // Storage is not even read: a blocked store cannot send the installed app to SCR-INSTALL.
+    const blocked = new Error('SecurityError');
+    expect(read(fakeWindow(fullscreen, '', { storage: blocked }), 'android').standalone).toBe(true);
   });
 
   it('honours Safari navigator.standalone', () => {

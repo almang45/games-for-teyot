@@ -1,7 +1,7 @@
 import './styles.css';
 import type { Game } from 'phaser';
 import { registerSW } from 'virtual:pwa-register';
-import { getStrings } from './content/strings';
+import { strings } from './content/strings';
 import { renderInstallScreen } from './install/installScreen';
 import {
   captureGlobalErrors,
@@ -12,6 +12,7 @@ import {
 } from './log';
 import { detectInstallPlatform, readLaunchSignals, resolveLaunchMode } from './platform/launch';
 import { renderFailureScreen } from './shell/failureScreen';
+import { AUTO_RELOAD_DELAY_MS, claimAutoReload } from './shell/recovery';
 
 // No module imported above does work at import time, so the capture below sees every boot error.
 const { logger } = createAppLog(createSessionId(), import.meta.env.DEV);
@@ -19,19 +20,43 @@ const appRoot = document.getElementById('app');
 let game: Game | undefined;
 let failed = false;
 
-/** PRD §7.5: any failure ends on the retry screen, never a blank or frozen one. */
-function fail(): void {
-  if (failed || !appRoot) return;
-  failed = true;
+let reloading = false;
+function reload(): void {
+  if (reloading) return;
+  reloading = true;
+  location.reload();
+}
+
+function destroyGame(): void {
+  const current = game;
+  game = undefined;
+  if (!current) return;
   try {
-    game?.destroy(true);
+    // destroy() only flags the game for teardown at the start of the next frame. An error thrown
+    // inside a frame stops Phaser from scheduling one, so stop the loop and run that frame now:
+    // otherwise WebGL, the AudioContext and Phaser's window input listeners stay alive.
+    current.loop.stop();
+    current.destroy(true);
+    current.step(performance.now(), 0);
   } catch (err) {
     logger.error('app.game_destroy_failed', err);
   }
-  game = undefined;
-  renderFailureScreen(appRoot, () => {
-    location.reload();
+}
+
+/**
+ * PRD §7.5: any failure ends on the recovery screen, then one automatic reload to SCR-BOOT. In M0
+ * the hub is the only scene, so there is no OVL-RECOVER step yet.
+ */
+function fail(): void {
+  if (failed || !appRoot) return;
+  failed = true;
+  destroyGame();
+  const autoReload = claimAutoReload(window, Date.now(), (err: unknown) => {
+    logger.warn('app.recovery_storage_unavailable', { error: serializeError(err) });
   });
+  logger.info('app.recovering', { autoReload });
+  renderFailureScreen(appRoot, reload);
+  if (autoReload) setTimeout(reload, AUTO_RELOAD_DELAY_MS);
 }
 
 captureGlobalErrors(window, logger, fail);
@@ -64,32 +89,36 @@ async function requestPersistentStorage(log: Logger): Promise<void> {
 async function startGame(root: HTMLElement, log: Logger): Promise<void> {
   // Phaser is loaded lazily so SCR-INSTALL stays light.
   const { createGame } = await import('./game/createGame');
+  // fail() may have run while the chunk loaded; a game built now would run hidden under its screen.
+  if (failed) return;
   const audio = new AudioContext({ latencyHint: 'interactive' });
-  game = createGame(root, { logger: log, audio });
+  const started = createGame(root, { logger: log, audio });
+  started.events.once('destroy', () => {
+    log.info('game.destroyed');
+    audio.close().catch((err: unknown) => {
+      log.error('game.audio_close_failed', err);
+    });
+  });
+  game = started;
 }
 
 type NavigatorWithHints = Navigator & { userAgentData?: { platform?: string } };
 
 function main(root: HTMLElement): void {
-  const strings = getStrings();
-  const signals = readLaunchSignals(window, (err: unknown) => {
+  const platform = detectInstallPlatform({
+    userAgent: navigator.userAgent,
+    maxTouchPoints: navigator.maxTouchPoints,
+    uaPlatform: (navigator as NavigatorWithHints).userAgentData?.platform,
+  });
+  const signals = readLaunchSignals(window, platform, (err: unknown) => {
     logger.warn('launch.storage_unavailable', { error: serializeError(err) });
   });
   const mode = resolveLaunchMode(signals);
-  logger.info('app.launch', { mode, ...signals, version: __APP_VERSION__ });
+  logger.info('app.launch', { mode, platform, ...signals, version: __APP_VERSION__ });
   registerServiceWorker(logger);
 
   if (mode === 'install') {
-    renderInstallScreen(
-      root,
-      detectInstallPlatform({
-        userAgent: navigator.userAgent,
-        maxTouchPoints: navigator.maxTouchPoints,
-        uaPlatform: (navigator as NavigatorWithHints).userAgentData?.platform,
-      }),
-      strings.install,
-      new URL(location.href),
-    );
+    renderInstallScreen(root, platform, strings.install, new URL(location.href));
     return;
   }
 

@@ -1,24 +1,54 @@
 import { expect, test } from '@playwright/test';
-import { GAME_URL, expectScene, pressStart } from './helpers';
+import { AUTO_RELOAD_DELAY_MS, AUTO_RELOAD_KEY } from '../../src/shell/recovery';
+import { GAME_URL, collectLog, expectScene, pressStart } from './helpers';
 
-test('PRD §7.5 an uncaught error in the running game ends on the retry screen', async ({
+test('PRD §7.5 an error inside the game loop tears the game down and reloads to SCR-BOOT', async ({
   page,
   hasTouch,
 }) => {
+  const log = collectLog(page);
   await page.goto(GAME_URL);
   await expectScene(page, 'Boot');
   await pressStart(page, hasTouch);
   await expectScene(page, 'House');
 
-  // Stands in for a throw inside a scene's create() or an input handler.
+  // Phaser schedules its next frame at the end of the current one. Throwing from that call puts
+  // the error inside Phaser's frame and stops the loop, like a throw in a scene's create() or a
+  // tween callback: no later frame comes along to run a deferred teardown.
   await page.evaluate(() => {
-    setTimeout(() => {
-      throw new Error('e2e: injected game failure');
-    }, 0);
+    const native = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = () => {
+      window.requestAnimationFrame = native;
+      throw new Error('e2e: injected game-loop failure');
+    };
   });
 
   await expectScene(page, 'Failure');
   await expect(page.locator('canvas')).toHaveCount(0);
+  // The game is really gone (WebGL, AudioContext, window input listeners), not just hidden.
+  await expect.poll(() => log.some((e) => e.event === 'game.destroyed')).toBe(true);
+  expect(log.find((e) => e.event === 'app.recovering')?.data).toEqual({ autoReload: true });
+  // No tap needed: the app reloads to SCR-BOOT on its own.
+  await expectScene(page, 'Boot');
+});
+
+test('PRD §7.5 a failure that survives the reload waits on the retry button', async ({ page }) => {
+  const log = collectLog(page);
+  await page.goto(GAME_URL);
+  await expectScene(page, 'Boot');
+  await page.evaluate((key) => {
+    sessionStorage.setItem(key, String(Date.now()));
+  }, AUTO_RELOAD_KEY);
+
+  // An unhandled rejection is as fatal as a throw: SCR-BOOT's start runs in a promise chain.
+  await page.evaluate(() => {
+    void Promise.reject(new Error('e2e: injected async failure'));
+  });
+
+  await expectScene(page, 'Failure');
+  expect(log.find((e) => e.event === 'app.recovering')?.data).toEqual({ autoReload: false });
+  await page.waitForTimeout(AUTO_RELOAD_DELAY_MS + 500);
+  await expectScene(page, 'Failure');
   await page.getByRole('button', { name: 'Coba lagi' }).click();
   await expectScene(page, 'Boot');
 });

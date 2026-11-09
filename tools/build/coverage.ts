@@ -9,8 +9,7 @@ export const COVERAGE_EXCLUDE = [
   'src/main.ts',
   'src/scenes/**',
   'src/game/createGame.ts',
-  // Data, and type declarations.
-  'src/placeholder/palette.ts',
+  // Type declarations.
   'src/**/*.d.ts',
   // CLI entry points run by the build and CI; their logic lives in tested modules.
   'tools/build/check-budget.mjs',

@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { placeholderPalette } from '../placeholder/palette';
 import { BootScene } from '../scenes/BootScene';
 import { HouseScene } from '../scenes/HouseScene';
 import { provideServices, type GameServices } from './services';
@@ -11,7 +12,7 @@ export function createGame(parent: HTMLElement, services: GameServices): Phaser.
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    backgroundColor: '#fff4e6',
+    backgroundColor: placeholderPalette.sky,
     banner: false,
     // EXPAND keeps the whole 1920×1200 frame visible and adds side area on wider screens (phones).
     scale: {
