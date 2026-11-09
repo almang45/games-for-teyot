@@ -328,7 +328,8 @@ Pages use **raster line art with runtime flood fill**, so AI-generated art works
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
   pass when the page loads, so bigger gaps leak. An opening between two areas is either a gap
   (≤ 2 px) or a deliberate passage (> 8 px), never in between.
-- Every fillable region holds a **40 × 40 px square**: her finger has to fit inside. Thin strips
+- Every fillable region holds a **40 × 40 px square** of paper inside its lines (corners may be
+  rounded): her finger has to fit inside. Thin strips
   and smaller details are just drawn lines, not fillable areas. A margin around the subject
   counts only if it is that wide too.
 - 6–15 regions per page at age 3.

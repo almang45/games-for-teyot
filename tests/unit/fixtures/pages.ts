@@ -17,7 +17,8 @@ export function page(
 
 /**
  * Line art: a frame inset from the page edge, split into `cols` × `rows` cells by lines of the
- * given thickness. Regions: one per cell plus the background around the frame.
+ * given thickness. Regions: one per cell plus the background around the frame, which is 40 px
+ * wide at the sides and 30 px at top and bottom unless `inset` sets all four.
  */
 export function gridPage(opts: {
   width?: number;
@@ -25,11 +26,13 @@ export function gridPage(opts: {
   cols: number;
   rows: number;
   line?: number;
+  inset?: number;
   gap?: { x: number; y: number; size: number };
   extra?: (x: number, y: number) => Rgba | undefined;
 }): DecodedPng {
   const { width = 480, height = 300, cols, rows, line = 8 } = opts;
-  const [left, top, right, bottom] = [40, 30, width - 40, height - 30];
+  const [insetX, insetY] = opts.inset === undefined ? [40, 30] : [opts.inset, opts.inset];
+  const [left, top, right, bottom] = [insetX, insetY, width - insetX, height - insetY];
   const onLine = (v: number, start: number, end: number, n: number): boolean => {
     for (let i = 0; i <= n; i++) {
       const at = start + Math.round(((end - start - line) * i) / n);

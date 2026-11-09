@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
@@ -145,6 +153,19 @@ describe('delivered icons', () => {
     });
     symlinkSync(join(root, 'assets', 'private'), join(root, 'assets', 'brand'));
     expect(() => deliveredIconPaths(root)).toThrow('brand/icon.png goes through a symlink');
+  });
+
+  it('refuses a symlinked assets/ folder', () => {
+    const manifestJson = JSON.stringify({
+      version: 1,
+      assets: [{ key: 'icons.app.192', type: 'image', path: 'brand/icon.png', room: 'global' }],
+    });
+    const root = makeRoot(manifestJson, {
+      'brand/icon.png': encodePng(1, 1, () => [0, 0, 0, 255]),
+    });
+    renameSync(join(root, 'assets'), join(root, 'reference'));
+    symlinkSync(join(root, 'reference'), join(root, 'assets'));
+    expect(() => deliveredIconPaths(root)).toThrow('assets/manifest.json goes through a symlink');
   });
 
   it('fails the build on an invalid manifest instead of hiding the art', () => {

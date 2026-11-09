@@ -144,13 +144,39 @@ export function erode(mask: Mask, radius: number): Mask {
 export const closingRadius = (gap: number): number => Math.ceil(gap / 2);
 
 /**
- * Closes gaps up to `gap` px. The fill then stops at the grown lines, which the original art hides
- * underneath.
+ * Closes gaps up to `gap` px by growing lines by a disc of `closingRadius(gap)`, the same pixels
+ * `dilate` gives. The fill then stops at the grown lines, which the original art hides underneath.
+ * It runs on every page load, so it paints a few short spans per line pixel instead of computing
+ * a whole distance field.
  */
-export const closeGaps = (mask: Mask, gap = GAP_CLOSE_PX): Mask => dilate(mask, closingRadius(gap));
+export function closeGaps(mask: Mask, gap = GAP_CLOSE_PX): Mask {
+  const { width, height, data } = mask;
+  const r = closingRadius(gap);
+  // The disc's half-width on each row offset: (dx, dy) is inside when dx² + dy² ≤ r².
+  const spans = Array.from({ length: 2 * r + 1 }, (_, k) => {
+    const dy = k - r;
+    return [dy, Math.floor(Math.sqrt(r * r - dy * dy))] as const;
+  });
+  const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] !== 1) continue;
+    const x = i % width;
+    const y = (i - x) / width;
+    for (const [dy, half] of spans) {
+      const row = y + dy;
+      if (row >= 0 && row < height) {
+        const start = row * width;
+        out.fill(1, start + Math.max(0, x - half), start + Math.min(width - 1, x + half) + 1);
+      }
+    }
+  }
+  return { width, height, data: out };
+}
 
 export interface Region {
   readonly id: number;
+  /** Index of its first pixel in row-major order: one pixel that stands for the region. */
+  readonly first: number;
   readonly area: number;
   /** [x, y, width, height]. */
   readonly bounds: readonly [number, number, number, number];
@@ -200,6 +226,7 @@ export function labelRegions(mask: Mask): Labels {
     const touchesBorder = minX === 0 || minY === 0 || maxX === width - 1 || maxY === height - 1;
     regions.push({
       id,
+      first: start,
       area,
       bounds: [minX, minY, maxX - minX + 1, maxY - minY + 1],
       touchesBorder,

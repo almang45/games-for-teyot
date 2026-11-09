@@ -1,5 +1,6 @@
 import { error, type Issue } from '../../contracts/common.ts';
 import {
+  closeGaps,
   closingRadius,
   dilate,
   distanceToLines,
@@ -19,7 +20,10 @@ import type { DecodedPng } from '../build/png.ts';
 export const COLORING_RULES = {
   minRegions: 6,
   maxRegions: 15,
-  /** A fillable region holds a square this big; narrower pockets and slivers are just lines. */
+  /**
+   * A fillable region's paper holds a square this big (its corners may be rounded); narrower
+   * pockets and slivers are just lines.
+   */
   minRegionPx: 40,
   /**
    * Openings up to this wide that the 2 px closing leaves open count as leaks: a region that
@@ -86,8 +90,13 @@ function paperIssues(png: DecodedPng, distance: DistanceField, path: string): Is
   return issues;
 }
 
-const fillable = (labels: Labels, width: number): ReadonlySet<number> =>
-  regionsHoldingSquare(labels, width, COLORING_RULES.minRegionPx);
+/**
+ * Regions whose paper held a `minRegionPx` square before lines grew by `radius`: the growth
+ * trims `radius` px off each side, so the square left to find is that much smaller. Every mask
+ * then measures the same art the same way.
+ */
+const fillable = (labels: Labels, width: number, radius: number): ReadonlySet<number> =>
+  regionsHoldingSquare(labels, width, COLORING_RULES.minRegionPx - 2 * radius);
 
 /**
  * Closes openings up to `leakProbePx` as well and looks for a fillable region that falls apart
@@ -95,19 +104,19 @@ const fillable = (labels: Labels, width: number): ReadonlySet<number> =>
  * how a leak looks. Catches leaks the region count misses when the total still lands in 6–15.
  */
 function leakIssues(lines: Mask, closed: Labels, distance: DistanceField, path: string): Issue[] {
-  const probed = labelRegions(within(distance, closingRadius(COLORING_RULES.leakProbePx)));
-  const probedFillable = fillable(probed, lines.width);
-  // Pieces that matter: somewhere to fill, or the background around the subject.
-  const significant = (piece: number): boolean =>
-    probedFillable.has(piece) || probed.regions[piece - 1]?.touchesBorder === true;
+  const radius = closingRadius(COLORING_RULES.leakProbePx);
+  const probed = labelRegions(within(distance, radius));
+  const probedFillable = fillable(probed, lines.width, radius);
+  // Probe lines cover the closed lines, so each piece lies inside one closed region.
   const pieces = new Map<number, Set<number>>();
-  probed.ids.forEach((piece, i) => {
-    const region = closed.ids[i] ?? 0;
-    if (piece === 0 || region === 0 || !significant(piece)) return;
+  for (const piece of probed.regions) {
+    // Pieces that matter: somewhere to fill, or the background around the subject.
+    if (!probedFillable.has(piece.id) && !piece.touchesBorder) continue;
+    const region = closed.ids[piece.first] ?? 0;
     const set = pieces.get(region) ?? new Set<number>();
-    set.add(piece);
+    set.add(piece.id);
     pieces.set(region, set);
-  });
+  }
   const issues: Issue[] = [];
   for (const [id, set] of pieces) {
     const region = closed.regions[id - 1];
@@ -144,11 +153,12 @@ function lineIssues(lines: Mask, path: string): Issue[] {
  */
 export function checkColoringPage(png: DecodedPng, path: string): ColoringReport {
   const lines = lineMask(png.rgba, png.width, png.height);
-  // One distance field serves the gap closing, the leak probe and the grey-near-line test.
+  // One distance field serves the leak probe and the grey-near-line test.
   const distance = distanceToLines(lines);
   const issues = [...paperIssues(png, distance, path), ...lineIssues(lines, path)];
-  const closed = labelRegions(within(distance, closingRadius(GAP_CLOSE_PX)));
-  const closedFillable = fillable(closed, lines.width);
+  // The game's own gap closing, so a page that passes here fills the same way on the tablet.
+  const closed = labelRegions(closeGaps(lines));
+  const closedFillable = fillable(closed, lines.width, closingRadius(GAP_CLOSE_PX));
   issues.push(...leakIssues(lines, closed, distance, path));
   const count = closedFillable.size;
   const min = COLORING_RULES.minRegionPx;

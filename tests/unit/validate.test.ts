@@ -171,7 +171,8 @@ describe('validateAssets', () => {
       }),
     );
     expect(errors(validateAssets(root))).toEqual([
-      expect.stringMatching(/^assets\/coloring\/ayam\.png : 1 fillable regions/) as string,
+      // The one cell, and the 40 px side margins of the background.
+      expect.stringMatching(/^assets\/coloring\/ayam\.png : 2 fillable regions/) as string,
     ]);
   }, 30_000);
 
@@ -199,7 +200,16 @@ describe('validateAssets', () => {
     symlinkSync(join(root, 'outside/ui'), join(root, 'assets/ui'));
     expect(errors(validateAssets(root))).toEqual([
       'assets/ui : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
-      'assets/ui/home.png : ui/home.png goes through a symlink: copy the file in instead',
+      'assets/ui/home.png : assets/ui/home.png goes through a symlink: copy the file in instead',
+    ]);
+  });
+
+  it('reads nothing through a symlinked assets/ folder', () => {
+    deliverAssets();
+    renameSync(join(root, 'assets'), join(root, 'outside'));
+    symlinkSync(join(root, 'outside'), join(root, 'assets'));
+    expect(errors(validateAssets(root))).toEqual([
+      'assets : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
     ]);
   });
 });
@@ -252,11 +262,52 @@ describe('lintUiComponent', () => {
       '</script>',
       "import { log } from '../src/log';\nlocalStorage.x = 1; fetch('/x'); window.state = 1;\n</script>",
     );
+    const globals = '(use props, events, <svelte:window> or svelte/reactivity)';
     expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
       '../src/log: ui/ must not import from src/',
-      'ui/ must not use storage',
-      'ui/ must not use network',
-      'ui/ must not use global state',
+      'ui/ must not use storage: localStorage',
+      'ui/ must not use network: fetch',
+      `ui/ must not use browser globals ${globals}: window`,
+    ]);
+    const sneaky = COMPONENT.replace(
+      '</script>',
+      [
+        "import { getContext, onMount } from 'svelte';",
+        "const game = getContext('game-state');",
+        "const mods = import.meta.glob('../src/game/*.ts', { eager: true });",
+        "self.x = 1; globalThis['y'] ||= 1; caches.open('x'); navigator.storage.persist();",
+        "new Function('return this')();",
+        '</script>',
+        '{@html label}',
+      ].join('\n'),
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', sneaky).map((i) => i.message)).toEqual([
+      'getContext from svelte: ui/ uses only onMount, onDestroy, tick, untrack, flushSync (context is shared state)',
+      'ui/ must not use {@html}: write the markup out, so it can be checked',
+      'ui/ must not use import.meta: files and settings come in as props',
+      `ui/ must not use browser globals ${globals}: self`,
+      `ui/ must not use browser globals ${globals}: globalThis`,
+      'ui/ must not use storage: caches',
+      `ui/ must not use browser globals ${globals}: navigator`,
+      'ui/ must not use dynamic code: Function',
+    ]);
+  });
+
+  it('is not fooled by regex literals or script attributes', () => {
+    const regex = COMPONENT.replace(
+      '</script>',
+      "const re = /^https?:\\/\\//; fetch('/x');\nconst q = /['\"]/; localStorage.y = 1;\n</script>",
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', regex).map((i) => i.message)).toEqual([
+      'ui/ must not use network: fetch',
+      'ui/ must not use storage: localStorage',
+    ]);
+    const generic = COMPONENT.replace(
+      '<script lang="ts">',
+      '<script lang="ts" generics="T extends Record<string, unknown>">',
+    ).replace('</script>', 'const cdn = "https://cdn.example.com/x.js";\n</script>');
+    expect(lintUiComponent('ui/BigButton.svelte', generic).map((i) => i.message)).toEqual([
+      'remote URL https://cdn.example.com/x.js: ui/ ships no third-party requests',
     ]);
   });
 
@@ -302,13 +353,19 @@ describe('lintUiComponent', () => {
     ].join('\n');
     const bad = COMPONENT.replace('</script>', `${imports}\n</script>`);
     expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
-      'ui/ must not use dynamic import()',
+      '../src/log/side-effect: ui/ must not import from src/',
       'svelte/store: ui/ imports only svelte, sibling ui/ components and contracts/ui.ts',
       '../src: ui/ must not import from src/',
-      '../src/log/side-effect: ui/ must not import from src/',
+      'ui/ must not use dynamic import()',
+    ]);
+    const whole = COMPONENT.replace('</script>', "import * as svelte from 'svelte';\n</script>");
+    expect(lintUiComponent('ui/BigButton.svelte', whole).map((i) => i.message)).toEqual([
+      'svelte: import its functions by name',
     ]);
     const shared = COMPONENT.replace('<script lang="ts">', '<script lang="ts" module>');
     expect(lintUiComponent('ui/BigButton.svelte', shared).map((i) => i.message)).toEqual([
+      // A module script is no instance script, so nothing reads the props either.
+      'declare props as BigButtonProps from contracts/ui.ts via $props()',
       'ui/ must not use <script module>: it is state shared by every instance',
     ]);
   });
@@ -331,20 +388,38 @@ describe('lintUiComponent', () => {
     ]);
   });
 
-  it('ignores comments and comparisons', () => {
+  it('ignores comments, properties, local names, namespaces and selectors', () => {
     const fine = COMPONENT.replace(
       '</script>',
       [
+        "  import { onMount, type Snippet } from 'svelte';",
         '  // never touch localStorage here; see https://example.com/rules',
         '  /* fetch( happens in src/, not here */',
-        '  const wide = window.innerWidth == 3;',
+        '  const same = label == "x";',
         '  const url = "local//path";',
         "  const note = 'it\\'s // still a string';",
+        '  const api = { fetch: () => 1 }; api.fetch();',
+        '  const history: string[] = []; history.push(label);',
         '</script>',
         '<!-- https://example.com/mockup -->',
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M0 0" /></svg>',
       ].join('\n'),
-    ).replace('<style>', '<style>\n  /* #ff0000 was the old red, 12px the old size */');
+    ).replace(
+      '<style>',
+      [
+        '<style>',
+        '  /* #ff0000 was the old red, 12px the old size */',
+        '  button:not(.white) { clip-path: url(#face); }',
+        '  div :global(.red) { opacity: 0.5; }',
+      ].join('\n'),
+    );
     expect(lintUiComponent('ui/BigButton.svelte', fine)).toEqual([]);
+  });
+
+  it('reports a component that does not parse', () => {
+    expect(
+      lintUiComponent('ui/BigButton.svelte', '<script>let x = ;</script>')[0]?.message,
+    ).toMatch(/^does not parse: /);
   });
 });
 

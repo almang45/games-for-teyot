@@ -60,6 +60,12 @@ describe('fill regions', () => {
         }
         return hit === grow ? 1 : 0;
       });
+    for (const gap of [1, 2, 4, 8]) {
+      // The runtime closing paints spans instead of a distance field; same pixels.
+      expect([...closeGaps(m, gap).data], `closeGaps ${gap}`).toEqual(
+        brute(Math.ceil(gap / 2), true),
+      );
+    }
     for (const r of [0, 1, 2, 3, 5]) {
       expect([...dilate(m, r).data], `dilate ${r}`).toEqual(brute(r, true));
       expect([...erode(m, r).data], `erode ${r}`).toEqual(brute(r, false));
@@ -98,8 +104,8 @@ describe('fill regions', () => {
     const m = mask(['#####', '#..##', '##.##', '#####', '....#']);
     const { ids, regions } = labelRegions(m);
     expect(regions).toEqual([
-      { id: 1, area: 3, bounds: [1, 1, 2, 2], touchesBorder: false },
-      { id: 2, area: 4, bounds: [0, 4, 4, 1], touchesBorder: true },
+      { id: 1, first: 6, area: 3, bounds: [1, 1, 2, 2], touchesBorder: false },
+      { id: 2, first: 20, area: 4, bounds: [0, 4, 4, 1], touchesBorder: true },
     ]);
     expect(ids[0]).toBe(0);
     // A diagonal pinch does not connect regions.
@@ -112,19 +118,53 @@ describe('checkColoringPage', () => {
   it('accepts a closed page with 6–15 regions', () => {
     const report = checkColoringPage(gridPage({ cols: 3, rows: 3 }), 'p');
     expect(report.issues).toEqual([]);
-    expect(report.regions).toBe(9);
+    // 9 cells, plus the background: its 40 px side margins hold the square.
+    expect(report.regions).toBe(10);
+  });
+
+  it('counts a region whose paper is exactly 40 × 40 px, and not one px less', () => {
+    // A 6 × 1 row of square cells with 8 px walls; the 2 px closing must not eat the margin.
+    const cells = (inner: number): number =>
+      checkColoringPage(
+        gridPage({
+          width: 6 * inner + 7 * 8 + 2,
+          height: inner + 16 + 2,
+          cols: 6,
+          rows: 1,
+          inset: 1,
+        }),
+        'p',
+      ).regions;
+    expect(cells(40)).toBe(6);
+    expect(cells(39)).toBe(0);
+  });
+
+  it('catches a leak out of a small region next to a big one', () => {
+    // A 44 × 44 pocket in a big cell's corner, its wall opened 5 px: both still hold the square.
+    const wall = (x: number, y: number): Rgba | undefined => {
+      const onWall =
+        (x >= 92 && x < 100 && y >= 38 && y < 90) || (y >= 82 && y < 90 && x >= 48 && x < 100);
+      if (!onWall) return undefined;
+      return x >= 92 && y >= 60 && y < 65 ? WHITE : BLACK;
+    };
+    const leaky = checkColoringPage(gridPage({ cols: 3, rows: 3, extra: wall }), 'p');
+    expect(leaky.issues.map((i) => i.message)).toEqual([
+      expect.stringMatching(
+        /^2 areas in \[\d+, \d+, \d+, \d+\] join through an opening of 3–8 px:/,
+      ) as string,
+    ]);
   });
 
   it('closes 2 px gaps but catches a leak', () => {
     const base = { height: 400, cols: 2, rows: 5 } as const;
-    expect(checkColoringPage(gridPage(base), 'p').regions).toBe(10);
+    expect(checkColoringPage(gridPage(base), 'p').regions).toBe(11);
     // The first divider runs at y = 96..103; a 2 px slit through it is closed when the page loads.
     expect(
       checkColoringPage(gridPage({ ...base, gap: { x: 200, y: 96, size: 2 } }), 'p').issues,
     ).toEqual([]);
     const leaky = checkColoringPage(gridPage({ ...base, gap: { x: 200, y: 96, size: 8 } }), 'p');
-    // Two cells merge, which leaves 9 regions: inside 6–15, so only the leak probe catches it.
-    expect(leaky.regions).toBe(9);
+    // Two cells merge, which leaves 10 regions: inside 6–15, so only the leak probe catches it.
+    expect(leaky.regions).toBe(10);
     expect(leaky.issues.map((i) => i.message)).toEqual([
       '2 areas in [49, 39, 186, 123] join through an opening of 3–8 px: close the gap, or widen a deliberate passage past 8 px',
     ]);
@@ -162,8 +202,8 @@ describe('checkColoringPage', () => {
 
   it('ignores pockets smaller than 40 × 40 px', () => {
     const report = checkColoringPage(gridPage({ width: 480, height: 300, cols: 12, rows: 1 }), 'p');
-    // 12 columns of ~27 px are too narrow to fill, and so is the 30–40 px margin around them.
-    expect(report.regions).toBe(0);
+    // 12 columns of ~27 px are too narrow to fill; only the background's 40 px sides count.
+    expect(report.regions).toBe(1);
   });
 
   it('rejects thin lines', () => {

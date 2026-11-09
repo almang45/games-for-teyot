@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { z } from 'zod';
 import { error, zodIssues, type Issue } from '../../contracts/common.ts';
@@ -24,10 +24,15 @@ export interface LaneFile {
   readonly symlink: boolean;
 }
 
-/** Every file under `<root>/<lane>`, minus folder placeholders. Missing lanes are empty. */
+/**
+ * Every file under `<root>/<lane>`, minus folder placeholders. Missing lanes are empty. A linked
+ * lane folder is listed as itself and never read through.
+ */
 export function laneFiles(root: string, lane: string): LaneFile[] {
   const dir = join(root, lane);
-  if (!existsSync(dir)) return [];
+  const stat = lstatSync(dir, { throwIfNoEntry: false });
+  if (!stat) return [];
+  if (stat.isSymbolicLink()) return [{ path: lane, symlink: true }];
   return distFiles(dir, root)
     .filter((f) => !IGNORED_NAMES.has(f.path.slice(f.path.lastIndexOf('/') + 1)))
     .map((f) => ({ path: f.path, symlink: f.symlink }));

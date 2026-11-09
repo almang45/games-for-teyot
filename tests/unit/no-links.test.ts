@@ -34,4 +34,17 @@ describe('resolveWithoutLinks', () => {
     expect(() => resolveWithoutLinks(lane, 'linked/a.png')).toThrow('goes through a symlink');
     expect(() => resolveWithoutLinks(lane, '../secret.png')).toThrow('points outside');
   });
+
+  it('rejects a linked lane folder, but not a linked folder the repo sits in', () => {
+    const root = makeRoot();
+    symlinkSync(join(root, 'lane'), join(root, 'linked-lane'));
+    expect(() => resolveWithoutLinks(root, 'linked-lane/ok/a.png')).toThrow(
+      'linked-lane/ok/a.png goes through a symlink',
+    );
+    symlinkSync(root, `${root}-alias`);
+    roots.push(`${root}-alias`);
+    expect(resolveWithoutLinks(`${root}-alias`, 'lane/ok/a.png')).toBe(
+      join(root, 'lane', 'ok', 'a.png'),
+    );
+  });
 });

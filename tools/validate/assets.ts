@@ -27,7 +27,8 @@ export const MANIFEST_FILE = `${ASSETS_LANE}/manifest.json`;
 
 /**
  * Reference sheets (ASSETS.md §3) are review material: committed, never registered or shipped.
- * They are drawn PNG sheets only, so nothing else (a photo, a recording) can hide in the folder.
+ * Only real PNGs pass, which keeps recordings, PDFs and JPEG photos out. A photo re-saved as PNG
+ * still passes: telling drawn art from a photo is the reviewer's call (ASSETS.md §8 checklist).
  */
 const REFERENCE_SHEETS = `${ASSETS_LANE}/style/`;
 
@@ -45,6 +46,7 @@ function checkReferenceSheet(root: string, file: string): FileIssue[] {
 /** The manifest, if `assets/` has one. Shared with validate:design for its cross-lane checks. */
 export function loadManifest(root: string): Parsed<Manifest> | undefined {
   if (!existsSync(join(root, MANIFEST_FILE))) return undefined;
+  if (lstatSync(join(root, ASSETS_LANE)).isSymbolicLink()) return undefined;
   return parseJsonFile(root, MANIFEST_FILE, manifest);
 }
 
@@ -76,7 +78,7 @@ function checkEntryFile(root: string, entry: ManifestEntry, at: string, m: Manif
   // A linked file is already reported by the lane listing; never read through a link.
   if (lstatSync(full).isSymbolicLink()) return [];
   try {
-    resolveWithoutLinks(join(root, ASSETS_LANE), entry.path);
+    resolveWithoutLinks(root, file);
   } catch (err) {
     return [{ ...error('', err instanceof Error ? err.message : String(err)), file }];
   }
@@ -115,6 +117,8 @@ export function validateAssets(root: string): Report {
   if (files.length === 0) return report([]);
 
   const issues: FileIssue[] = files.filter((f) => f.symlink).map(symlinkIssue);
+  // A linked assets/ folder: nothing in it is read.
+  if (files.some((f) => f.path === ASSETS_LANE)) return report(issues);
   const parsed = loadManifest(root);
   if (!parsed)
     return report([

@@ -31,8 +31,8 @@ type Icon = (typeof ICONS)[number];
  * shipping placeholders over real art would hide the breakage.
  */
 export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
-  const file = resolve(root, 'assets', 'manifest.json');
-  if (!existsSync(file)) return new Map();
+  if (!existsSync(resolve(root, 'assets', 'manifest.json'))) return new Map();
+  const file = resolveWithoutLinks(root, 'assets/manifest.json');
   const parsed = manifest.safeParse(JSON.parse(readFileSync(file, 'utf8')));
   if (!parsed.success) {
     throw new Error(
@@ -42,7 +42,7 @@ export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
   return new Map(
     parsed.data.assets
       .filter((a) => ICONS.some((i) => i.key === a.key))
-      .map((a) => [a.key, resolveWithoutLinks(resolve(root, 'assets'), a.path)]),
+      .map((a) => [a.key, resolveWithoutLinks(root, `assets/${a.path}`)]),
   );
 }
 
