@@ -1,4 +1,5 @@
 import type { Strings } from '../content/strings';
+import { markActiveScene } from '../game/services';
 import { BROWSER_OVERRIDE_PARAM, type InstallPlatform } from '../platform/launch';
 
 /**
@@ -42,5 +43,5 @@ export function renderInstallScreen(
 
   section.append(title, lead, steps, warning, continueLink);
   root.replaceChildren(section);
-  doc.body.dataset.scene = 'Install';
+  markActiveScene('Install');
 }

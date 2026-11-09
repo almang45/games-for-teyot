@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { GAME_URL, collectLog, expectScene, pressStart } from './helpers';
+import {
+  FRONT_ROOM_OFFSET,
+  GAME_URL,
+  emulateAutoplayPolicy,
+  collectLog,
+  expectScene,
+  pressStart,
+  tapCanvas,
+} from './helpers';
 
 test.describe('US-OFF-01: install and offline play', () => {
   test('US-OFF-01 a plain browser tab shows SCR-INSTALL', async ({ page }) => {
@@ -16,15 +24,17 @@ test.describe('US-OFF-01: install and offline play', () => {
     await expect(page.locator('canvas')).toBeVisible();
   });
 
-  test('US-OFF-01 after one online visit, the app boots offline', async ({
+  test('US-OFF-01 after one online visit, the app boots and plays offline', async ({
     page,
     context,
     browserName,
+    hasTouch,
   }) => {
     test.skip(
       browserName !== 'chromium',
       'Service worker offline emulation is Chromium-only in Playwright',
     );
+    const log = collectLog(page);
     await page.goto(GAME_URL);
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
@@ -39,6 +49,15 @@ test.describe('US-OFF-01: install and offline play', () => {
     await page.reload();
     await expectScene(page, 'Boot');
     expect(Date.now() - started).toBeLessThan(3_000);
+
+    // "The placeholder house is playable" offline: start, reach the house, walk to a room.
+    await pressStart(page, hasTouch);
+    await expectScene(page, 'House');
+    await tapCanvas(page, hasTouch, FRONT_ROOM_OFFSET);
+    await expect
+      .poll(() => log.find((e) => e.event === 'house.room_tap')?.data.room)
+      .toBe('ruang-tamu');
+    expect(log.filter((e) => e.level === 'error')).toEqual([]);
   });
 });
 
@@ -49,15 +68,20 @@ test.describe('US-AUD-01: audio starts on the first tap', () => {
     browserName,
   }) => {
     const log = collectLog(page);
+    await emulateAutoplayPolicy(page);
     await page.goto(GAME_URL);
     await expectScene(page, 'Boot');
     expect(log.some((e) => e.event === 'boot.audio_unlocked')).toBe(false);
+    // Proves the tap does the unlocking: before it, the context must still be locked.
+    const ready = log.find((e) => e.event === 'scene.ready' && e.data.audioState !== undefined);
+    expect(ready?.data.audioState, 'AudioContext state at SCR-BOOT').not.toBe('running');
 
     await pressStart(page, hasTouch);
 
     await expectScene(page, 'House');
     const unlocked = log.find((e) => e.event === 'boot.audio_unlocked');
     expect(unlocked, 'boot.audio_unlocked was logged').toBeDefined();
+    expect(unlocked?.data.audioState).toBe('running');
     // The 300 ms budget targets Chrome on Android (checked here on Chromium and on the real tablet).
     // Headless WebKit's audio backend start varies (seen 300-400 ms), so there it only has to unlock.
     if (browserName === 'chromium') {

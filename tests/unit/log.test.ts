@@ -49,11 +49,14 @@ describe('Logger', () => {
       },
     };
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    new Logger([broken, good], 's', null, fixedClock).warn('w');
-    expect(good.entries).toHaveLength(1);
-    expect(consoleError).toHaveBeenCalledOnce();
-    expect(String(consoleError.mock.calls[0]?.[0])).toContain('log.sink_failed');
-    consoleError.mockRestore();
+    try {
+      new Logger([broken, good], 's', null, fixedClock).warn('w');
+      expect(good.entries).toHaveLength(1);
+      expect(consoleError).toHaveBeenCalledOnce();
+      expect(String(consoleError.mock.calls[0]?.[0])).toContain('log.sink_failed');
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
 

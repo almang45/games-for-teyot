@@ -48,3 +48,34 @@ body {
   margin-top: 1rem;
   color: inherit;
 }
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  height: 100%;
+  text-align: center;
+}
+
+.failure h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.failure__retry {
+  min-width: 14rem;
+  min-height: 6rem;
+  padding: 1rem 2.5rem;
+  /* Same colors as the placeholder Mulai button (src/placeholder/palette.ts). */
+  border: 0.375rem solid #6b4f4f;
+  border-radius: 999px;
+  background: #ff8a80;
+  color: #ffffff;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}

@@ -14,7 +14,9 @@ const pkg = JSON.parse(readFileSync(new URL('package.json', import.meta.url), 'u
 };
 
 function gitSha(): string {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  // CI sets APP_COMMIT_SHA to the PR head; GITHUB_SHA on a PR is a temporary merge commit.
+  const ciSha = process.env.APP_COMMIT_SHA ?? process.env.GITHUB_SHA;
+  if (ciSha) return ciSha.slice(0, 7);
   try {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch (err) {
@@ -70,7 +72,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,webp,webm,json,webmanifest}'],
+        // No webmanifest here: vite-plugin-pwa adds the manifest to the precache itself.
+        globPatterns: ['**/*.{js,css,html,png,svg,webp,webm,json}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,

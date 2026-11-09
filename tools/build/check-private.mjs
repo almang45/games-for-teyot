@@ -1,61 +1,27 @@
 #!/usr/bin/env node
-// PRD US-PRIV-01: the build output must contain nothing from reference/ or recordings/.
-// Photos and raw audio never ship; processed voice ships only as Opus .webm sprites.
-import { readdirSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// fileURLToPath, not URL.pathname: handles spaces and Windows drive letters.
-const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
-
-/** dist-relative path with '/' separators on every OS, so prefix checks work on Windows. */
-const toPosix = (/** @type {string} */ full) => relative(DIST, full).split(sep).join('/');
-
-const FORBIDDEN_EXTENSIONS = [
-  '.jpg',
-  '.jpeg',
-  '.heic',
-  '.heif',
-  '.dng',
-  '.raw',
-  '.mov',
-  '.mp4',
-  '.m4v',
-  '.avi',
-  '.wav',
-  '.aif',
-  '.aiff',
-  '.flac',
-  '.m4a',
-  '.mp3',
-];
-const FORBIDDEN_SEGMENTS = ['reference', 'recordings'];
-
-/** @param {string} dir @returns {string[]} */
-function walk(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name);
-    return entry.isDirectory() ? walk(full) : [toPosix(full)];
-  });
-}
+// PRD US-PRIV-01: the build output must contain nothing from reference/ or recordings/, and only
+// allow-listed web asset types (tools/build/privacy-rules.mjs).
+import { distFiles, DIST } from './dist-files.mjs';
+import { violation } from './privacy-rules.mjs';
 
 function main() {
   let files;
   try {
-    files = walk(DIST);
+    files = distFiles();
   } catch (err) {
     console.error(
-      JSON.stringify({ level: 'error', event: 'privacy.dist_unreadable', error: String(err) }),
+      JSON.stringify({
+        level: 'error',
+        event: 'privacy.dist_unreadable',
+        dist: DIST,
+        error: String(err),
+      }),
     );
     return 1;
   }
-  const violations = files.filter((path) => {
-    const lower = path.toLowerCase();
-    const segments = lower.split('/');
-    return (
-      FORBIDDEN_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
-      segments.some((s) => FORBIDDEN_SEGMENTS.includes(s))
-    );
+  const violations = files.flatMap(({ path }) => {
+    const reason = violation(path);
+    return reason ? [{ path, reason }] : [];
   });
   if (violations.length > 0) {
     console.error(JSON.stringify({ level: 'error', event: 'privacy.forbidden_files', violations }));

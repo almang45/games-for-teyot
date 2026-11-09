@@ -20,7 +20,9 @@ export function createGame(parent: HTMLElement, services: GameServices): Phaser.
       width: DESIGN_WIDTH,
       height: DESIGN_HEIGHT,
     },
-    audio: { context: services.audio },
+    // The app owns the AudioContext (services.audio). Handing it to Phaser would add Phaser's own
+    // unlock: an unhandled resume() at boot plus body-wide gesture listeners that race the Mulai tap.
+    audio: { noAudio: true },
     input: { activePointers: 3 },
     render: { antialias: true, powerPreference: 'high-performance' },
     scene: [BootScene, HouseScene],

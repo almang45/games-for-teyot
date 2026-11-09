@@ -12,6 +12,12 @@
         "Pilih \"Tambahkan ke layar utama\", lalu \"Instal\".",
         "Buka Rumah Cici Theia dari layar utama."
       ],
+      "ios": [
+        "Buka halaman ini di Safari.",
+        "Ketuk tombol Bagikan (kotak dengan panah ke atas).",
+        "Pilih \"Tambah ke Layar Utama\", lalu \"Tambah\".",
+        "Buka Rumah Cici Theia dari layar utama."
+      ],
       "safari-mac": [
         "Di Safari, buka menu File.",
         "Pilih \"Tambahkan ke Dock\".",

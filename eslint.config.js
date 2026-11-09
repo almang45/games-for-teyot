@@ -32,7 +32,8 @@ export default defineConfig(
       },
     },
     rules: {
-      'no-console': ['error', { allow: ['info', 'warn', 'error', 'debug'] }],
+      // Everything goes through the structured logger (src/log), so the ring buffer sees it.
+      'no-console': 'error',
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
     },
   },

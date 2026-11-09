@@ -1,11 +1,13 @@
 // Static-assets-only Worker (docs/ARCHITECTURE.md §8.2). Access protects the custom domain and the
-// workers.dev previews; configure it in the Zero Trust dashboard, not here.
+// preview URLs; configure it in the Cloudflare dashboard, not here.
+// workers_dev is off so production has one hostname, the Access-protected custom domain. Preview
+// URLs still live on workers.dev, so `preview_urls` is set explicitly (it defaults to workers_dev).
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "rumah-cici-theia",
   "compatibility_date": "2026-11-01",
   "routes": [{ "pattern": "rct.amns.my.id", "custom_domain": true }],
-  "workers_dev": true,
+  "workers_dev": false,
   "preview_urls": true,
   "assets": {
     "directory": "./dist",

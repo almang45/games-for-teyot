@@ -4,6 +4,7 @@ import { getStrings } from './content/strings';
 import { renderInstallScreen } from './install/installScreen';
 import { captureGlobalErrors, createAppLog, createSessionId, type Logger } from './log';
 import { detectInstallPlatform, readLaunchSignals, resolveLaunchMode } from './platform/launch';
+import { renderFailureScreen } from './shell/failureScreen';
 
 // No module imported above does work at import time, so the capture below sees every boot error.
 const { logger } = createAppLog(createSessionId(), import.meta.env.DEV);
@@ -41,12 +42,13 @@ async function startGame(root: HTMLElement, log: Logger): Promise<void> {
   createGame(root, { logger: log, audio });
 }
 
-function main(): void {
-  const root = document.getElementById('app');
-  if (!root) throw new Error('#app root element missing from index.html');
+type NavigatorWithHints = Navigator & { userAgentData?: { platform?: string } };
 
+function main(root: HTMLElement): void {
   const strings = getStrings();
-  const signals = readLaunchSignals(window);
+  const signals = readLaunchSignals(window, (err: unknown) => {
+    logger.warn('launch.storage_unavailable', { error: String(err) });
+  });
   const mode = resolveLaunchMode(signals);
   logger.info('app.launch', { mode, ...signals, version: __APP_VERSION__ });
   registerServiceWorker(logger);
@@ -54,7 +56,11 @@ function main(): void {
   if (mode === 'install') {
     renderInstallScreen(
       root,
-      detectInstallPlatform(navigator.userAgent),
+      detectInstallPlatform({
+        userAgent: navigator.userAgent,
+        maxTouchPoints: navigator.maxTouchPoints,
+        uaPlatform: (navigator as NavigatorWithHints).userAgentData?.platform,
+      }),
       strings.install,
       new URL(location.href),
     );
@@ -66,11 +72,25 @@ function main(): void {
   });
   startGame(root, logger).catch((err: unknown) => {
     logger.error('app.start_failed', err);
+    showFailure(root);
   });
 }
 
-try {
-  main();
-} catch (err) {
-  logger.error('app.boot_failed', err);
+function showFailure(root: HTMLElement): void {
+  renderFailureScreen(root, () => {
+    location.reload();
+  });
+}
+
+const appRoot = document.getElementById('app');
+if (appRoot) {
+  try {
+    main(appRoot);
+  } catch (err) {
+    logger.error('app.boot_failed', err);
+    showFailure(appRoot);
+  }
+} else {
+  // Only a broken index.html gets here; there is nowhere to render a screen.
+  logger.error('app.boot_failed', new Error('#app root element missing from index.html'));
 }

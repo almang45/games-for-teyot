@@ -27,6 +27,38 @@ export async function expectScene(page: Page, scene: string): Promise<void> {
   await expect(page.locator('body')).toHaveAttribute('data-scene', scene, { timeout: 15_000 });
 }
 
+/**
+ * Headless Chromium creates every AudioContext 'running' (no flag changes that), so an unlock test
+ * would pass even if the tap never resumed anything. This applies the device policy in the page: a
+ * context stays 'suspended' until resume() is called with transient user activation, i.e. from
+ * inside a real tap or click handler.
+ */
+export async function emulateAutoplayPolicy(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const Native = window.AudioContext;
+    window.AudioContext = class extends Native {
+      #unlocked = false;
+
+      override get state(): AudioContextState {
+        return this.#unlocked ? super.state : 'suspended';
+      }
+
+      override resume(): Promise<void> {
+        if (!navigator.userActivation.isActive && !this.#unlocked) {
+          return Promise.reject(
+            new DOMException('resume() without a user gesture', 'NotAllowedError'),
+          );
+        }
+        this.#unlocked = true;
+        return super.resume();
+      }
+    };
+  });
+}
+
+/** 200 design px below the center lands in the front room (ruang-tamu) of the placeholder house. */
+export const FRONT_ROOM_OFFSET = 200;
+
 /** Design-frame height; Scale.EXPAND keeps it on every 16:10-or-wider test viewport. */
 const DESIGN_HEIGHT = 1200;
 

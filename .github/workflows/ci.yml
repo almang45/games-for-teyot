@@ -68,6 +68,8 @@ jobs:
       - run: npm ci
       # Includes the size budget and the privacy check (US-PRIV-01).
       - run: npm run build
+        env:
+          APP_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
@@ -102,39 +104,30 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  codeql:
+  # Semgrep CE (LGPL engine, Semgrep Registry rules): CodeQL's licence doesn't cover private repos
+  # without GitHub Code Security. The image is pinned by digest like the actions.
+  semgrep:
     needs: e2e
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      actions: read
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
-        with:
-          languages: javascript-typescript
-          build-mode: none
-          queries: security-extended
-      # Private repo without GitHub Advanced Security: analyze locally and gate on the SARIF.
-      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
-        with:
-          upload: never
-          output: codeql-results
-      - name: Fail on CodeQL findings
+      - name: Semgrep scan
         run: |
-          count=$(jq '[.runs[].results[]] | length' codeql-results/*.sarif)
-          jq -r '.runs[].results[] | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri),line=\(.locations[0].physicalLocation.region.startLine)::\(.ruleId): \(.message.text)"' codeql-results/*.sarif
-          echo "CodeQL findings: ${count}"
-          test "${count}" -eq 0
+          docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}:/src" -w /src \
+            -e HOME=/tmp \
+            semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0 \
+            semgrep scan --config p/default --config p/typescript --metrics=off \
+              --error --sarif-output=semgrep.sarif src tools
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: codeql-sarif
-          path: codeql-results/
+          name: semgrep-sarif
+          path: semgrep.sarif
           retention-days: 14
+          if-no-files-found: ignore
 
   osv-scanner:
     needs: e2e
@@ -150,7 +143,7 @@ jobs:
             --lockfile=package-lock.json
 
   quality-gate:
-    needs: [codeql, osv-scanner]
+    needs: [semgrep, osv-scanner]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
@@ -164,28 +157,24 @@ jobs:
         with:
           name: coverage
           path: coverage
+      # The gate blocks the pipeline: no token means no gate, which is a failure, not a skip.
+      # Dependabot PRs read Dependabot secrets, so SONAR_TOKEN must be set there too.
       - name: Check SonarQube Cloud token
-        id: sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           if [ -z "${SONAR_TOKEN}" ]; then
-            echo "::warning::SONAR_TOKEN is not set: the quality gate did not run, so nothing deploys."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "::error::SONAR_TOKEN is not set (Actions secrets, and Dependabot secrets for Dependabot PRs); the quality gate cannot run."
+            exit 1
           fi
-      - if: steps.sonar.outputs.enabled == 'true'
-        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+      - uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: -Dsonar.qualitygate.wait=true
       # Only reached when the scan passed the gate (a failing gate fails the step above).
       - id: result
-        env:
-          ENABLED: ${{ steps.sonar.outputs.enabled }}
-        run: echo "passed=${ENABLED}" >> "$GITHUB_OUTPUT"
+        run: echo "passed=true" >> "$GITHUB_OUTPUT"
 
   deploy-preview:
     if: github.event_name == 'pull_request'

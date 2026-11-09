@@ -23,7 +23,13 @@ describe('SCR-INSTALL (US-OFF-01)', () => {
     expect(document.body.dataset.scene).toBe('Install');
   });
 
-  it('links "Lanjut di browser" to the same page with the override, keeping other params', () => {
+  it('has steps for iPhone and iPad', () => {
+    renderInstallScreen(root, 'ios', strings.install, new URL('https://rct.amns.my.id/'));
+    const steps = [...root.querySelectorAll('li')].map((li) => li.textContent);
+    expect(steps).toEqual(strings.install.steps.ios);
+  });
+
+  it('links "Lanjut di browser"to the same page with the override, keeping other params', () => {
     renderInstallScreen(root, 'safari-mac', strings.install, new URL('https://x.test/?a=1'));
     const link = root.querySelector<HTMLAnchorElement>('a.install__continue');
     expect(link?.getAttribute('href')).toBe('/?a=1&browser=1');

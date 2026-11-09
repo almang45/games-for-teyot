@@ -2,9 +2,10 @@
 // Usage: npm run build && (npx vite preview --port 4173 &) && npx tsx tools/dev/pr-screenshots.ts <outDir>
 import { chromium } from '@playwright/test';
 
+// CSS size × scale must equal the AGENTS.md device pixels exactly, so each scale divides both sides.
 const VIEWPORTS = [
   { name: 'tablet-1920x1200', width: 1280, height: 800, scale: 1.5 },
-  { name: 'phone-2400x1080', width: 2400 / 2.625, height: 1080 / 2.625, scale: 2.625 },
+  { name: 'phone-2400x1080', width: 960, height: 432, scale: 2.5 },
 ] as const;
 
 async function main(outDir: string): Promise<void> {
@@ -12,7 +13,7 @@ async function main(outDir: string): Promise<void> {
   try {
     for (const vp of VIEWPORTS) {
       const context = await browser.newContext({
-        viewport: { width: Math.round(vp.width), height: Math.round(vp.height) },
+        viewport: { width: vp.width, height: vp.height },
         deviceScaleFactor: vp.scale,
         hasTouch: true,
         isMobile: true,
@@ -38,6 +39,8 @@ async function main(outDir: string): Promise<void> {
 }
 
 main(process.argv[2] ?? '.').catch((err: unknown) => {
-  console.error(err);
+  const error =
+    err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err);
+  console.error(JSON.stringify({ level: 'error', event: 'screenshots.failed', error }));
   process.exitCode = 1;
 });

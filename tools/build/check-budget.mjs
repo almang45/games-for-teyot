@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 // Fails the build when dist/ exceeds the budgets in docs/ARCHITECTURE.md §10.
-import { readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { distFiles, DIST } from './dist-files.mjs';
 
-// fileURLToPath, not URL.pathname: handles spaces and Windows drive letters.
-const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
-
-/** dist-relative path with '/' separators on every OS, so prefix checks work on Windows. */
-const toPosix = (/** @type {string} */ full) => relative(DIST, full).split(sep).join('/');
 const MB = 1024 * 1024;
 
 // Room bundles (lazy, cached on first entry) live under these prefixes once they exist.
@@ -18,22 +11,18 @@ const BUDGETS = {
   totalBytes: 60 * MB,
 };
 
-/** @param {string} dir @returns {{ path: string, bytes: number }[]} */
-function walk(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) return walk(full);
-    return [{ path: toPosix(full), bytes: statSync(full).size }];
-  });
-}
-
 function main() {
   let files;
   try {
-    files = walk(DIST);
+    files = distFiles();
   } catch (err) {
     console.error(
-      JSON.stringify({ level: 'error', event: 'budget.dist_unreadable', error: String(err) }),
+      JSON.stringify({
+        level: 'error',
+        event: 'budget.dist_unreadable',
+        dist: DIST,
+        error: String(err),
+      }),
     );
     return 1;
   }

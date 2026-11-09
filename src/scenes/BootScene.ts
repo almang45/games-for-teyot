@@ -78,7 +78,10 @@ export class BootScene extends Phaser.Scene {
       unlockAudio(audio)
         .then(() => {
           playPlaceholderChime(audio);
-          log.info('boot.audio_unlocked', { latencyMs: Math.round(performance.now() - tapAt) });
+          log.info('boot.audio_unlocked', {
+            latencyMs: Math.round(performance.now() - tapAt),
+            audioState: audio.state,
+          });
         })
         .catch((err: unknown) => {
           // Silent play beats a stuck start screen; the parent log shows why.
@@ -90,6 +93,7 @@ export class BootScene extends Phaser.Scene {
     });
 
     markActiveScene(BootScene.KEY);
-    log.info('scene.ready');
+    // Before the tap this must not be 'running'; US-AUD-01's E2E test checks it.
+    log.info('scene.ready', { audioState: audio.state });
   }
 }

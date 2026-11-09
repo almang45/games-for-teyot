@@ -206,8 +206,11 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 
 ## 7. Audio engine
 
-- Phaser WebAudio. The first tap on "Mulai" unlocks the audio context. The voice queue only starts
-  after that tap.
+- One app-owned `AudioContext` (`src/engine/audio`), shared through the game services. Phaser's
+  sound manager is off (`audio.noAudio`): its built-in unlock resumes the context at boot and on any
+  gesture anywhere, which would race the Mulai tap. The tap on "Mulai" is the only unlock, and the
+  voice queue only starts after it. Resuming after the app returns from the background is the audio
+  engine's job.
 - **Voice queue**: one voice clip at a time. A new instruction cancels pending praise, never the
   reverse. Background music ducks to −12 dB while a voice clip plays.
 - Clips are referenced by **key** (`instr.tracing.follow`, `letter.name.A`). The narrator setting
@@ -253,8 +256,9 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   `Permissions-Policy` that denies camera, mic, and geolocation.
 
 ### 8.3 Cloudflare Access
-- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's
-  `workers.dev` preview URLs. The policy allows the family Google accounts.
+- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's preview
+  URLs (Worker → Settings → Domains & Routes). Production has no `workers.dev` route
+  (`workers_dev: false`), so the custom domain is its only hostname. The policy allows the family Google accounts.
   Session duration: 1 month.
 - Offline and on expired sessions, the service worker serves the cached shell, so she can always
   play. An update fetch that gets an Access redirect counts as "no update". The service worker
@@ -281,13 +285,14 @@ lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-
 | test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
 | build | `vite build`. Fails if the size budget (§10) is exceeded. |
 | validate-assets | `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
-| SAST | CodeQL (javascript-typescript), `osv-scanner` on the lockfile |
+| SAST | Semgrep CE (`p/default`, `p/typescript`; CodeQL's licence excludes private repos without GitHub Code Security), `osv-scanner` on the lockfile |
 | quality-gate | SonarQube Cloud. The gate blocks the pipeline. |
 | deploy | PR: `wrangler versions upload` (preview URL, behind Access). `master`: `wrangler deploy`. |
 
 Secrets live in GitHub Actions secrets:
-- `CLOUDFLARE_API_TOKEN`: the "Edit Cloudflare Workers" template, limited to one account and the
-  `amns.my.id` zone (the custom domain needs *Workers Routes: Edit* on the zone)
+- `CLOUDFLARE_API_TOKEN`: a custom least-privilege token. Account: *Workers Scripts: Edit*,
+  *Account Settings: Read*. Zone `amns.my.id`: *Workers Routes: Edit* (for the custom domain). Every
+  PR run can use it, so it gets nothing else.
 - `CLOUDFLARE_ACCOUNT_ID`
 - `SONAR_TOKEN`
 

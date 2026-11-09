@@ -10,6 +10,7 @@ const StringsSchema = z.object({
     lead: z.string().min(1),
     steps: z.object({
       android: StepsSchema,
+      ios: StepsSchema,
       'safari-mac': StepsSchema,
       'desktop-chromium': StepsSchema,
       other: StepsSchema,

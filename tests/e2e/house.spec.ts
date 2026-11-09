@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { GAME_URL, collectLog, expectScene, pressStart, tapCanvas } from './helpers';
-
-// 200 design px below the center lands in the front room (ruang-tamu) of the placeholder house.
-const FRONT_ROOM_OFFSET = 200;
+import {
+  FRONT_ROOM_OFFSET,
+  GAME_URL,
+  collectLog,
+  expectScene,
+  pressStart,
+  tapCanvas,
+} from './helpers';
 
 test('SCR-HOUSE keeps Theia in the room she walked to when the screen resizes', async ({
   page,

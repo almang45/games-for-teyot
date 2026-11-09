@@ -46,15 +46,17 @@ npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKi
 | `tools/build/` | Placeholder icons, `_headers` parsing, budget and privacy checks |
 | `tests/unit/`, `tests/e2e/` | Vitest and Playwright. E2E tests are named after PRD story IDs. |
 | `public/` | `_headers` (CSP, caching), `robots.txt` |
-| `.github/workflows/ci.yml` | lint → test + e2e → build → CodeQL + osv-scanner → SonarQube Cloud → deploy |
+| `.github/workflows/ci.yml` | lint → test → build → e2e → Semgrep + osv-scanner → SonarQube Cloud gate → deploy |
 
 ### CI secrets
 
 | Secret | Used by |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Deploy jobs. "Edit Cloudflare Workers" template, limited to one account and the `amns.my.id` zone (the custom domain needs *Workers Routes: Edit*). |
+| `CLOUDFLARE_API_TOKEN` | Deploy jobs. Custom token, least privilege: Account → *Workers Scripts: Edit* and *Account Settings: Read*; Zone `amns.my.id` → *Workers Routes: Edit*. |
 | `CLOUDFLARE_ACCOUNT_ID` | Deploy jobs |
-| `SONAR_TOKEN` | Quality gate (skipped with a warning until set) |
+| `SONAR_TOKEN` | Quality gate. Required: CI fails without it. Add it to **Dependabot** secrets as well, so Dependabot PRs pass the gate. |
 
-Deploys: each PR uploads a preview version (`pr-<n>` alias on `workers.dev`); `master` deploys to
-`rct.amns.my.id`. Roll back with `npx wrangler rollback <version-id>`.
+Deploys run only after the quality gate passes. Each PR uploads a preview version (`pr-<n>`
+preview URL on `workers.dev`, behind Access); `master` deploys to `rct.amns.my.id`, the only
+production hostname (`workers_dev` is off). `npm run deploy` builds first, but it bypasses the CI
+gates, so it is for the very first deploy only. Roll back with `npx wrangler rollback <version-id>`.

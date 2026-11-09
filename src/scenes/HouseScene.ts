@@ -17,6 +17,7 @@ import { placeholderPalette as pal } from '../placeholder/palette';
 
 const TILE_WIDTH = 180;
 const GRID_TILES = 8;
+const RESIZE_SETTLE_MS = 120;
 
 /**
  * SCR-HOUSE placeholder: a code-drawn isometric cutaway with tappable rooms. The real hub replaces
@@ -43,13 +44,18 @@ export class HouseScene extends Phaser.Scene {
     this.theia.setDepth(1000);
     this.theiaRoom = placeholderRooms[0];
 
-    const redraw = (): void => {
-      this.draw();
+    this.draw();
+    // A window drag or rotation fires dozens of RESIZE events; rebuild once the size settles.
+    let settle: Phaser.Time.TimerEvent | undefined;
+    const onResize = (): void => {
+      settle?.remove();
+      settle = this.time.delayedCall(RESIZE_SETTLE_MS, () => {
+        this.draw();
+      });
     };
-    redraw();
-    this.scale.on(Phaser.Scale.Events.RESIZE, redraw);
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, redraw);
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
     });
 
     markActiveScene(HouseScene.KEY);
