@@ -42,6 +42,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
+      // Manifest fetches omit cookies by default; behind Cloudflare Access that gets a login redirect.
+      useCredentials: true,
       manifest: {
         id: '/',
         name: 'Rumah Cici Theia',

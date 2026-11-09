@@ -52,7 +52,7 @@ npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKi
 
 | Secret | Used by |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Deploy jobs. Scope: *Workers Scripts: Edit* on one account. |
+| `CLOUDFLARE_API_TOKEN` | Deploy jobs. "Edit Cloudflare Workers" template, limited to one account and the `amns.my.id` zone (the custom domain needs *Workers Routes: Edit*). |
 | `CLOUDFLARE_ACCOUNT_ID` | Deploy jobs |
 | `SONAR_TOKEN` | Quality gate (skipped with a warning until set) |
 

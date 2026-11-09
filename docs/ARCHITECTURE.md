@@ -286,7 +286,8 @@ lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-
 | deploy | PR: `wrangler versions upload` (preview URL, behind Access). `master`: `wrangler deploy`. |
 
 Secrets live in GitHub Actions secrets:
-- `CLOUDFLARE_API_TOKEN`, scoped to *Workers Scripts: Edit* on one account
+- `CLOUDFLARE_API_TOKEN`: the "Edit Cloudflare Workers" template, limited to one account and the
+  `amns.my.id` zone (the custom domain needs *Workers Routes: Edit* on the zone)
 - `CLOUDFLARE_ACCOUNT_ID`
 - `SONAR_TOKEN`
 
