@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { encodePng } from '../../tools/build/png';
-import { validateAssets } from '../../tools/validate/assets';
+import { loadManifest, validateAssets } from '../../tools/validate/assets';
 import { validateDesign } from '../../tools/validate/design';
 import { printReport, type Report } from '../../tools/validate/lane';
 import { lintUiComponent } from '../../tools/validate/ui-lint';
@@ -212,6 +212,16 @@ describe('validateAssets', () => {
       'assets : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
     ]);
   });
+
+  it('reads nothing through a symlinked manifest, here or in validate:design', () => {
+    deliverAssets();
+    renameSync(join(root, 'assets/manifest.json'), join(root, 'manifest.json'));
+    symlinkSync(join(root, 'manifest.json'), join(root, 'assets/manifest.json'));
+    expect(errors(validateAssets(root))).toEqual([
+      'assets/manifest.json : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
+    ]);
+    expect(loadManifest(root)).toBeUndefined();
+  });
 });
 
 const COMPONENT = `<script lang="ts">
@@ -283,13 +293,13 @@ describe('lintUiComponent', () => {
     );
     expect(lintUiComponent('ui/BigButton.svelte', sneaky).map((i) => i.message)).toEqual([
       'getContext from svelte: ui/ uses only onMount, onDestroy, tick, untrack, flushSync (context is shared state)',
-      'ui/ must not use {@html}: write the markup out, so it can be checked',
       'ui/ must not use import.meta: files and settings come in as props',
       `ui/ must not use browser globals ${globals}: self`,
       `ui/ must not use browser globals ${globals}: globalThis`,
       'ui/ must not use storage: caches',
       `ui/ must not use browser globals ${globals}: navigator`,
       'ui/ must not use dynamic code: Function',
+      'ui/ must not use {@html}: write the markup out, so it can be checked',
     ]);
   });
 
@@ -308,6 +318,69 @@ describe('lintUiComponent', () => {
     ).replace('</script>', 'const cdn = "https://cdn.example.com/x.js";\n</script>');
     expect(lintUiComponent('ui/BigButton.svelte', generic).map((i) => i.message)).toEqual([
       'remote URL https://cdn.example.com/x.js: ui/ ships no third-party requests',
+    ]);
+  });
+
+  it('rejects markup that hides code or styles from the checks', () => {
+    const hidden = COMPONENT.replace(
+      '<button',
+      [
+        '<svelte:head><style>@import url(https://fonts.example.com/x); .a { color: red; }</style>',
+        "<script>localStorage.setItem('a', 'b');</script></svelte:head>",
+        '<a href="javascript:void(0)" onclick="localStorage.clear()">x</a>',
+        '<svelte:element this="script">x</svelte:element>',
+        '<svelte:element this={label}>y</svelte:element>',
+        '<iframe title="t" src="/x.html"></iframe>',
+        '<button',
+      ].join('\n'),
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', hidden).map((i) => i.message)).toEqual([
+      'ui/ must not render <style>: styles go in the component <style>',
+      'ui/ must not render <script>: code goes in the component <script>',
+      'href="javascript:…": handle it with an event prop',
+      'onclick="…": write handlers as onclick={…}',
+      '<svelte:element> needs a fixed tag, so it can be checked',
+      'ui/ must not render <iframe>: ui/ shows its own markup only',
+    ]);
+  });
+
+  it('wants its own names to differ from browser globals, wherever they are declared', () => {
+    const shadowing = COMPONENT.replace(
+      '</script>',
+      [
+        'function load(fetch: () => void) { return fetch; }',
+        "fetch('/api');",
+        'const { parent } = { parent: 1 };',
+        '</script>',
+        '{#each [label] as item, history}<i>{item}{history}</i>{/each}',
+      ].join('\n'),
+    );
+    // Markup is read first. A use of the each index counts as the global too; renaming fixes both.
+    expect(lintUiComponent('ui/BigButton.svelte', shadowing).map((i) => i.message)).toEqual([
+      'history is a browser global: give yours another name (a prop: { history: other })',
+      'ui/ must not use browser globals (use props, events, <svelte:window> or svelte/reactivity): history',
+      'fetch is a browser global: give yours another name (a prop: { fetch: other })',
+      'ui/ must not use network: fetch',
+      'parent is a browser global: give yours another name (a prop: { parent: other })',
+    ]);
+  });
+
+  it('allows TypeScript for types only', () => {
+    // Type positions are skipped (WebSocket here is a type); constructs that emit code are refused.
+    const runtime = COMPONENT.replace(
+      '</script>',
+      [
+        "enum E { A = fetch('/x') as never }",
+        'namespace N { export const x = 1; }',
+        'class C { constructor(private x = 1) {} }',
+        'type T = { a: WebSocket };',
+        '</script>',
+      ].join('\n'),
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', runtime).map((i) => i.message)).toEqual([
+      'ui/ uses TypeScript for types only: no enum',
+      'ui/ uses TypeScript for types only: no namespace',
+      'ui/ uses TypeScript for types only: no parameter properties',
     ]);
   });
 
@@ -399,7 +472,7 @@ describe('lintUiComponent', () => {
         '  const url = "local//path";',
         "  const note = 'it\\'s // still a string';",
         '  const api = { fetch: () => 1 }; api.fetch();',
-        '  const history: string[] = []; history.push(label);',
+        '  const { history: past } = { history: [label] }; past.push(label);',
         '</script>',
         '<!-- https://example.com/mockup -->',
         '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M0 0" /></svg>',

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { manifest } from '../../contracts/manifest.ts';
@@ -31,7 +31,13 @@ type Icon = (typeof ICONS)[number];
  * shipping placeholders over real art would hide the breakage.
  */
 export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
-  if (!existsSync(resolve(root, 'assets', 'manifest.json'))) return new Map();
+  // lstat, not existsSync: a dangling link must fail the build, not look like "no art yet".
+  const lane = lstatSync(resolve(root, 'assets'), { throwIfNoEntry: false });
+  if (!lane) return new Map();
+  const manifestFile = lstatSync(resolve(root, 'assets', 'manifest.json'), {
+    throwIfNoEntry: false,
+  });
+  if (!lane.isSymbolicLink() && !manifestFile) return new Map();
   const file = resolveWithoutLinks(root, 'assets/manifest.json');
   const parsed = manifest.safeParse(JSON.parse(readFileSync(file, 'utf8')));
   if (!parsed.success) {

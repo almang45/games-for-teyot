@@ -168,6 +168,13 @@ describe('delivered icons', () => {
     expect(() => deliveredIconPaths(root)).toThrow('assets/manifest.json goes through a symlink');
   });
 
+  it('refuses a dangling assets/ link instead of falling back to placeholders', () => {
+    const root = makeRoot();
+    rmSync(join(root, 'assets'), { recursive: true, force: true });
+    symlinkSync(join(root, 'reference-not-here'), join(root, 'assets'));
+    expect(() => deliveredIconPaths(root)).toThrow('assets/manifest.json goes through a symlink');
+  });
+
   it('fails the build on an invalid manifest instead of hiding the art', () => {
     const root = makeRoot(JSON.stringify({ version: 1, assets: [{ key: 'icons.app.192' }] }));
     expect(() => deliveredIconPaths(root)).toThrow(/assets\/manifest\.json is invalid/);

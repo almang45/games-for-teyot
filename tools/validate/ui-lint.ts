@@ -29,7 +29,10 @@ const INTO_SRC = /^(?:\.\.?\/)+src(?:\/|$)/;
 
 const GLOBALS_HINT = 'use props, events, <svelte:window> or svelte/reactivity';
 
-/** Globals a component must not reach, by what they are. A name the component declares is its own. */
+/**
+ * Globals a component must not reach, by what they are. The component may not declare these
+ * names either, so a use of one is always the global: no scope analysis to get wrong.
+ */
 const FORBIDDEN_GLOBALS: ReadonlyMap<string, string> = new Map(
   Object.entries({
     storage: ['localStorage', 'sessionStorage', 'indexedDB', 'caches', 'cookieStore'],
@@ -130,45 +133,43 @@ function walk(node: Node, visit: Visit, parent?: Node, key = ''): void {
   for (const [k, child] of children(node)) walk(child, visit, node, k);
 }
 
-/** Names a destructuring or parameter pattern binds. */
-function patternNames(pattern: Node | undefined): string[] {
+/** The Identifier nodes a destructuring or parameter pattern binds. */
+function patternIds(pattern: Node | undefined): Node[] {
   switch (pattern?.type) {
     case 'Identifier':
-      return [text(pattern.name)];
+      return [pattern];
     case 'ObjectPattern':
       return nodes(pattern.properties).flatMap((p) =>
-        patternNames(p.type === 'RestElement' ? asNode(p.argument) : asNode(p.value)),
+        patternIds(p.type === 'RestElement' ? asNode(p.argument) : asNode(p.value)),
       );
     case 'ArrayPattern':
-      return nodes(pattern.elements).flatMap(patternNames);
+      return nodes(pattern.elements).flatMap(patternIds);
     case 'AssignmentPattern':
-      return patternNames(asNode(pattern.left));
+      return patternIds(asNode(pattern.left));
     case 'RestElement':
-      return patternNames(asNode(pattern.argument));
+      return patternIds(asNode(pattern.argument));
     default:
       return [];
   }
 }
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
+const CLASSES = new Set(['ClassDeclaration', 'ClassExpression']);
 
-function bindingsOf(node: Node): string[] {
-  if (node.type === 'VariableDeclarator') return patternNames(asNode(node.id));
+/** The names `node` declares, as Identifier nodes; `{#each}` indexes are plain strings. */
+function declaredIds(node: Node): Node[] {
+  if (node.type === 'VariableDeclarator') return patternIds(asNode(node.id));
   if (FUNCTIONS.has(node.type))
-    return [...patternNames(asNode(node.id)), ...nodes(node.params).flatMap(patternNames)];
-  if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression')
-    return patternNames(asNode(node.id));
-  if (node.type === 'CatchClause') return patternNames(asNode(node.param));
+    return [...patternIds(asNode(node.id)), ...nodes(node.params).flatMap(patternIds)];
+  if (CLASSES.has(node.type)) return patternIds(asNode(node.id));
+  if (node.type === 'CatchClause') return patternIds(asNode(node.param));
   if (node.type.startsWith('Import') && node.type.endsWith('Specifier'))
-    return patternNames(asNode(node.local));
-  if (node.type === 'EachBlock') return patternNames(asNode(node.context));
+    return patternIds(asNode(node.local));
+  if (node.type === 'EachBlock') return patternIds(asNode(node.context));
   if (node.type === 'AwaitBlock')
-    return [...patternNames(asNode(node.value)), ...patternNames(asNode(node.error))];
+    return [...patternIds(asNode(node.value)), ...patternIds(asNode(node.error))];
   if (node.type === 'SnippetBlock')
-    return [
-      ...patternNames(asNode(node.expression)),
-      ...nodes(node.parameters).flatMap(patternNames),
-    ];
+    return [...patternIds(asNode(node.expression)), ...nodes(node.parameters).flatMap(patternIds)];
   return [];
 }
 
@@ -256,17 +257,14 @@ const remoteIssues = (s: string): Issue[] =>
     error('remote', `remote URL ${url}: ui/ ships no third-party requests`),
   );
 
-/** One component's findings, by kind, so the report reads the same whatever the source order. */
-interface Findings {
-  readonly imports: Issue[];
-  readonly script: Issue[];
-  readonly remote: Issue[];
-  readonly style: Issue[];
-}
+const IMPORT_FORMS = new Set([
+  'ImportDeclaration',
+  'ExportNamedDeclaration',
+  'ExportAllDeclaration',
+]);
 
 const importSource = (node: Node): string | undefined => {
-  if (!['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type))
-    return undefined;
+  if (!IMPORT_FORMS.has(node.type)) return undefined;
   const source = asNode(node.source)?.value;
   return typeof source === 'string' ? source : undefined;
 };
@@ -303,99 +301,182 @@ function importIssues(node: Node, spec: string): Issue[] {
   ];
 }
 
+/**
+ * Elements that run or pull in what the checks can't read: a nested `<script>` or `<style>` is
+ * plain text to the parser, the others load other documents or stylesheets.
+ */
+const FOREIGN_ELEMENTS: ReadonlyMap<string, string> = new Map([
+  ['script', 'code goes in the component <script>'],
+  ['style', 'styles go in the component <style>'],
+  ['link', 'styles come from tokens'],
+  ['iframe', 'ui/ shows its own markup only'],
+  ['object', 'ui/ shows its own markup only'],
+  ['embed', 'ui/ shows its own markup only'],
+]);
+
+/** TypeScript that emits code; ui/ uses TypeScript for types only, which the checks skip. */
+const RUNTIME_TS: ReadonlyMap<string, string> = new Map([
+  ['TSEnumDeclaration', 'enum'],
+  ['TSModuleDeclaration', 'namespace'],
+  ['TSParameterProperty', 'parameter properties'],
+  ['TSExportAssignment', 'export ='],
+  ['TSImportEqualsDeclaration', 'import ='],
+]);
+
 const isNamespaceAttribute = (name: string): boolean =>
   name === 'xmlns' || name.startsWith('xmlns:');
 
-function attributeFindings(node: Node, found: Findings): void {
-  const name = text(node.name);
-  if (node.type === 'StyleDirective') {
-    for (const v of inlineCss(node.value, false)) found.style.push(...cssValueIssues(v));
-    return;
-  }
-  if (isNamespaceAttribute(name)) return;
-  for (const part of nodes(node.value))
-    if (part.type === 'Text') found.remote.push(...remoteIssues(text(part.data)));
-  if (name === 'style') {
-    for (const v of inlineCss(node.value, true)) found.style.push(...cssValueIssues(v));
-  }
-}
+/** One component's findings, by kind, so the report reads the same whatever the source order. */
+class Findings {
+  readonly imports: Issue[] = [];
+  readonly script: Issue[] = [];
+  readonly markup: Issue[] = [];
+  readonly remote: Issue[] = [];
+  readonly style: Issue[] = [];
+  /** Identifier nodes that declare a name, so they aren't also read as uses of a global. */
+  readonly declarations = new WeakSet<Node>();
+  /** Set while walking the instance script: only it can take and read the props. */
+  inInstance = false;
+  private importsContractProps = false;
+  private callsProps = false;
 
-function cssFindings(node: Node, found: Findings): void {
-  if (node.type === 'Declaration') {
-    const value = text(node.value);
-    found.remote.push(...remoteIssues(value));
-    found.style.push(...cssValueIssues(value));
-    return;
-  }
-  found.remote.push(...remoteIssues(text(node.prelude)));
-  if (node.name === 'import') {
-    found.style.push(error('style', '@import: styles come from tokens, not other stylesheets'));
-  }
-}
+  constructor(private readonly props: string) {}
 
-function codeFindings(
-  node: Node,
-  parent: Node | undefined,
-  key: string,
-  bound: ReadonlySet<string>,
-  found: Findings,
-): void {
-  if (node.type === 'Identifier' && isReference(parent, key)) {
-    const name = text(node.name);
-    const what = FORBIDDEN_GLOBALS.get(name);
-    if (what && !bound.has(name))
-      found.script.push(error('script', `ui/ must not use ${what}: ${name}`));
-  } else if (node.type === 'Literal' && typeof node.value === 'string' && key !== 'source') {
-    found.remote.push(...remoteIssues(node.value));
-  } else if (node.type === 'TemplateElement') {
-    found.remote.push(...stringsIn(node).flatMap(remoteIssues));
-  } else if (node.type === 'ImportExpression') {
-    found.imports.push(error('imports', 'ui/ must not use dynamic import()'));
-  } else if (node.type === 'MetaProperty' && asNode(node.meta)?.name === 'import') {
-    found.script.push(
-      error('script', 'ui/ must not use import.meta: files and settings come in as props'),
-    );
-  } else if (node.type === 'HtmlTag') {
-    found.script.push(
-      error('script', 'ui/ must not use {@html}: write the markup out, so it can be checked'),
-    );
-  }
-}
-
-const ATTRIBUTES = new Set(['Attribute', 'StyleDirective']);
-const CSS_NODES = new Set(['Declaration', 'Atrule']);
-
-function findings(root: Node): Findings {
-  const bound = new Set<string>();
-  walk(root, (node) => {
-    for (const name of bindingsOf(node)) bound.add(name);
-  });
-  const found: Findings = { imports: [], script: [], remote: [], style: [] };
-  walk(root, (node, parent, key) => {
+  visit(node: Node, parent: Node | undefined, key: string): void {
+    this.declare(node);
     const spec = importSource(node);
-    if (spec !== undefined) found.imports.push(...importIssues(node, spec));
-    else if (ATTRIBUTES.has(node.type)) attributeFindings(node, found);
-    else if (CSS_NODES.has(node.type)) cssFindings(node, found);
-    else codeFindings(node, parent, key, bound, found);
-  });
-  return found;
-}
+    if (spec !== undefined) this.importDeclaration(node, spec);
+    else if (node.type === 'Attribute') this.attribute(node);
+    else if (node.type === 'StyleDirective') this.styleDirective(node);
+    else if (node.type === 'Declaration' || node.type === 'Atrule') this.css(node);
+    else if (node.type === 'RegularElement' || node.type === 'SvelteElement') this.element(node);
+    else this.code(node, parent, key);
+  }
 
-/** Whether the instance script takes `<Name>Props` from the ui contract and reads `$props()`. */
-function declaresContractProps(instance: Node | undefined, props: string): boolean {
-  if (!instance) return false;
-  const seen = { imported: false, called: false };
-  walk(instance, (node) => {
-    if (node.type === 'ImportDeclaration' && UI_CONTRACT.test(importSource(node) ?? '')) {
-      seen.imported ||= nodes(node.specifiers).some(
-        (s) => (isTypeOnly(node) || isTypeOnly(s)) && asNode(s.imported)?.name === props,
+  issues(hasModuleScript: boolean): Issue[] {
+    const lead: Issue[] = [];
+    if (!this.importsContractProps || !this.callsProps) {
+      lead.push(error('props', `declare props as ${this.props} from contracts/ui.ts via $props()`));
+    }
+    if (hasModuleScript) {
+      lead.push(
+        error('script', 'ui/ must not use <script module>: it is state shared by every instance'),
       );
     }
-    if (node.type === 'CallExpression' && asNode(node.callee)?.name === '$props') {
-      seen.called = true;
+    return [
+      ...lead,
+      ...this.imports,
+      ...this.script,
+      ...this.markup,
+      ...this.remote,
+      ...this.style,
+    ];
+  }
+
+  /** A name of the component's own that reads like a browser global hides which one is meant. */
+  private declare(node: Node): void {
+    const names = declaredIds(node).map((id) => {
+      this.declarations.add(id);
+      return text(id.name);
+    });
+    if (node.type === 'EachBlock' && typeof node.index === 'string') names.push(node.index);
+    for (const name of names.filter((n) => FORBIDDEN_GLOBALS.has(n))) {
+      this.script.push(
+        error(
+          'script',
+          `${name} is a browser global: give yours another name (a prop: { ${name}: other })`,
+        ),
+      );
     }
-  });
-  return seen.imported && seen.called;
+  }
+
+  private importDeclaration(node: Node, spec: string): void {
+    this.imports.push(...importIssues(node, spec));
+    if (this.inInstance && node.type === 'ImportDeclaration' && UI_CONTRACT.test(spec)) {
+      this.importsContractProps ||= nodes(node.specifiers).some(
+        (s) => (isTypeOnly(node) || isTypeOnly(s)) && asNode(s.imported)?.name === this.props,
+      );
+    }
+  }
+
+  private attribute(node: Node): void {
+    const name = text(node.name);
+    if (isNamespaceAttribute(name)) return;
+    const texts = nodes(node.value).filter((part) => part.type === 'Text');
+    for (const part of texts) {
+      const value = text(part.data);
+      this.remote.push(...remoteIssues(value));
+      if (/^\s*javascript:/i.test(value)) {
+        this.markup.push(error('markup', `${name}="javascript:…": handle it with an event prop`));
+      }
+    }
+    // A quoted handler is code the browser runs from a string, out of sight of every check.
+    if (/^on/i.test(name) && texts.length > 0) {
+      this.markup.push(error('markup', `${name}="…": write handlers as ${name}={…}`));
+    }
+    if (name === 'style') {
+      for (const v of inlineCss(node.value, true)) this.style.push(...cssValueIssues(v));
+    }
+  }
+
+  private styleDirective(node: Node): void {
+    for (const v of inlineCss(node.value, false)) this.style.push(...cssValueIssues(v));
+  }
+
+  private css(node: Node): void {
+    if (node.type === 'Declaration') {
+      const value = text(node.value);
+      this.remote.push(...remoteIssues(value));
+      this.style.push(...cssValueIssues(value));
+      return;
+    }
+    this.remote.push(...remoteIssues(text(node.prelude)));
+    if (node.name === 'import') {
+      this.style.push(error('style', '@import: styles come from tokens, not other stylesheets'));
+    }
+  }
+
+  private element(node: Node): void {
+    const tag = node.type === 'SvelteElement' ? asNode(node.tag)?.value : node.name;
+    if (typeof tag !== 'string') {
+      this.markup.push(error('markup', '<svelte:element> needs a fixed tag, so it can be checked'));
+      return;
+    }
+    const why = FOREIGN_ELEMENTS.get(tag.toLowerCase());
+    if (why) this.markup.push(error('markup', `ui/ must not render <${tag}>: ${why}`));
+  }
+
+  private code(node: Node, parent: Node | undefined, key: string): void {
+    const runtimeTs = RUNTIME_TS.get(node.type);
+    if (runtimeTs) {
+      this.script.push(error('script', `ui/ uses TypeScript for types only: no ${runtimeTs}`));
+    } else if (node.type === 'Identifier') {
+      this.identifier(node, parent, key);
+    } else if (node.type === 'Literal' && typeof node.value === 'string' && key !== 'source') {
+      this.remote.push(...remoteIssues(node.value));
+    } else if (node.type === 'TemplateElement') {
+      this.remote.push(...stringsIn(node).flatMap(remoteIssues));
+    } else if (node.type === 'ImportExpression') {
+      this.imports.push(error('imports', 'ui/ must not use dynamic import()'));
+    } else if (node.type === 'MetaProperty' && asNode(node.meta)?.name === 'import') {
+      this.script.push(
+        error('script', 'ui/ must not use import.meta: files and settings come in as props'),
+      );
+    } else if (node.type === 'HtmlTag') {
+      this.markup.push(
+        error('markup', 'ui/ must not use {@html}: write the markup out, so it can be checked'),
+      );
+    } else if (node.type === 'CallExpression' && asNode(node.callee)?.name === '$props') {
+      this.callsProps ||= this.inInstance;
+    }
+  }
+
+  private identifier(node: Node, parent: Node | undefined, key: string): void {
+    if (this.declarations.has(node) || !isReference(parent, key)) return;
+    const name = text(node.name);
+    const what = FORBIDDEN_GLOBALS.get(name);
+    if (what) this.script.push(error('script', `ui/ must not use ${what}: ${name}`));
+  }
 }
 
 const componentName = (file: string): string =>
@@ -418,17 +499,18 @@ export function lintUiComponent(file: string, source: string): Issue[] {
   } catch (err) {
     return [error('', `does not parse: ${err instanceof Error ? err.message : String(err)}`)];
   }
-  const issues: Issue[] = [];
-  const props = `${name as UiComponent}Props`;
-  if (!declaresContractProps(asNode(asNode(root.instance)?.content), props)) {
-    issues.push(error('props', `declare props as ${props} from contracts/ui.ts via $props()`));
-  }
-  if (root.module) {
-    issues.push(
-      error('script', 'ui/ must not use <script module>: it is state shared by every instance'),
+  const found = new Findings(`${name as UiComponent}Props`);
+  // One pass over the whole file, part by part, so the instance script is known as such.
+  for (const [key, part] of children(root)) {
+    found.inInstance = key === 'instance';
+    walk(
+      part,
+      (node, parent, at) => {
+        found.visit(node, parent, at);
+      },
+      root,
+      key,
     );
   }
-  const found = findings(root);
-  issues.push(...found.imports, ...found.script, ...found.remote, ...found.style);
-  return unique(issues);
+  return unique(found.issues(root.module !== null && root.module !== undefined));
 }

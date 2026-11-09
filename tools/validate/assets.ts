@@ -43,10 +43,19 @@ function checkReferenceSheet(root: string, file: string): FileIssue[] {
   }
 }
 
-/** The manifest, if `assets/` has one. Shared with validate:design for its cross-lane checks. */
+const isLink = (root: string, path: string): boolean =>
+  lstatSync(join(root, path), { throwIfNoEntry: false })?.isSymbolicLink() === true;
+
+/** A linked lane folder or manifest: the lane listing reports it, and nothing reads through it. */
+const manifestIsLinked = (root: string): boolean =>
+  isLink(root, ASSETS_LANE) || isLink(root, MANIFEST_FILE);
+
+/**
+ * The manifest, if `assets/` has a plain one. Shared with validate:design for its cross-lane
+ * checks.
+ */
 export function loadManifest(root: string): Parsed<Manifest> | undefined {
-  if (!existsSync(join(root, MANIFEST_FILE))) return undefined;
-  if (lstatSync(join(root, ASSETS_LANE)).isSymbolicLink()) return undefined;
+  if (manifestIsLinked(root) || !existsSync(join(root, MANIFEST_FILE))) return undefined;
   return parseJsonFile(root, MANIFEST_FILE, manifest);
 }
 
@@ -117,8 +126,7 @@ export function validateAssets(root: string): Report {
   if (files.length === 0) return report([]);
 
   const issues: FileIssue[] = files.filter((f) => f.symlink).map(symlinkIssue);
-  // A linked assets/ folder: nothing in it is read.
-  if (files.some((f) => f.path === ASSETS_LANE)) return report(issues);
+  if (manifestIsLinked(root)) return report(issues);
   const parsed = loadManifest(root);
   if (!parsed)
     return report([

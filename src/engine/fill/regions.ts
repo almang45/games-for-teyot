@@ -130,9 +130,6 @@ export function within(field: DistanceField, radius: number): Mask {
   return { width, height, data };
 }
 
-/** Grows lines by a disc of `radius`. */
-export const dilate = (mask: Mask, radius: number): Mask => within(distanceToLines(mask), radius);
-
 /** Shrinks lines by a disc of `radius`: a pixel stays only if no paper lies within it. */
 export function erode(mask: Mask, radius: number): Mask {
   const grownPaper = within(distanceToPaper(mask), radius);
@@ -144,18 +141,17 @@ export function erode(mask: Mask, radius: number): Mask {
 export const closingRadius = (gap: number): number => Math.ceil(gap / 2);
 
 /**
- * Closes gaps up to `gap` px by growing lines by a disc of `closingRadius(gap)`, the same pixels
- * `dilate` gives. The fill then stops at the grown lines, which the original art hides underneath.
- * It runs on every page load, so it paints a few short spans per line pixel instead of computing
- * a whole distance field.
+ * Grows lines by a disc of `radius`: the pixels within `radius` of a line, as `within` gives
+ * them from `distanceToLines`. It paints a few short spans per line pixel instead of computing a
+ * whole distance field, since gap closing runs on every page load.
  */
-export function closeGaps(mask: Mask, gap = GAP_CLOSE_PX): Mask {
+export function dilate(mask: Mask, radius: number): Mask {
   const { width, height, data } = mask;
-  const r = closingRadius(gap);
-  // The disc's half-width on each row offset: (dx, dy) is inside when dx² + dy² ≤ r².
+  const r = Math.floor(radius);
+  // The disc's half-width on each row offset: (dx, dy) is inside when dx² + dy² ≤ radius².
   const spans = Array.from({ length: 2 * r + 1 }, (_, k) => {
     const dy = k - r;
-    return [dy, Math.floor(Math.sqrt(r * r - dy * dy))] as const;
+    return [dy, Math.floor(Math.sqrt(radius * radius - dy * dy))] as const;
   });
   const out = new Uint8Array(data.length);
   for (let i = 0; i < data.length; i++) {
@@ -172,6 +168,12 @@ export function closeGaps(mask: Mask, gap = GAP_CLOSE_PX): Mask {
   }
   return { width, height, data: out };
 }
+
+/**
+ * Closes gaps up to `gap` px. The fill then stops at the grown lines, which the original art hides
+ * underneath.
+ */
+export const closeGaps = (mask: Mask, gap = GAP_CLOSE_PX): Mask => dilate(mask, closingRadius(gap));
 
 export interface Region {
   readonly id: number;
