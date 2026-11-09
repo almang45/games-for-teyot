@@ -57,7 +57,7 @@ test.describe('US-OFF-01: install and offline play', () => {
     await tapCanvas(page, hasTouch, FRONT_ROOM_OFFSET);
     await expect
       .poll(() => log.find((e) => e.event === 'house.room_tap')?.data.room)
-      .toBe('ruang-tamu');
+      .toBe('ruang-keluarga');
     expect(log.filter((e) => e.level === 'error')).toEqual([]);
   });
 });

@@ -9,6 +9,8 @@ dist/
 dev-dist/
 .wrangler/
 coverage/
+# npm run contracts:schema (generated from the zod schemas)
+contracts/schema/
 playwright-report/
 test-results/
 

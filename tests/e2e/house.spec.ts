@@ -24,7 +24,7 @@ test('SCR-HOUSE keeps Theia in the room she walked to when the screen resizes', 
   await tapCanvas(page, hasTouch, FRONT_ROOM_OFFSET);
   await expect
     .poll(() => log.find((e) => e.event === 'house.room_tap')?.data.room)
-    .toBe('ruang-tamu');
+    .toBe('ruang-keluarga');
 
   const layoutsBefore = log.filter((e) => e.event === 'house.layout').length;
   const size = page.viewportSize();
@@ -36,7 +36,7 @@ test('SCR-HOUSE keeps Theia in the room she walked to when the screen resizes', 
     .poll(() => log.filter((e) => e.event === 'house.layout').length)
     .toBeGreaterThan(layoutsBefore);
   const latest = log.filter((e) => e.event === 'house.layout').at(-1);
-  expect(latest?.data.theiaRoom).toBe('ruang-tamu');
+  expect(latest?.data.theiaRoom).toBe('ruang-keluarga');
   // She is drawn at the new centre of that room, not at stale pre-resize coordinates.
   expect(latest?.data.roomCenter).toBeDefined();
   expect(latest?.data.theia).toEqual(latest?.data.roomCenter);

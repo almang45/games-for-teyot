@@ -2,7 +2,11 @@
  * The one list of what unit coverage measures. vite.config.ts uses it, and a unit test keeps
  * sonar.coverage.exclusions in sonar-project.properties identical, so local and Sonar coverage agree.
  */
-export const COVERAGE_INCLUDE = ['src/**/*.ts', 'tools/**/*.{ts,mjs}'] as const;
+export const COVERAGE_INCLUDE = [
+  'src/**/*.ts',
+  'tools/**/*.{ts,mjs}',
+  'contracts/**/*.ts',
+] as const;
 
 export const COVERAGE_EXCLUDE = [
   // Phaser scenes and the browser entry are exercised by Playwright, not unit tests.
@@ -14,6 +18,7 @@ export const COVERAGE_EXCLUDE = [
   // CLI entry points run by the build and CI; their logic lives in tested modules.
   'tools/build/check-budget.mjs',
   'tools/build/check-private.mjs',
-  'tools/validate/**',
+  'tools/validate/validate-*.ts',
+  'tools/validate/write-schemas.ts',
   'tools/dev/**',
 ] as const;

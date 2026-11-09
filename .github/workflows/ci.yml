@@ -77,11 +77,11 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # AGENTS.md: design/ and assets/ validate against contracts/ (fails closed until contracts v1).
+  # AGENTS.md: design/, ui/ and assets/ validate against contracts/ (tools/validate).
   validate:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,6 +89,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
       - run: npm run validate
 
   # Tests the exact artifact that deploys, served by `vite preview` with the production headers.

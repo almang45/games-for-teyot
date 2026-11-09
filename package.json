@@ -18,7 +18,10 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "deploy": "npm run build && wrangler deploy",
-    "validate": "node tools/validate/check-lanes.mjs",
+    "validate": "npm run validate:design && npm run validate:assets",
+    "validate:design": "node tools/validate/validate-design.ts",
+    "validate:assets": "node tools/validate/validate-assets.ts",
+    "contracts:schema": "node tools/validate/write-schemas.ts",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {

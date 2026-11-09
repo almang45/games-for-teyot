@@ -267,6 +267,9 @@ every room shares one perspective.
 - After 2 successful "Ikuti" completions of an item, it moves to "Titik-titik" (Score mode).
 - A stroke passes when it meets the age-3 thresholds (`ARCHITECTURE.md` §4.3).
 - A failed stroke fades out gently, the demo replays for that stroke only, and Ocica comforts her.
+  The order is fixed: the ink fades out (about 400 ms, `trace.miss-fade` in `motion.json`) while
+  Ocica plays `comfort` and the hint clip (`hint.tryagain.*`) starts. Bubu's demo replays only after
+  the clip ends, so two voices never overlap (US-AUD-01).
 - After 3 failed strokes in a row, the game falls back to "Ikuti" for that stroke. She is never
   stuck.
 
