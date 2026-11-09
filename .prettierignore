@@ -1,0 +1,10 @@
+# Prose docs are hand-wrapped with tables; Prettier would churn them.
+*.md
+package-lock.json
+dist/
+dev-dist/
+coverage/
+playwright-report/
+test-results/
+.wrangler/
+.claude/

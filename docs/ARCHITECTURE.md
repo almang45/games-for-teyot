@@ -11,7 +11,7 @@ Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`AS
 |---|---|---|
 | Language | TypeScript, `strict` | One language for game, tooling, and Worker |
 | Build | Vite | Fast, first-class static output, PWA plugin |
-| Game runtime | Phaser (latest stable major at implementation time) | Scenes, tweens, WebAudio unlock, texture atlases, input. Mature on Android Chrome. |
+| Game runtime | Phaser (latest stable major at implementation time) | Scenes, tweens, texture atlases, input. Mature on Android Chrome. Its sound manager is off; the app owns audio (§7). |
 | Parent UI | Svelte, mounted as a DOM overlay | Forms and dashboards are painful in canvas |
 | Offline | `vite-plugin-pwa` (Workbox) | Precached app shell plus each room's assets |
 | Storage | IndexedDB via `idb` | Structured progress and stroke replays. Larger quota than localStorage. |
@@ -206,8 +206,11 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 
 ## 7. Audio engine
 
-- Phaser WebAudio. The first tap on "Mulai" unlocks the audio context. The voice queue only starts
-  after that tap.
+- One app-owned `AudioContext` (`src/engine/audio`), shared through the game services. Phaser's
+  sound manager is off (`audio.noAudio`): its built-in unlock resumes the context at boot and on any
+  gesture anywhere, which would race the Mulai tap. The tap on "Mulai" is the only unlock, and the
+  voice queue only starts after it. Resuming after the app returns from the background is the audio
+  engine's job.
 - **Voice queue**: one voice clip at a time. A new instruction cancels pending praise, never the
   reverse. Background music ducks to −12 dB while a voice clip plays.
 - Clips are referenced by **key** (`instr.tracing.follow`, `letter.name.A`). The narrator setting
@@ -226,7 +229,9 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   maskable icons.
 - Workbox:
   - **Precache** the app shell, the house hub, and the boot audio.
-  - **Runtime cache-first** for hashed room bundles and atlases.
+  - **Runtime cache-first** for room bundles (`rooms/**`, `audio/rooms/**`): kept out of the
+    precache and cached the first time she enters the room. `tools/build/budget.mjs` defines the
+    prefixes for both the service worker and the size check; only `200` responses are cached.
 - `navigator.storage.persist()` requested on first launch. The result is shown in the parent area.
 - Updates use `registerType: 'prompt'`. The new version activates on the **next** cold start, never
   in the middle of a session.
@@ -253,13 +258,22 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   `Permissions-Policy` that denies camera, mic, and geolocation.
 
 ### 8.3 Cloudflare Access
-- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's
-  `workers.dev` preview URLs. The policy allows the family Google accounts.
+- An Access application covers `rct.amns.my.id`, and Access is enabled for the Worker's preview
+  URLs (Worker → Settings → Domains & Routes). Production has no `workers.dev` route
+  (`workers_dev: false`), so the custom domain is its only hostname. The policy allows the family Google accounts.
   Session duration: 1 month.
 - Offline and on expired sessions, the service worker serves the cached shell, so she can always
   play. An update fetch that gets an Access redirect counts as "no update". The service worker
   never caches that redirect.
-- A parent re-authenticates in Chrome to pick up new versions.
+- A parent re-authenticates at `/masuk` to pick up new versions. The service worker answers every
+  other navigation (including `/`) from the cached shell, so Access would never get to redirect.
+  `/masuk` and Access's own `/cdn-cgi/` endpoints are on the navigation denylist
+  (`src/platform/swRouting.ts`) and always reach the network.
+- **Known gap: the macOS Safari Dock app.** It has no address bar, and it keeps its own cookies
+  apart from Safari, so a parent cannot open `/masuk` inside it. Once its Access session expires
+  it keeps playing the cached build but stops receiving updates. The fix is a "masuk lagi" button
+  in the parent area that navigates to `/masuk` (issue #6). Until
+  then, remove the Dock app and add it to the Dock again from Safari after logging in there.
 
 ### 8.4 Rollback
 - Every deploy is a Worker version. Rollback with `wrangler rollback <version-id>`.
@@ -272,30 +286,34 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 Every action is pinned by commit SHA.
 
 ```
-lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-gate ─▶ deploy
+lint ─▶ test ─▶ build ─▶ validate + e2e ─▶ SAST ─▶ quality-gate ─▶ deploy
 ```
 
 | Stage | Contents |
 |---|---|
 | lint | `tsc --noEmit`, ESLint, Prettier check |
-| test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
-| build | `vite build`. Fails if the size budget (§10) is exceeded. |
-| validate-assets | `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
-| SAST | CodeQL (javascript-typescript), `osv-scanner` on the lockfile |
+| test | Vitest with coverage. |
+| build | `vite build`. Fails if the size budget (§10) is exceeded. Uploads `dist` for the next stages. |
+| validate | Until contracts v1: fails closed if `design/` or `assets/` has any file (`tools/validate/check-lanes.mjs`). Then `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
+| e2e | Playwright against the built `dist` (`vite preview`): tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. Runs next to validate. |
+| SAST | Semgrep CE (`p/default`, `p/typescript`; CodeQL's licence excludes private repos without GitHub Code Security), `osv-scanner` on the lockfile |
 | quality-gate | SonarQube Cloud. The gate blocks the pipeline. |
-| deploy | PR: `wrangler versions upload` (preview URL, behind Access). `master`: `wrangler deploy`. |
+| deploy | `master`: `wrangler deploy` through the `production` environment (deployment branch: `master` only). PR: `wrangler versions upload` (preview URL, behind Access), off unless `vars.PREVIEW_DEPLOYS == 'enabled'`. |
 
-Secrets live in GitHub Actions secrets:
-- `CLOUDFLARE_API_TOKEN`, scoped to *Workers Scripts: Edit* on one account
-- `CLOUDFLARE_ACCOUNT_ID`
-- `SONAR_TOKEN`
+Secrets:
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: secrets of the `production` environment only.
+  A `pull_request` run executes the PR's own workflow file and can read every repository secret, and
+  a Cloudflare token that can upload versions can also deploy. The environment's branch policy keeps
+  the token away from anything but `master`. The token itself is least privilege. Account: *Workers
+  Scripts: Edit*, *Account Settings: Read*. Zone `amns.my.id`: *Workers Routes: Edit*.
+- `SONAR_TOKEN`: repository secret, and a Dependabot secret for Dependabot PRs.
 
 ## 10. Budgets
 
 | Budget | Target |
 |---|---|
 | First load (shell + house + boot audio) | ≤ 3 MB |
-| Each room bundle (atlas + audio sprite) | ≤ 4 MB |
+| Each room bundle (atlas + audio sprite, all files under its `rooms/<id>` and `audio/rooms/<id>`) | ≤ 4 MB |
 | Total offline cache, M3 | ≤ 60 MB |
 | Texture atlas | ≤ 2048 × 2048 (low-end Android GPUs) |
 | Frame rate | 60 fps on a mid-range Android tablet. Tracing input latency < 30 ms. |
@@ -307,7 +325,11 @@ Secrets live in GitHub Actions secrets:
 - Uncaught errors and unhandled rejections are captured there with their stack traces.
 - The parent area shows the log and can export it.
 - Nothing leaves the device.
-- A scene error returns her to the House hub with a neutral animation, never a blank screen.
+- Every uncaught error and unhandled rejection is fatal (except the benign `ResizeObserver loop`
+  notice): the game is torn down at once, the recovery screen shows for about 2 s, and the app
+  reloads to SCR-BOOT (PRD §7.5). One automatic reload per 30 s (`src/shell/recovery.ts`); a
+  failure that comes back waits on the icon retry button. Once rooms exist, a scene error returns
+  her to the House hub through OVL-RECOVER instead.
 
 ## 12. Data model (sketch)
 

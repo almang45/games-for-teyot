@@ -1,0 +1,39 @@
+{
+  "boot": {
+    "start": "Mulai"
+  },
+  "install": {
+    "title": "Pasang Rumah Cici Theia",
+    "lead": "Supaya bisa dimainkan tanpa internet, pasang aplikasinya dulu.",
+    "steps": {
+      "android": [
+        "Buka halaman ini di Chrome.",
+        "Ketuk menu ⋮ di kanan atas.",
+        "Pilih \"Tambahkan ke layar utama\", lalu \"Instal\".",
+        "Buka Rumah Cici Theia dari layar utama."
+      ],
+      "ios": [
+        "Buka halaman ini di Safari.",
+        "Ketuk tombol Bagikan (kotak dengan panah ke atas).",
+        "Pilih \"Tambah ke Layar Utama\", lalu \"Tambah\".",
+        "Buka Rumah Cici Theia dari layar utama."
+      ],
+      "safari-mac": [
+        "Di Safari, buka menu File.",
+        "Pilih \"Tambahkan ke Dock\".",
+        "Buka Rumah Cici Theia dari Dock."
+      ],
+      "desktop-chromium": [
+        "Klik ikon instal di ujung kanan kolom alamat.",
+        "Pilih \"Instal\".",
+        "Buka Rumah Cici Theia dari jendela aplikasinya."
+      ],
+      "other": [
+        "Buka halaman ini di Chrome (Android, Windows, macOS) atau Safari (macOS).",
+        "Pasang aplikasinya dari menu browser."
+      ]
+    },
+    "continueInBrowser": "Lanjut di browser",
+    "browserWarning": "Di tab browser biasa, progres Theia bisa terhapus otomatis (di Safari setelah 7 hari tidak dibuka). Pakai aplikasi yang terpasang supaya aman."
+  }
+}
