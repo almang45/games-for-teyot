@@ -141,6 +141,7 @@ describe('validateAssets', () => {
     expect(errors(validateAssets(root))[0]).toMatch(/^assets\/house\/layout\.json size: /);
   });
 
+  // A full 1920 × 1200 page through encode, decode and morphology takes ~8 s on CI under coverage.
   it('decodes coloring pages and checks their line art', () => {
     deliverAssets();
     const m = manifestFixture();
@@ -162,7 +163,7 @@ describe('validateAssets', () => {
     expect(errors(validateAssets(root))).toEqual([
       expect.stringMatching(/^assets\/coloring\/ayam\.png : 2 fillable regions/) as string,
     ]);
-  });
+  }, 30_000);
 
   it('rejects symlinks', () => {
     deliverAssets();
