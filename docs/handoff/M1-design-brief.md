@@ -297,20 +297,20 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
      - *Implementation cost is minimal:* A single additive/screen overlay layer (`house/lights.png`) covering lamp and window glows. The engine can simply tween its opacity from 0.0 to 1.0 during the last 2 minutes of the session (dusk), and dim it off during the bedtime sequence in `SCR-BEDTIME`.
 
 4. Which rooms does the floor plan suggest for the 3 M1 activities?
-   - **Answer**: Based on the complete architectural denah in `reference/rumah/denah/` (`denah-lt-0.png`, `denah-lt-1.png`, `denah-lt-2.png`, `tampak-depan-dengan-ukuran-tinggi.png`), the house is a split-level design (Lt. Dasar ±0.000, Mezzanine 1 +2.400, Lt. Atas +3.400, Mezzanine 2 +4.800). We map the 3 M1 activities as follows:
-     - **Tracing (`SCR-TRACE` — Menulis)**: **`kamar-tidur` (Lt. Atas 01, FFL +3.400)**.
-       - *Framing*: Theia's study desk / chalkboard in the upper bedroom (`R. TIDUR UTAMA`).
-       - *Why*: Provides a quiet, focused learning corner. Crucially, the bedroom directly hosts the session bedtime sequence (`SCR-BEDTIME`: Theia, Bubu, and Ocica falling asleep in bed), creating a unified narrative and spatial anchor. Walking up the stairs (`walk` + `stairs` animation) to her bedroom gives an endearing sense of journey.
-     - **Counting (`SCR-COUNT` — Berhitung)**: **`dapur` / `ruang-makan` (Lt. Dasar, FFL ±0.000)**.
-       - *Framing*: The open kitchen counter and dining table (`R. MAKAN` & `DAPUR`).
+   - **Answer**: Based on the complete architectural denah in `reference/rumah/denah/` (`denah-lt-0.png`, `denah-lt-1.png`, `denah-lt-2.png`, `tampak-depan-dengan-ukuran-tinggi.png`), the house is a split-level design. Following Papa's final decisions, we map the rooms as follows (using exact stable room ids):
+     - **Tracing (`SCR-TRACE` — Menulis)**: **`kamar-tidur`** (R. TIDUR UTAMA, Lt. Atas, FFL +3.400).
+       - *Framing*: Theia's study desk / chalkboard in the master bedroom.
+       - *Why*: Quiet, focused learning corner. Crucially, the bedroom directly hosts the session bedtime sequence (`SCR-BEDTIME`: Theia, Bubu, and Ocica falling asleep in bed), creating a unified narrative and spatial anchor. Walking up the stairs (`walk` + `stairs` animation) to her bedroom gives an endearing sense of journey.
+     - **Counting (`SCR-COUNT` — Berhitung)**: **`dapur`** (kitchen, including the dining table, Lt. Dasar, FFL ±0.000; DAPUR + R. MAKAN on the denah).
+       - *Framing*: The open kitchen counter and dining table.
        - *Why*: Perfectly suits food-based counting objects (telur, apel, kue) and containers (mangkuk, piring). Ocica "eating" the counted cookies fits naturally at the kitchen table.
-     - **Coloring (`SCR-COLOR-PICK` / `SCR-COLOR` — Mewarnai)**: **`ruang-keluarga` / `ruang-tamu` (Lt. Dasar, FFL ±0.000)**.
+     - **Coloring (`SCR-COLOR-PICK` / `SCR-COLOR` — Mewarnai)**: **`ruang-keluarga`** (living room, Lt. Dasar, FFL ±0.000; R. TAMU on the denah).
        - *Framing*: The living room floor/rug and drawing easel under the high-ceiling void.
-       - *Why*: The open living space is the natural family creative play area. Finished coloring pages hang on the fridge (`house.fridge`), which sits in the adjacent dining/kitchen area in direct visual line-of-sight in this open plan. This room also hosts the M1 tidy-up break (`SCR-TIDY`: Beberes scattered toys on the floor).
-     - **Future Milestones (M2–M4 Preview)**:
-       - *Mezzanine 1 (+2.400, Kantor Papa)*: Reading nook & letter recognition (`R1–R6`).
-       - *Mezzanine 2 (+4.800, Loft)*: Play nook / sticker gallery.
-       - *Taman Depan & Belakang*: Garden activities (M4 shapes, colors, plants).
+       - *Why*: Central creative play area. Finished coloring pages hang on the fridge (`house.fridge`), which sits in the adjacent dining/kitchen area in direct visual line-of-sight in this open plan. Also hosts the M1 tidy-up break (`SCR-TIDY`: Beberes scattered toys on the floor).
+     - **Future rooms (locked in M1)**: Drawn and present in `layout.json` (dimmed / sleepy look; tap = soft "zzz" sound + Ocica yawns):
+       - **`kantor-papa`**: Mezzanine 1, FFL +2.400 (Papa's office, overlooking the void). Reserved for M2/M3 letter recognition & reading (`R1–R6`).
+       - **`kamar-anak`**: The small upstairs bedroom, MEZZANINE 2, FFL +4.800 (confirmed by Papa as the children's room, reference in `reference/rumah/mezzanine-2-kamar-anak/`).
+     - **Garden note (M4)**: Ground-floor front and back garden activities stay reserved for M4 without room ids yet.
 
 5. Isometric pipeline: is painting over the SVG blockout workable with your image tools, or would
    you prefer another structure guide (for example a depth map rendered from the blockout)?
@@ -322,18 +322,18 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
    workflow or tools?
    - **Status: Waiting on the contracts v1 PR.**
    - **What is needed:** We need to review the zod schemas and generated JSON Schemas in `contracts/` (manifest, layout, tokens, motion, ui props) once Claude opens the contracts PR.
-   - **Current assessment:** `ASSETS.md` is clean, specific, and fully aligned with our design system approach. The strict coloring rules (closed line art ≥ 6 px, gaps ≤ 2 px, regions ≥ 40 px) and manifest keys are completely clear. We will formally co-sign once the schema PR is ready for review.
+   - **Current assessment:** `ASSETS.md` is clean, specific, and fully aligned with our design system approach. The strict coloring rules (closed line art ≥ 6 px, gaps ≤ 2 px, regions ≥ 40 px) and manifest keys are completely clear. The 192 × 160 companion frame size, `house.lights` key, and `ruang-keluarga` start room will land in contracts v1, which Antigravity will co-sign.
 
 ### Blocking questions from Antigravity for Gate 1 / Phase 2 kickoff
 
 1. **Reference photos in `reference/` (Google Drive)**:
-   - *Status: Confirmed & ready.* Full reference sets for Theia, Mama, Papa, Bubu, Ocica (including 360° turn videos), style inspiration, and house denah/photos have been reviewed in `reference/`. No blocker here.
+   - *Status: Resolved.* Full reference sets for Theia, Mama, Papa, Bubu, Ocica (including 360° turn videos), style inspiration, and house denah/photos confirmed ready in `reference/`. Reference material stays strictly local and gitignored.
 2. **Surface styling vs. token contrast in Tracing (`SCR-TRACE`)**:
-   - The brief mentions either chalkboard or desk paper for `tracing/surface.png`. If we explore a dark chalkboard look during style directions, guide lines and ink will require light/pastel tones instead of dark ink. Can Claude confirm that guide, path, and ink colors are driven entirely by `design/tokens.json` semantic tokens so contrast adjusts automatically to whichever surface style Papa approves?
+   - *Status: Resolved.* Confirmed by Claude: all guide, path, ink, and hint-glow colors are driven strictly by semantic tokens in `design/tokens.json` (`tracing.*`). Base surface color will be defined as a token, and the design validator checks contrast against it automatically.
 3. **Audio-visual coordination on error/comfort**:
-   - When Theia misses a stroke or count, Ocica plays the `comfort` animation. Does `HUD-SPEAKER` simultaneously play the narrator's encouraging voice clip ("coba lagi"), or does audio wait until Bubu's demo step replays?
+   - *Status: Resolved.* Confirmed by Claude: ink fades out (~400 ms), Ocica `comfort` animation and narrator hint ("Hampir! Coba lagi ya.") play simultaneously. Bubu's demo step replays only after the spoken clip ends, respecting US-AUD-01 (no overlapping voice clips).
 4. **Asset validation tooling during Phase 2**:
-   - When will `npm run validate:assets` and `npm run validate:design` be functional in CI/local environment? Having these available early in Phase 2 will let us continuously test coloring-page line closure and manifest schemas before submitting PRs.
+   - *Status: Resolved.* Confirmed by Claude: `npm run validate:design` and `npm run validate:assets` ship in the contracts v1 PR (M0), available for local verification before Phase 2 begins.
 
 ## 8. Sign-off
 
