@@ -274,15 +274,55 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 
 1. Does the 160 × 160 companion frame give Ocica's round body enough room, or should it be
    192 × 160?
+   - **Recommendation: 192 × 160 px** (width × height).
+   - **Reasoning:**
+     - Ocica is designed with a round, chubby, wide-body silhouette (40–50% of Theia's height). At ~110–120 px tall on baseline y = 150, a spherical body plus chubby arms in 2:1 isometric projection easily reaches 120–130 px in static width.
+     - More critically, her key animations require lateral movement: the `walk` waddle has a side-to-side sway/weight shift, `comfort` involves reaching wide for a hug, and `eat` involves holding food. A 160 px width leaves under 15 px margin per side, which risks clipping or forcing a compromised, squished silhouette.
+     - Standardizing both companions at 192 × 160 px (baseline y = 150) also benefits Bubu (providing comfortable clearance for `point` and `demo` paw gestures) while keeping companion spritesheet dimensions unified for texture atlas packing.
+
 2. Phone 2400 × 1080: should the house view use a single wide composition, or a tablet
    composition extended at the sides?
+   - **Recommendation: Tablet composition (1920 × 1200 / 16:10 source), extended at the sides for wider viewports.**
+   - **Reasoning:**
+     - *Single geometric source of truth:* The isometric cutaway diorama of the house (walls, room proportions, stairs, doors, waypoints, walk polygons, and occluders in `assets/house/layout.json`) remains completely identical across tablet, laptop, and phone. We avoid managing two divergent architectural models or distorted perspectives.
+     - *Consistent framing & zoom:* On phone (2400 × 1080), the house view opens zoomed into the current room with drag-to-pan / pinch-to-zoom (PRD US-HOUSE-05). When zoomed out to view the entire house, scaling to the 1080 px height leaves ~240 px of horizontal space on each side. We extend `house/bg.png` with lush ambient decoration (garden foliage, fence, trees, sky) beyond the 16:10 frame.
+     - *Safe areas & ergonomics:* All interactive elements and room tap polygons remain strictly inside the 1760 × 1080 safe area, safely away from phone edges to prevent accidental triggering of system gesture navigation.
+
 3. Day/night: are 4 sky looks plus tint values enough, or should rooms also get light layers (lamps
    switching on at dusk)?
+   - **Recommendation: 4 sky looks + tint values as the base, PLUS a dedicated indoor warm light overlay layer (`house/lights.png`).**
+   - **Reasoning:**
+     - Global tinting darkens both exterior and interior uniformly. At dusk and bedtime, a pure dark tint makes indoor rooms feel gloomy, muddy, and murky rather than cozy.
+     - In the isometric diorama style, warm glowing indoor lamps turning on ("lampu rumah dinyalakan") are the signature visual cue that daytime play is winding down. It provides high-contrast warmth that makes the transition soothing rather than sad for a 3-year-old.
+     - *Implementation cost is minimal:* A single additive/screen overlay layer (`house/lights.png`) covering lamp and window glows. The engine can simply tween its opacity from 0.0 to 1.0 during the last 2 minutes of the session (dusk), and dim it off during the bedtime sequence in `SCR-BEDTIME`.
+
 4. Which rooms does the floor plan suggest for the 3 M1 activities?
+   - **Status: Waiting on the parents' floor plan.**
+   - **What is needed:** We need the parents to upload the floor plan sketch with room names and dimensions in metres to `reference/rumah/denah/` before we can finalize room placement.
+   - **Current working hypothesis:** We will follow the natural mapping from `PLAN.md` §3 (Tracing in Theia's bedroom `kamar-theia`, Counting in the kitchen `dapur`, Coloring in the living room `ruang-tamu` / `ruang-keluarga`), subject to confirming room adjacencies and storey distribution once the denah is reviewed.
+
 5. Isometric pipeline: is painting over the SVG blockout workable with your image tools, or would
    you prefer another structure guide (for example a depth map rendered from the blockout)?
+   - **Status: Waiting on Claude's `house:blockout` tool.**
+   - **What is needed:** We need Claude to implement and run `npm run house:blockout` (US-REF-02 in M0) against the floor plan data to generate the 3840 × 2400 SVG blockout.
+   - **Preferred guide format:** An SVG blockout with clean strokes and grouped layers (floors, back walls, stairs, door openings) is an excellent primary structural wireframe for vector/raster painting. If the tool can also export a rendered 3840 × 2400 raster line guide PNG (or flat color-coded surface ID pass), that will additionally allow direct depth/ControlNet conditioning in our generative passes. We will validate this hands-on as soon as the blockout tool outputs its first artifact.
+
 6. Anything in the contracts (`ASSETS.md`, upcoming `contracts/`) that blocks your preferred
    workflow or tools?
+   - **Status: Waiting on the contracts v1 PR.**
+   - **What is needed:** We need to review the zod schemas and generated JSON Schemas in `contracts/` (manifest, layout, tokens, motion, ui props) once Claude opens the contracts PR.
+   - **Current assessment:** `ASSETS.md` is clean, specific, and fully aligned with our design system approach. The strict coloring rules (closed line art ≥ 6 px, gaps ≤ 2 px, regions ≥ 40 px) and manifest keys are completely clear. We will formally co-sign once the schema PR is ready for review.
+
+### Blocking questions from Antigravity for Gate 1 / Phase 2 kickoff
+
+1. **Reference photos in `reference/` (Google Drive)**:
+   - Are the reference photos/videos for Theia, Mama, Papa, and especially the real dolls Bubu and Ocica (360° turn video or front/side/back angles) ready in Google Drive? We need these before Deliverables 1 (Style exploration) and 2 (Family sheet) can start in Phase 2.
+2. **Surface styling vs. token contrast in Tracing (`SCR-TRACE`)**:
+   - The brief mentions either chalkboard or desk paper for `tracing/surface.png`. If we explore a dark chalkboard look during style directions, guide lines and ink will require light/pastel tones instead of dark ink. Can Claude confirm that guide, path, and ink colors are driven entirely by `design/tokens.json` semantic tokens so contrast adjusts automatically to whichever surface style Papa approves?
+3. **Audio-visual coordination on error/comfort**:
+   - When Theia misses a stroke or count, Ocica plays the `comfort` animation. Does `HUD-SPEAKER` simultaneously play the narrator's encouraging voice clip ("coba lagi"), or does audio wait until Bubu's demo step replays?
+4. **Asset validation tooling during Phase 2**:
+   - When will `npm run validate:assets` and `npm run validate:design` be functional in CI/local environment? Having these available early in Phase 2 will let us continuously test coloring-page line closure and manifest schemas before submitting PRs.
 
 ## 8. Sign-off
 
