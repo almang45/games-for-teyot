@@ -19,8 +19,10 @@ function main() {
     );
     return 1;
   }
-  const violations = files.flatMap(({ path }) => {
-    const reason = violation(path);
+  const violations = files.flatMap(({ path, symlink }) => {
+    const reason = symlink
+      ? 'symlink (never shipped; copy the processed file instead)'
+      : violation(path);
     return reason ? [{ path, reason }] : [];
   });
   if (violations.length > 0) {

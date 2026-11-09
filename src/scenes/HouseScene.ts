@@ -87,6 +87,9 @@ export class HouseScene extends Phaser.Scene {
       width: this.scale.width,
       height: this.scale.height,
       theiaRoom: this.theiaRoom?.id ?? null,
+      // Her actual position against her room's centre; the resize E2E test compares the two.
+      theia: { x: Math.round(this.theia.x), y: Math.round(this.theia.y) },
+      roomCenter: this.theiaRoom ? roundPoint(centerOf(this.theiaRoom, proj)) : null,
     });
   }
 
@@ -137,12 +140,28 @@ export class HouseScene extends Phaser.Scene {
     this.theiaRoom = room;
     this.tweens.killTweensOf(this.theia);
     // Straight-line stand-in; waypoint navigation (ARCHITECTURE §6) replaces it.
-    this.tweens.add({ targets: this.theia, x, y, duration: 600, ease: 'Sine.easeInOut' });
+    this.tweens.add({
+      targets: this.theia,
+      x,
+      y,
+      duration: 600,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.log.info('house.arrived', {
+          room: room.id,
+          theia: { x: Math.round(this.theia.x), y: Math.round(this.theia.y) },
+        });
+      },
+    });
   }
 }
 
 function toVec(p: ScreenPoint): Phaser.Math.Vector2 {
   return new Phaser.Math.Vector2(p.x, p.y);
+}
+
+function roundPoint([x, y]: [number, number]): { x: number; y: number } {
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 function centerOf(room: PlaceholderRoom, proj: IsoProjection): [number, number] {

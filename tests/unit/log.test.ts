@@ -135,4 +135,25 @@ describe('captureGlobalErrors', () => {
     ]);
     expect(sink.entries[0]?.data).toMatchObject({ source: 'a.js', line: 1, column: 2 });
   });
+
+  it('calls onFatal for uncaught Errors only, after logging them', () => {
+    const listeners = new Map<string, (e: unknown) => void>();
+    const target = {
+      addEventListener: (type: string, fn: (e: unknown) => void) => listeners.set(type, fn),
+    } as unknown as Window;
+    const sink = new CollectingSink();
+    const fatal: Error[] = [];
+    captureGlobalErrors(target, new Logger([sink], 's', null, fixedClock), (err) => {
+      expect(sink.entries).toHaveLength(1);
+      fatal.push(err);
+    });
+
+    const boom = new Error('boom');
+    listeners.get('error')?.({ error: boom, message: 'boom' });
+    listeners.get('error')?.({ error: null, message: 'ResizeObserver loop completed' });
+    listeners.get('unhandledrejection')?.({ reason: new Error('later') });
+
+    expect(fatal).toEqual([boom]);
+    expect(sink.entries).toHaveLength(3);
+  });
 });

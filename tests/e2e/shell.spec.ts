@@ -7,6 +7,7 @@ import {
   expectScene,
   pressStart,
   tapCanvas,
+  type LoggedEvent,
 } from './helpers';
 
 test.describe('US-OFF-01: install and offline play', () => {
@@ -73,8 +74,10 @@ test.describe('US-AUD-01: audio starts on the first tap', () => {
     await expectScene(page, 'Boot');
     expect(log.some((e) => e.event === 'boot.audio_unlocked')).toBe(false);
     // Proves the tap does the unlocking: before it, the context must still be locked.
-    const ready = log.find((e) => e.event === 'scene.ready' && e.data.audioState !== undefined);
-    expect(ready?.data.audioState, 'AudioContext state at SCR-BOOT').not.toBe('running');
+    const bootReady = (): LoggedEvent | undefined =>
+      log.find((e) => e.event === 'scene.ready' && e.scene === 'Boot');
+    await expect.poll(bootReady, { message: 'SCR-BOOT logged scene.ready' }).toBeDefined();
+    expect(bootReady()?.data.audioState, 'AudioContext state at SCR-BOOT').toBe('suspended');
 
     await pressStart(page, hasTouch);
 

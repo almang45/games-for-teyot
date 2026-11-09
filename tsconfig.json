@@ -21,5 +21,6 @@
     "checkJs": true,
     "types": ["vite/client", "vite-plugin-pwa/client", "node"]
   },
-  "include": ["src", "tests", "tools", "vite.config.ts", "playwright.config.ts"]
+  // src/ has its own tsconfig without Node types; tests still pull src files in through imports.
+  "include": ["tests", "tools", "vite.config.ts", "playwright.config.ts"]
 }

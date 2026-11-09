@@ -1,4 +1,4 @@
-# docs/ARCHITECTURE.md §9: lint → test → build → e2e → SAST → quality gate → deploy.
+# docs/ARCHITECTURE.md §9: lint → test → build → validate + e2e → SAST → quality gate → deploy.
 # Every action is pinned by commit SHA; the trailing comment names the release.
 name: CI
 
@@ -77,6 +77,20 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  # AGENTS.md: design/ and assets/ validate against contracts/ (fails closed until contracts v1).
+  validate:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm run validate
+
   # Tests the exact artifact that deploys, served by `vite preview` with the production headers.
   e2e:
     needs: build
@@ -107,7 +121,7 @@ jobs:
   # Semgrep CE (LGPL engine, Semgrep Registry rules): CodeQL's licence doesn't cover private repos
   # without GitHub Code Security. The image is pinned by digest like the actions.
   semgrep:
-    needs: e2e
+    needs: [e2e, validate]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -130,7 +144,7 @@ jobs:
           if-no-files-found: ignore
 
   osv-scanner:
-    needs: e2e
+    needs: [e2e, validate]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -146,8 +160,6 @@ jobs:
     needs: [semgrep, osv-scanner]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      passed: ${{ steps.result.outputs.passed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -172,35 +184,29 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: -Dsonar.qualitygate.wait=true
-      # Only reached when the scan passed the gate (a failing gate fails the step above).
-      - id: result
-        run: echo "passed=true" >> "$GITHUB_OUTPUT"
 
+  # Off unless the repo variable PREVIEW_DEPLOYS is "enabled". A pull_request run executes the PR's
+  # own workflow file, and no Cloudflare token can upload versions without also being able to
+  # deploy, so the token must never be readable from PR runs by default. To enable: give the
+  # `preview` environment required reviewers and its own environment-scoped token first.
   deploy-preview:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.PREVIEW_DEPLOYS == 'enabled'
     needs: quality-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: preview
     steps:
-      - name: Check prerequisites
+      - name: Check the Worker exists
         id: pre
         env:
-          GATE_PASSED: ${{ needs.quality-gate.outputs.passed }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WORKER_NAME: rumah-cici-theia
         run: |
-          if [ "${GATE_PASSED}" != "true" ]; then
-            echo "::warning::Quality gate did not run; preview deploy skipped."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
-            echo "::warning::Cloudflare secrets are not set; preview deploy skipped."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::PREVIEW_DEPLOYS is enabled but the preview environment has no Cloudflare secrets."
+            exit 1
           fi
           # Preview versions need an existing Worker; the first one is created by the master deploy.
           status=$(curl -sS -o /dev/null -w '%{http_code}' \
@@ -239,10 +245,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          # GITHUB_SHA on a PR is a temporary merge commit; the build stamps the head SHA too.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           npx wrangler versions upload \
             --preview-alias "pr-${PR_NUMBER}" \
-            --message "PR #${PR_NUMBER} ${GITHUB_SHA::7}"
+            --message "PR #${PR_NUMBER} ${HEAD_SHA::7}"
 
   deploy-production:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -256,17 +264,14 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
-      - name: Check prerequisites
+      # `needs: quality-gate` already stops this job when the gate fails. The token is a secret of
+      # the `production` environment, which only master may use (deployment branch policy).
+      - name: Check the deploy token
         env:
-          GATE_PASSED: ${{ needs.quality-gate.outputs.passed }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          if [ "${GATE_PASSED}" != "true" ]; then
-            echo "::error::The SonarQube quality gate did not run (SONAR_TOKEN missing); production does not deploy without it."
-            exit 1
-          fi
           if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN is not set; production cannot deploy."
+            echo "::error::CLOUDFLARE_API_TOKEN is not set on the production environment; production cannot deploy."
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

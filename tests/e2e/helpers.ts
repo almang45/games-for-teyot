@@ -6,6 +6,7 @@ export const GAME_URL = '/?browser=1';
 export interface LoggedEvent {
   readonly event: string;
   readonly level: string;
+  readonly scene: string | null;
   readonly data: Record<string, unknown>;
 }
 

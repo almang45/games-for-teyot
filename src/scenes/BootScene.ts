@@ -77,11 +77,16 @@ export class BootScene extends Phaser.Scene {
       const tapAt = performance.now();
       unlockAudio(audio)
         .then(() => {
-          playPlaceholderChime(audio);
           log.info('boot.audio_unlocked', {
             latencyMs: Math.round(performance.now() - tapAt),
             audioState: audio.state,
           });
+          // Its own catch, so a chime bug is never reported as a failed unlock.
+          try {
+            playPlaceholderChime(audio);
+          } catch (err) {
+            log.error('boot.chime_failed', err);
+          }
         })
         .catch((err: unknown) => {
           // Silent play beats a stuck start screen; the parent log shows why.

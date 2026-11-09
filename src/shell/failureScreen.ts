@@ -11,8 +11,9 @@ export const FAILURE_COPY = {
 export const FAILURE_SCENE = 'Failure';
 
 /**
- * PRD §7.5: Theia never sees a blank screen. Shown when boot or the game start fails; the big
- * button reloads the app, which is also what fixes a stale chunk after a deploy.
+ * PRD §7.5: Theia never sees a blank or frozen screen. Shown when boot, the game start, or any
+ * uncaught error in the running game fails; the big button reloads the app, which also fixes a
+ * stale chunk after a deploy.
  */
 export function renderFailureScreen(root: HTMLElement, reload: () => void): void {
   const doc = root.ownerDocument;

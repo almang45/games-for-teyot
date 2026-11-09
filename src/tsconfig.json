@@ -1,0 +1,9 @@
+{
+  // Browser code: no Node types, so `process`, `Buffer` or `require` in src/ fail the typecheck
+  // instead of throwing on the tablet. The root tsconfig covers tools, tests and configs.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "vite-plugin-pwa/client"]
+  },
+  "include": ["."]
+}

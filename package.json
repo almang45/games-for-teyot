@@ -11,13 +11,14 @@
     "dev": "vite",
     "build": "vite build && node tools/build/check-budget.mjs && node tools/build/check-private.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.json",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "deploy": "npm run build && wrangler deploy",
+    "validate": "node tools/validate/check-lanes.mjs",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {

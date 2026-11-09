@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+import { COVERAGE_EXCLUDE, COVERAGE_INCLUDE } from './tools/build/coverage.ts';
 import { readGlobalHeaders } from './tools/build/headers.ts';
 import { INSTALLED_START_URL } from './src/platform/launch.ts';
+import { NETWORK_ONLY_NAVIGATIONS } from './src/platform/swRouting.ts';
 import { placeholderIcons } from './tools/build/placeholder-icons.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -75,6 +77,8 @@ export default defineConfig({
         // No webmanifest here: vite-plugin-pwa adds the manifest to the precache itself.
         globPatterns: ['**/*.{js,css,html,png,svg,webp,webm,json}'],
         navigateFallback: '/index.html',
+        // Access login/callback and the re-auth path must reach Cloudflare, not the cached shell.
+        navigateFallbackDenylist: [...NETWORK_ONLY_NAVIGATIONS],
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
@@ -86,16 +90,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['src/**/*.ts', 'tools/**/*.ts'],
-      // Phaser scenes and the browser entry are covered by Playwright, not Vitest; palette is data.
-      exclude: [
-        'src/main.ts',
-        'src/scenes/**',
-        'src/game/createGame.ts',
-        'src/placeholder/palette.ts',
-        'src/**/*.d.ts',
-        'tools/dev/**',
-      ],
+      include: [...COVERAGE_INCLUDE],
+      exclude: [...COVERAGE_EXCLUDE],
     },
   },
 });

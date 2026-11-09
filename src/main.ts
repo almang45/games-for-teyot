@@ -1,14 +1,40 @@
 import './styles.css';
+import type { Game } from 'phaser';
 import { registerSW } from 'virtual:pwa-register';
 import { getStrings } from './content/strings';
 import { renderInstallScreen } from './install/installScreen';
-import { captureGlobalErrors, createAppLog, createSessionId, type Logger } from './log';
+import {
+  captureGlobalErrors,
+  createAppLog,
+  createSessionId,
+  serializeError,
+  type Logger,
+} from './log';
 import { detectInstallPlatform, readLaunchSignals, resolveLaunchMode } from './platform/launch';
 import { renderFailureScreen } from './shell/failureScreen';
 
 // No module imported above does work at import time, so the capture below sees every boot error.
 const { logger } = createAppLog(createSessionId(), import.meta.env.DEV);
-captureGlobalErrors(window, logger);
+const appRoot = document.getElementById('app');
+let game: Game | undefined;
+let failed = false;
+
+/** PRD §7.5: any failure ends on the retry screen, never a blank or frozen one. */
+function fail(): void {
+  if (failed || !appRoot) return;
+  failed = true;
+  try {
+    game?.destroy(true);
+  } catch (err) {
+    logger.error('app.game_destroy_failed', err);
+  }
+  game = undefined;
+  renderFailureScreen(appRoot, () => {
+    location.reload();
+  });
+}
+
+captureGlobalErrors(window, logger, fail);
 
 function registerServiceWorker(log: Logger): void {
   registerSW({
@@ -39,7 +65,7 @@ async function startGame(root: HTMLElement, log: Logger): Promise<void> {
   // Phaser is loaded lazily so SCR-INSTALL stays light.
   const { createGame } = await import('./game/createGame');
   const audio = new AudioContext({ latencyHint: 'interactive' });
-  createGame(root, { logger: log, audio });
+  game = createGame(root, { logger: log, audio });
 }
 
 type NavigatorWithHints = Navigator & { userAgentData?: { platform?: string } };
@@ -47,7 +73,7 @@ type NavigatorWithHints = Navigator & { userAgentData?: { platform?: string } };
 function main(root: HTMLElement): void {
   const strings = getStrings();
   const signals = readLaunchSignals(window, (err: unknown) => {
-    logger.warn('launch.storage_unavailable', { error: String(err) });
+    logger.warn('launch.storage_unavailable', { error: serializeError(err) });
   });
   const mode = resolveLaunchMode(signals);
   logger.info('app.launch', { mode, ...signals, version: __APP_VERSION__ });
@@ -72,23 +98,16 @@ function main(root: HTMLElement): void {
   });
   startGame(root, logger).catch((err: unknown) => {
     logger.error('app.start_failed', err);
-    showFailure(root);
+    fail();
   });
 }
 
-function showFailure(root: HTMLElement): void {
-  renderFailureScreen(root, () => {
-    location.reload();
-  });
-}
-
-const appRoot = document.getElementById('app');
 if (appRoot) {
   try {
     main(appRoot);
   } catch (err) {
     logger.error('app.boot_failed', err);
-    showFailure(appRoot);
+    fail();
   }
 } else {
   // Only a broken index.html gets here; there is nowhere to render a screen.

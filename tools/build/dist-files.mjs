@@ -6,18 +6,24 @@ import { fileURLToPath } from 'node:url';
 // fileURLToPath, not URL.pathname: handles spaces and Windows drive letters.
 export const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
 
-/** dist-relative path with '/' separators on every OS, so prefix checks work on Windows. */
-const toPosix = (/** @type {string} */ full) => relative(DIST, full).split(sep).join('/');
+/**
+ * Root-relative path with '/' separators on every OS, so prefix checks work on Windows.
+ * @param {string} root @param {string} full
+ */
+const toPosix = (root, full) => relative(root, full).split(sep).join('/');
 
 /**
- * Symlinks are reported as files, never followed, so a link to reference/ can't hide its contents.
+ * Symlinks are listed, never followed, and flagged: the privacy check rejects them outright, since
+ * wrangler and Workbox would read through a link into reference/ or recordings/.
  * @param {string} [dir]
- * @returns {{ path: string, bytes: number }[]}
+ * @param {string} [root] what paths are made relative to
+ * @returns {{ path: string, bytes: number, symlink: boolean }[]}
  */
-export function distFiles(dir = DIST) {
+export function distFiles(dir = DIST, root = dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) return distFiles(full);
-    return [{ path: toPosix(full), bytes: entry.isSymbolicLink() ? 0 : statSync(full).size }];
+    if (entry.isDirectory()) return distFiles(full, root);
+    const symlink = entry.isSymbolicLink();
+    return [{ path: toPosix(root, full), bytes: symlink ? 0 : statSync(full).size, symlink }];
   });
 }

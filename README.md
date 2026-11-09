@@ -52,11 +52,16 @@ npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKi
 
 | Secret | Used by |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Deploy jobs. Custom token, least privilege: Account → *Workers Scripts: Edit* and *Account Settings: Read*; Zone `amns.my.id` → *Workers Routes: Edit*. |
-| `CLOUDFLARE_ACCOUNT_ID` | Deploy jobs |
+| `CLOUDFLARE_API_TOKEN` | **`production` environment secret**, never a repository secret (PR runs can read repository secrets). Custom token, least privilege: Account → *Workers Scripts: Edit* and *Account Settings: Read*; Zone `amns.my.id` → *Workers Routes: Edit*. |
+| `CLOUDFLARE_ACCOUNT_ID` | `production` environment secret |
 | `SONAR_TOKEN` | Quality gate. Required: CI fails without it. Add it to **Dependabot** secrets as well, so Dependabot PRs pass the gate. |
 
-Deploys run only after the quality gate passes. Each PR uploads a preview version (`pr-<n>`
-preview URL on `workers.dev`, behind Access); `master` deploys to `rct.amns.my.id`, the only
-production hostname (`workers_dev` is off). `npm run deploy` builds first, but it bypasses the CI
+Deploys run only after the quality gate passes. `master` deploys to `rct.amns.my.id`, the only
+production hostname (`workers_dev` is off), through the `production` environment, which only
+`master` may use. PR preview uploads are off unless the repository variable `PREVIEW_DEPLOYS` is
+`enabled`; turn that on only after giving the `preview` environment required reviewers and its own
+token.
+
+After the 1-month Access session expires, a parent opens `https://rct.amns.my.id/masuk` to log in
+again; the offline shell answers `/` from cache, so only that path reaches the Access login. `npm run deploy` builds first, but it bypasses the CI
 gates, so it is for the very first deploy only. Roll back with `npx wrangler rollback <version-id>`.

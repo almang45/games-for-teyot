@@ -11,7 +11,7 @@ Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`AS
 |---|---|---|
 | Language | TypeScript, `strict` | One language for game, tooling, and Worker |
 | Build | Vite | Fast, first-class static output, PWA plugin |
-| Game runtime | Phaser (latest stable major at implementation time) | Scenes, tweens, WebAudio unlock, texture atlases, input. Mature on Android Chrome. |
+| Game runtime | Phaser (latest stable major at implementation time) | Scenes, tweens, texture atlases, input. Mature on Android Chrome. Its sound manager is off; the app owns audio (§7). |
 | Parent UI | Svelte, mounted as a DOM overlay | Forms and dashboards are painful in canvas |
 | Offline | `vite-plugin-pwa` (Workbox) | Precached app shell plus each room's assets |
 | Storage | IndexedDB via `idb` | Structured progress and stroke replays. Larger quota than localStorage. |
@@ -263,7 +263,10 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 - Offline and on expired sessions, the service worker serves the cached shell, so she can always
   play. An update fetch that gets an Access redirect counts as "no update". The service worker
   never caches that redirect.
-- A parent re-authenticates in Chrome to pick up new versions.
+- A parent re-authenticates at `/masuk` to pick up new versions. The service worker answers every
+  other navigation (including `/`) from the cached shell, so Access would never get to redirect.
+  `/masuk` and Access's own `/cdn-cgi/` endpoints are on the navigation denylist
+  (`src/platform/swRouting.ts`) and always reach the network.
 
 ### 8.4 Rollback
 - Every deploy is a Worker version. Rollback with `wrangler rollback <version-id>`.
@@ -276,7 +279,7 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 Every action is pinned by commit SHA.
 
 ```
-lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-gate ─▶ deploy
+lint ─▶ test ─▶ build ─▶ validate + e2e ─▶ SAST ─▶ quality-gate ─▶ deploy
 ```
 
 | Stage | Contents |
@@ -284,17 +287,18 @@ lint ─▶ test ─▶ build ─▶ validate-assets ─▶ SAST ─▶ quality-
 | lint | `tsc --noEmit`, ESLint, Prettier check |
 | test | Vitest with coverage. Playwright smoke run on tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. |
 | build | `vite build`. Fails if the size budget (§10) is exceeded. |
-| validate-assets | `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
+| validate | Until contracts v1: fails closed if `design/` or `assets/` has any file (`tools/validate/check-lanes.mjs`). Then `tools/assets`: manifest schema, atlas max 2048², sprite frame sizes, coloring-page closure, all audio keys referenced in content are present |
 | SAST | Semgrep CE (`p/default`, `p/typescript`; CodeQL's licence excludes private repos without GitHub Code Security), `osv-scanner` on the lockfile |
 | quality-gate | SonarQube Cloud. The gate blocks the pipeline. |
-| deploy | PR: `wrangler versions upload` (preview URL, behind Access). `master`: `wrangler deploy`. |
+| deploy | `master`: `wrangler deploy` through the `production` environment (deployment branch: `master` only). PR: `wrangler versions upload` (preview URL, behind Access), off unless `vars.PREVIEW_DEPLOYS == 'enabled'`. |
 
-Secrets live in GitHub Actions secrets:
-- `CLOUDFLARE_API_TOKEN`: a custom least-privilege token. Account: *Workers Scripts: Edit*,
-  *Account Settings: Read*. Zone `amns.my.id`: *Workers Routes: Edit* (for the custom domain). Every
-  PR run can use it, so it gets nothing else.
-- `CLOUDFLARE_ACCOUNT_ID`
-- `SONAR_TOKEN`
+Secrets:
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: secrets of the `production` environment only.
+  A `pull_request` run executes the PR's own workflow file and can read every repository secret, and
+  a Cloudflare token that can upload versions can also deploy. The environment's branch policy keeps
+  the token away from anything but `master`. The token itself is least privilege. Account: *Workers
+  Scripts: Edit*, *Account Settings: Read*. Zone `amns.my.id`: *Workers Routes: Edit*.
+- `SONAR_TOKEN`: repository secret, and a Dependabot secret for Dependabot PRs.
 
 ## 10. Budgets
 
