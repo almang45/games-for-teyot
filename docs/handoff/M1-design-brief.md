@@ -297,9 +297,20 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
      - *Implementation cost is minimal:* A single additive/screen overlay layer (`house/lights.png`) covering lamp and window glows. The engine can simply tween its opacity from 0.0 to 1.0 during the last 2 minutes of the session (dusk), and dim it off during the bedtime sequence in `SCR-BEDTIME`.
 
 4. Which rooms does the floor plan suggest for the 3 M1 activities?
-   - **Status: Waiting on the parents' floor plan.**
-   - **What is needed:** We need the parents to upload the floor plan sketch with room names and dimensions in metres to `reference/rumah/denah/` before we can finalize room placement.
-   - **Current working hypothesis:** We will follow the natural mapping from `PLAN.md` §3 (Tracing in Theia's bedroom `kamar-theia`, Counting in the kitchen `dapur`, Coloring in the living room `ruang-tamu` / `ruang-keluarga`), subject to confirming room adjacencies and storey distribution once the denah is reviewed.
+   - **Answer**: Based on the complete architectural denah in `reference/rumah/denah/` (`denah-lt-0.png`, `denah-lt-1.png`, `denah-lt-2.png`, `tampak-depan-dengan-ukuran-tinggi.png`), the house is a split-level design (Lt. Dasar ±0.000, Mezzanine 1 +2.400, Lt. Atas +3.400, Mezzanine 2 +4.800). We map the 3 M1 activities as follows:
+     - **Tracing (`SCR-TRACE` — Menulis)**: **`kamar-tidur` (Lt. Atas 01, FFL +3.400)**.
+       - *Framing*: Theia's study desk / chalkboard in the upper bedroom (`R. TIDUR UTAMA`).
+       - *Why*: Provides a quiet, focused learning corner. Crucially, the bedroom directly hosts the session bedtime sequence (`SCR-BEDTIME`: Theia, Bubu, and Ocica falling asleep in bed), creating a unified narrative and spatial anchor. Walking up the stairs (`walk` + `stairs` animation) to her bedroom gives an endearing sense of journey.
+     - **Counting (`SCR-COUNT` — Berhitung)**: **`dapur` / `ruang-makan` (Lt. Dasar, FFL ±0.000)**.
+       - *Framing*: The open kitchen counter and dining table (`R. MAKAN` & `DAPUR`).
+       - *Why*: Perfectly suits food-based counting objects (telur, apel, kue) and containers (mangkuk, piring). Ocica "eating" the counted cookies fits naturally at the kitchen table.
+     - **Coloring (`SCR-COLOR-PICK` / `SCR-COLOR` — Mewarnai)**: **`ruang-keluarga` / `ruang-tamu` (Lt. Dasar, FFL ±0.000)**.
+       - *Framing*: The living room floor/rug and drawing easel under the high-ceiling void.
+       - *Why*: The open living space is the natural family creative play area. Finished coloring pages hang on the fridge (`house.fridge`), which sits in the adjacent dining/kitchen area in direct visual line-of-sight in this open plan. This room also hosts the M1 tidy-up break (`SCR-TIDY`: Beberes scattered toys on the floor).
+     - **Future Milestones (M2–M4 Preview)**:
+       - *Mezzanine 1 (+2.400, Kantor Papa)*: Reading nook & letter recognition (`R1–R6`).
+       - *Mezzanine 2 (+4.800, Loft)*: Play nook / sticker gallery.
+       - *Taman Depan & Belakang*: Garden activities (M4 shapes, colors, plants).
 
 5. Isometric pipeline: is painting over the SVG blockout workable with your image tools, or would
    you prefer another structure guide (for example a depth map rendered from the blockout)?
@@ -316,7 +327,7 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 ### Blocking questions from Antigravity for Gate 1 / Phase 2 kickoff
 
 1. **Reference photos in `reference/` (Google Drive)**:
-   - Are the reference photos/videos for Theia, Mama, Papa, and especially the real dolls Bubu and Ocica (360° turn video or front/side/back angles) ready in Google Drive? We need these before Deliverables 1 (Style exploration) and 2 (Family sheet) can start in Phase 2.
+   - *Status: Confirmed & ready.* Full reference sets for Theia, Mama, Papa, Bubu, Ocica (including 360° turn videos), style inspiration, and house denah/photos have been reviewed in `reference/`. No blocker here.
 2. **Surface styling vs. token contrast in Tracing (`SCR-TRACE`)**:
    - The brief mentions either chalkboard or desk paper for `tracing/surface.png`. If we explore a dark chalkboard look during style directions, guide lines and ink will require light/pastel tones instead of dark ink. Can Claude confirm that guide, path, and ink colors are driven entirely by `design/tokens.json` semantic tokens so contrast adjusts automatically to whichever surface style Papa approves?
 3. **Audio-visual coordination on error/comfort**:
