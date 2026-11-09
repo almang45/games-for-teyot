@@ -9,6 +9,7 @@ import {
   type Manifest,
   type ManifestEntry,
 } from '../../contracts/manifest.ts';
+import { resolveWithoutLinks } from '../build/no-links.ts';
 import { decodePng, readPngHeader } from '../build/png.ts';
 import { checkColoringPage } from './coloring.ts';
 import {
@@ -24,8 +25,22 @@ import {
 export const ASSETS_LANE = 'assets';
 export const MANIFEST_FILE = `${ASSETS_LANE}/manifest.json`;
 
-/** Reference sheets (ASSETS.md §3) are review material: committed, never registered or shipped. */
-const UNREGISTERED_PREFIXES = [`${ASSETS_LANE}/style/`];
+/**
+ * Reference sheets (ASSETS.md §3) are review material: committed, never registered or shipped.
+ * They are drawn PNG sheets only, so nothing else (a photo, a recording) can hide in the folder.
+ */
+const REFERENCE_SHEETS = `${ASSETS_LANE}/style/`;
+
+function checkReferenceSheet(root: string, file: string): FileIssue[] {
+  const only = 'reference sheets are drawn PNG sheets (ASSETS.md §3)';
+  if (!file.endsWith('.png')) return [{ ...error('', only), file }];
+  try {
+    readPngHeader(readFileSync(join(root, file)));
+    return [];
+  } catch (err) {
+    return [{ ...error('', `${err instanceof Error ? err.message : String(err)}: ${only}`), file }];
+  }
+}
 
 /** The manifest, if `assets/` has one. Shared with validate:design for its cross-lane checks. */
 export function loadManifest(root: string): Parsed<Manifest> | undefined {
@@ -58,8 +73,13 @@ function checkEntryFile(root: string, entry: ManifestEntry, at: string, m: Manif
   const full = join(root, file);
   if (!existsSync(full))
     return [{ ...error(`${at}.path`, `${file} does not exist`), file: MANIFEST_FILE }];
-  // Already reported by the lane listing; never read through the link.
+  // A linked file is already reported by the lane listing; never read through a link.
   if (lstatSync(full).isSymbolicLink()) return [];
+  try {
+    resolveWithoutLinks(join(root, ASSETS_LANE), entry.path);
+  } catch (err) {
+    return [{ ...error('', err instanceof Error ? err.message : String(err)), file }];
+  }
   try {
     switch (entry.type) {
       case 'layout':
@@ -109,8 +129,9 @@ export function validateAssets(root: string): Report {
 
   const registered = new Set([MANIFEST_FILE, ...m.assets.map((a) => `${ASSETS_LANE}/${a.path}`)]);
   for (const f of files) {
-    const reference = UNREGISTERED_PREFIXES.some((p) => f.path.startsWith(p));
-    if (!f.symlink && !reference && !registered.has(f.path)) {
+    if (f.symlink) continue;
+    if (f.path.startsWith(REFERENCE_SHEETS)) issues.push(...checkReferenceSheet(root, f.path));
+    else if (!registered.has(f.path)) {
       issues.push({ ...error('', 'not registered in assets/manifest.json'), file: f.path });
     }
   }

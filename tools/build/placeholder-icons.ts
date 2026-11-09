@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { manifest } from '../../contracts/manifest.ts';
+import { resolveWithoutLinks } from './no-links.ts';
 import { encodePng, type Rgba } from './png.ts';
 
 /**
@@ -25,8 +26,9 @@ type Icon = (typeof ICONS)[number];
 
 /**
  * Where each icon's delivered art lives: `assets/<path>` from the manifest entry with its key.
- * Unregistered keys fall back to the placeholder. A broken manifest fails the build: validate:assets
- * reports the details, and shipping placeholders over real art would hide the breakage.
+ * Unregistered keys fall back to the placeholder. A broken manifest, or a registered icon that is
+ * missing or reached through a symlink, fails the build: validate:assets reports the details, and
+ * shipping placeholders over real art would hide the breakage.
  */
 export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
   const file = resolve(root, 'assets', 'manifest.json');
@@ -40,7 +42,7 @@ export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
   return new Map(
     parsed.data.assets
       .filter((a) => ICONS.some((i) => i.key === a.key))
-      .map((a) => [a.key, resolve(root, 'assets', a.path)]),
+      .map((a) => [a.key, resolveWithoutLinks(resolve(root, 'assets'), a.path)]),
   );
 }
 

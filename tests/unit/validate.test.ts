@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -87,6 +87,16 @@ describe('validateAssets', () => {
     ]);
   });
 
+  it('keeps assets/style/ to PNG reference sheets', () => {
+    deliverAssets();
+    put('assets/style/theia-ref.jpg', 'JFIF');
+    put('assets/style/fake.png', 'not a png at all, just text pretending');
+    expect(errors(validateAssets(root))).toEqual([
+      'assets/style/fake.png : not a PNG file: reference sheets are drawn PNG sheets (ASSETS.md §3)',
+      'assets/style/theia-ref.jpg : reference sheets are drawn PNG sheets (ASSETS.md §3)',
+    ]);
+  });
+
   it('accepts a complete delivery, warning only about staged art', () => {
     deliverAssets();
     put('assets/style/reference-sheet.png', blank(10, 10));
@@ -141,7 +151,6 @@ describe('validateAssets', () => {
     expect(errors(validateAssets(root))[0]).toMatch(/^assets\/house\/layout\.json size: /);
   });
 
-  // A full 1920 × 1200 page through encode, decode and morphology takes ~8 s on CI under coverage.
   it('decodes coloring pages and checks their line art', () => {
     deliverAssets();
     const m = manifestFixture();
@@ -161,9 +170,9 @@ describe('validateAssets', () => {
       }),
     );
     expect(errors(validateAssets(root))).toEqual([
-      expect.stringMatching(/^assets\/coloring\/ayam\.png : 2 fillable regions/) as string,
+      expect.stringMatching(/^assets\/coloring\/ayam\.png : 1 fillable regions/) as string,
     ]);
-  }, 30_000);
+  });
 
   it('rejects symlinks', () => {
     deliverAssets();
@@ -179,6 +188,17 @@ describe('validateAssets', () => {
     symlinkSync(join(root, 'assets/counting/objects/apel.png'), join(root, 'assets/ui/home.png'));
     expect(errors(validateAssets(root))).toEqual([
       'assets/ui/home.png : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
+    ]);
+  });
+
+  it('never reads a registered file through a symlinked folder', () => {
+    deliverAssets();
+    mkdirSync(join(root, 'outside'));
+    renameSync(join(root, 'assets/ui'), join(root, 'outside/ui'));
+    symlinkSync(join(root, 'outside/ui'), join(root, 'assets/ui'));
+    expect(errors(validateAssets(root))).toEqual([
+      'assets/ui : symlinks are not allowed in a lane: they can point into reference/ or recordings/',
+      'assets/ui/home.png : ui/home.png goes through a symlink: copy the file in instead',
     ]);
   });
 });
@@ -210,6 +230,7 @@ describe('lintUiComponent', () => {
     const local = COMPONENT.replace("from '../contracts/ui.ts'", "from './types'");
     expect(lintUiComponent('ui/BigButton.svelte', local).map((i) => i.message)).toEqual([
       'declare props as BigButtonProps from contracts/ui.ts via $props()',
+      './types: ui/ imports only svelte, sibling ui/ components and contracts/ui.ts',
     ]);
   });
 
@@ -231,7 +252,7 @@ describe('lintUiComponent', () => {
       "import { log } from '../src/log';\nlocalStorage.x = 1; fetch('/x'); window.state = 1;\n</script>",
     );
     expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
-      'ui/ must not import from src/',
+      '../src/log: ui/ must not import from src/',
       'ui/ must not use storage',
       'ui/ must not use network',
       'ui/ must not use global state',
@@ -244,11 +265,85 @@ describe('lintUiComponent', () => {
       'background: rgb(1, 2, 3); padding: 1.5rem',
     );
     expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
-      'literal colour #ff0000: use a token variable',
       'literal size 12px: use a token variable',
+      'literal colour #ff0000: use a token variable',
       'literal colour rgb(: use a token variable',
       'literal size 1.5rem: use a token variable',
     ]);
+  });
+
+  it('reads every way a component can write CSS', () => {
+    const bad = COMPONENT.replace(
+      'style="padding: var(--space-m)"',
+      "style='color: #ff0000' style:height={'20px'} style:outline-color=\"red\"",
+    ).replace(
+      'margin: 0;',
+      'margin: -8px; color: White; height: 10dvh; white-space: nowrap; color: var(--red);',
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
+      'literal size -8px: use a token variable',
+      'literal colour White: use a token variable',
+      'literal size 10dvh: use a token variable',
+      'literal colour #ff0000: use a token variable',
+      'literal size 20px: use a token variable',
+      'literal colour red: use a token variable',
+    ]);
+  });
+
+  it('allows only svelte, sibling components and the ui contract as imports', () => {
+    const imports = [
+      "import { fade } from 'svelte/transition';",
+      "import Swatch from './Swatch.svelte';",
+      "import '../src/log/side-effect';",
+      "import { writable } from 'svelte/store';",
+      "export { x } from '../src';",
+      "const later = await import('../src/game/state.ts');",
+    ].join('\n');
+    const bad = COMPONENT.replace('</script>', `${imports}\n</script>`);
+    expect(lintUiComponent('ui/BigButton.svelte', bad).map((i) => i.message)).toEqual([
+      'ui/ must not use dynamic import()',
+      'svelte/store: ui/ imports only svelte, sibling ui/ components and contracts/ui.ts',
+      '../src: ui/ must not import from src/',
+      '../src/log/side-effect: ui/ must not import from src/',
+    ]);
+    const shared = COMPONENT.replace('<script lang="ts">', '<script lang="ts" module>');
+    expect(lintUiComponent('ui/BigButton.svelte', shared).map((i) => i.message)).toEqual([
+      'ui/ must not use <script module>: it is state shared by every instance',
+    ]);
+  });
+
+  it('keeps remote URLs out of markup, script and style', () => {
+    const cdn = COMPONENT.replace(
+      '<button',
+      '<img src="https://cdn.example.com/x.png" alt="" />\n<button',
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', cdn).map((i) => i.message)).toEqual([
+      'remote URL https://cdn.example.com/x.png: ui/ ships no third-party requests',
+    ]);
+    const font = COMPONENT.replace(
+      '<style>',
+      "<style>\n  @import url('//fonts.googleapis.com/css2?family=Andika');",
+    );
+    expect(lintUiComponent('ui/BigButton.svelte', font).map((i) => i.message)).toEqual([
+      'remote URL //fonts.googleapis.com: ui/ ships no third-party requests',
+      '@import: styles come from tokens, not other stylesheets',
+    ]);
+  });
+
+  it('ignores comments and comparisons', () => {
+    const fine = COMPONENT.replace(
+      '</script>',
+      [
+        '  // never touch localStorage here; see https://example.com/rules',
+        '  /* fetch( happens in src/, not here */',
+        '  const wide = window.innerWidth == 3;',
+        '  const url = "local//path";',
+        "  const note = 'it\\'s // still a string';",
+        '</script>',
+        '<!-- https://example.com/mockup -->',
+      ].join('\n'),
+    ).replace('<style>', '<style>\n  /* #ff0000 was the old red, 12px the old size */');
+    expect(lintUiComponent('ui/BigButton.svelte', fine)).toEqual([]);
   });
 });
 

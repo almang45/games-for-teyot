@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
@@ -86,7 +86,8 @@ describe('placeholderIcons plugin', () => {
 describe('delivered icons', () => {
   const roots: string[] = [];
   const makeRoot = (manifestJson?: string, files: Record<string, Buffer> = {}): string => {
-    const root = mkdtempSync(join(tmpdir(), 'rct-icons-'));
+    // Real path: the temp dir is itself a symlink on macOS (/var → /private/var).
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'rct-icons-')));
     roots.push(root);
     if (manifestJson !== undefined) {
       mkdirSync(join(root, 'assets'), { recursive: true });
@@ -132,6 +133,18 @@ describe('delivered icons', () => {
 
   it('falls back to placeholders without a manifest', () => {
     expect(deliveredIconPaths(makeRoot())).toEqual(new Map());
+  });
+
+  it('refuses icons reached through a symlink, so private files never reach dist/', () => {
+    const manifestJson = JSON.stringify({
+      version: 1,
+      assets: [{ key: 'icons.app.192', type: 'image', path: 'brand/icon.png', room: 'global' }],
+    });
+    const root = makeRoot(manifestJson, {
+      'private/icon.png': encodePng(1, 1, () => [0, 0, 0, 255]),
+    });
+    symlinkSync(join(root, 'assets', 'private'), join(root, 'assets', 'brand'));
+    expect(() => deliveredIconPaths(root)).toThrow('brand/icon.png goes through a symlink');
   });
 
   it('fails the build on an invalid manifest instead of hiding the art', () => {
