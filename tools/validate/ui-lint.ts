@@ -340,10 +340,14 @@ class Findings {
   private importsContractProps = false;
   private callsProps = false;
 
-  constructor(private readonly props: string) {}
+  private readonly props: string;
+
+  constructor(props: string) {
+    this.props = props;
+  }
 
   visit(node: Node, parent: Node | undefined, key: string): void {
-    this.declare(node);
+    this.declaredNames(node);
     const spec = importSource(node);
     if (spec !== undefined) this.importDeclaration(node, spec);
     else if (node.type === 'Attribute') this.attribute(node);
@@ -374,7 +378,7 @@ class Findings {
   }
 
   /** A name of the component's own that reads like a browser global hides which one is meant. */
-  private declare(node: Node): void {
+  private declaredNames(node: Node): void {
     const names = declaredIds(node).map((id) => {
       this.declarations.add(id);
       return text(id.name);
