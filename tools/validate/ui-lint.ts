@@ -27,6 +27,17 @@ function styles(source: string): string[] {
   return [...blocks, ...inline];
 }
 
+const UI_TYPE_IMPORT =
+  /import\s+type\s*\{([^}]*)\}\s*from\s*['"](?:\.\.\/)+contracts\/ui(?:\.ts)?['"]/g;
+
+/** Names brought in by `import type { … } from '../contracts/ui'`, before any `as` rename. */
+function typeImportsFromUiContract(source: string): Set<string> {
+  const names = [...source.matchAll(UI_TYPE_IMPORT)].flatMap((m) =>
+    (m[1] ?? '').split(',').map((spec) => spec.trim().split(/\s+/)[0] ?? ''),
+  );
+  return new Set(names);
+}
+
 const componentName = (file: string): string =>
   file.slice(file.lastIndexOf('/') + 1).replace(/\.svelte$/, '');
 
@@ -38,10 +49,7 @@ export function lintUiComponent(file: string, source: string): Issue[] {
   }
   const issues: Issue[] = [];
   const props = `${name as UiComponent}Props`;
-  const importsProps = new RegExp(
-    String.raw`import\s+type\s*\{[^}]*\b${props}\b[^}]*\}\s*from\s*['"](?:\.\./)+contracts/ui(?:\.ts)?['"]`,
-  );
-  if (!importsProps.test(source) || !source.includes('$props()')) {
+  if (!typeImportsFromUiContract(source).has(props) || !source.includes('$props()')) {
     issues.push(error('props', `declare props as ${props} from contracts/ui.ts via $props()`));
   }
   if (FROM_SRC.test(source)) issues.push(error('imports', 'ui/ must not import from src/'));

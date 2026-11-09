@@ -212,6 +212,18 @@ describe('lintUiComponent', () => {
     ]);
   });
 
+  it('finds the props type among other imports, renamed or not', () => {
+    const several = COMPONENT.replace(
+      '{ BigButtonProps }',
+      '{ InteractiveState, BigButtonProps as Props, }',
+    ).replace(': BigButtonProps', ': Props');
+    expect(lintUiComponent('ui/BigButton.svelte', several)).toEqual([]);
+    const lookalike = COMPONENT.replace('{ BigButtonProps }', '{ BigButtonPropsDraft }');
+    expect(lintUiComponent('ui/BigButton.svelte', lookalike).map((i) => i.message)).toEqual([
+      'declare props as BigButtonProps from contracts/ui.ts via $props()',
+    ]);
+  });
+
   it('keeps src/, storage, network and globals out', () => {
     const bad = COMPONENT.replace(
       '</script>',
