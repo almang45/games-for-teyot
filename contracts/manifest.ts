@@ -188,6 +188,12 @@ const key = (source: string) => new RegExp(`^${source}$`);
 export const HOUSE_SOURCE: Size = [3840, 2400];
 /** The 1920 × 1200 game export, also the layout.json coordinate space. */
 export const HOUSE_EXPORT: Size = [1920, 1200];
+/**
+ * Garden and sky extend 384 px past each side of the export so a 20:9 phone fitting the house to its
+ * height (2667 px wide at frame scale) never shows an edge (M1 design brief §7 Q2).
+ */
+export const HOUSE_BACKDROP_BLEED = 384;
+export const HOUSE_BACKDROP: Size = [HOUSE_EXPORT[0] + 2 * HOUSE_BACKDROP_BLEED, HOUSE_EXPORT[1]];
 export const SCREEN: Size = [1920, 1200];
 
 const exact = (w: number, h: number): SizeRule => ({ exact: [w, h] });
@@ -234,7 +240,7 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     id: 'house.backdrop',
     pattern: key('house\\.(?:bg|sky\\.(?:morning|noon|afternoon|dusk))'),
     type: 'image',
-    size: { exact: HOUSE_EXPORT },
+    size: { exact: HOUSE_BACKDROP },
   },
   {
     id: 'house.layer',

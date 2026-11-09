@@ -203,6 +203,19 @@ describe('checkImageSize', () => {
     ]);
   });
 
+  it('wants garden and sky wide enough for a 20:9 phone', () => {
+    const bg: ManifestEntry = {
+      key: 'house.bg',
+      type: 'image',
+      path: 'house/bg.png',
+      room: 'global',
+    };
+    expect(checkImageSize(bg, [2688, 1200], 'a')).toEqual([]);
+    expect(messages(checkImageSize(bg, [1920, 1200], 'a'))).toEqual([
+      'error a: house.bg must be 2688 × 1200 px, got 1920 × 1200',
+    ]);
+  });
+
   it('checks the sheet grid and the frames it holds', () => {
     const sheet = entry(manifestFixture(), 'character.theia.default');
     expect(checkImageSize(sheet, [1024, 256], 'a')).toEqual([]);

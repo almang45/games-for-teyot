@@ -208,8 +208,8 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 
   | Key | Path (suggested) | Size | What |
   |---|---|---|---|
-  | `house.bg` | `house/bg.png` | 1920 × 1200 | Outside around the house: garden, fence, trees |
-  | `house.sky.<look>` | `house/sky/<look>.png` | 1920 × 1200 | One per look: `morning`, `noon`, `afternoon`, `dusk`. The game blends them with the `color.sky` tints. |
+  | `house.bg` | `house/bg.png` | 2688 × 1200 | Outside around the house: garden, fence, trees. The middle 1920 px lines up with the 1920 × 1200 export space; 384 px of extra garden on each side fills a 20:9 phone. |
+  | `house.sky.<look>` | `house/sky/<look>.png` | 2688 × 1200 | One per look: `morning`, `noon`, `afternoon`, `dusk`. The game blends them with the `color.sky` tints. Same side extension as `house.bg`. |
   | `house.structure` | `house/structure.png` | 3840 × 2400 | Walls, floors, stairs, everything *behind* the characters |
   | `house.lights` | `house/lights.png` | 3840 × 2400 | Warm lamp and window glow. The game fades it in at dusk and dims it at bedtime. |
   | `house.rooms.<room-id>` | `house/rooms/<room-id>.png` | 3840 × 2400 | Furniture in each room that stands behind the characters |
