@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { strings } from '../content/strings';
+import { getStrings } from '../content/strings';
 import { playPlaceholderChime, unlockAudio } from '../engine/audio/unlock';
 import { markActiveScene, servicesOf } from '../game/services';
 import { placeholderFont, placeholderPalette as pal } from '../placeholder/palette';
@@ -34,7 +34,7 @@ export class BootScene extends Phaser.Scene {
       .setStrokeStyle(10, pal.outline)
       .setInteractive({ useHandCursor: true });
     const label = this.add
-      .text(0, 0, strings.boot.start, {
+      .text(0, 0, getStrings().boot.start, {
         fontFamily: placeholderFont,
         fontSize: '96px',
         fontStyle: 'bold',

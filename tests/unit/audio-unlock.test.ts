@@ -65,3 +65,18 @@ describe('playPlaceholderChime', () => {
     expect(gain.connect).toHaveBeenCalledWith(ctx.destination);
   });
 });
+
+describe('unlockAudio timeout (US-AUD-01: the start screen never sticks)', () => {
+  it('rejects when resume() never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = { state: 'suspended', resume: () => new Promise<void>(() => undefined) };
+      const pending = unlockAudio(ctx as unknown as AudioContext, 500);
+      const assertion = expect(pending).rejects.toThrow(/did not settle within 500 ms/);
+      await vi.advanceTimersByTimeAsync(500);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 // Fails the build when dist/ exceeds the budgets in docs/ARCHITECTURE.md §10.
 import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = new URL('../../dist/', import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: handles spaces and Windows drive letters.
+const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
+
+/** dist-relative path with '/' separators on every OS, so prefix checks work on Windows. */
+const toPosix = (/** @type {string} */ full) => relative(DIST, full).split(sep).join('/');
 const MB = 1024 * 1024;
 
 // Room bundles (lazy, cached on first entry) live under these prefixes once they exist.
@@ -18,7 +23,7 @@ function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
-    return [{ path: relative(DIST, full), bytes: statSync(full).size }];
+    return [{ path: toPosix(full), bytes: statSync(full).size }];
   });
 }
 

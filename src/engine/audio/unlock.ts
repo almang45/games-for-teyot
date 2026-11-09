@@ -2,14 +2,34 @@
  * Browsers keep an AudioContext suspended until a user gesture. The context is created at startup
  * (silent) and resumed inside the "Mulai" tap handler (PRD US-AUD-01).
  */
-export async function unlockAudio(context: AudioContext): Promise<void> {
+// Generous next to the 300 ms target: a slow resume should still play, only a hung one is cut off.
+export const UNLOCK_TIMEOUT_MS = 1000;
+
+export async function unlockAudio(
+  context: AudioContext,
+  timeoutMs: number = UNLOCK_TIMEOUT_MS,
+): Promise<void> {
   if (context.state === 'running') return;
-  await context.resume();
+  // resume() can stay pending forever (no valid user activation, Safari interruption); never let
+  // that hold the start screen hostage.
+  await withTimeout(context.resume(), timeoutMs, 'AudioContext.resume()');
   // resume() can settle without starting (e.g. iOS interruption); re-read the live state.
   const state = context.state as AudioContextState;
   if (state !== 'running') {
     throw new Error(`AudioContext did not start after the gesture (state: ${state})`);
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${what} did not settle within ${ms} ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timer);
+  });
 }
 
 /** Code-generated stand-in for the welcome clip until Mama's recordings land (AUDIO.md). */

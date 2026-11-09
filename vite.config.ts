@@ -5,6 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 import { readGlobalHeaders } from './tools/build/headers.ts';
+import { INSTALLED_START_URL } from './src/platform/launch.ts';
 import { placeholderIcons } from './tools/build/placeholder-icons.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -50,7 +51,7 @@ export default defineConfig({
         short_name: 'Rumah Theia',
         description: 'Belajar menulis, membaca, berhitung, dan mewarnai bersama Bubu dan Ocica.',
         lang: 'id',
-        start_url: '/',
+        start_url: INSTALLED_START_URL,
         scope: '/',
         display: 'fullscreen',
         display_override: ['fullscreen', 'standalone'],

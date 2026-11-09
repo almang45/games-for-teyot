@@ -5,6 +5,7 @@ export { Logger, serializeError } from './logger';
 export type { LogEntry, LogLevel, LogSink } from './logger';
 export { ConsoleSink, RingBufferSink } from './sinks';
 export { captureGlobalErrors } from './capture';
+export { createSessionId } from './session';
 
 const RING_CAPACITY = 2000;
 

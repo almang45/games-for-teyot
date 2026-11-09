@@ -2,9 +2,14 @@
 // PRD US-PRIV-01: the build output must contain nothing from reference/ or recordings/.
 // Photos and raw audio never ship; processed voice ships only as Opus .webm sprites.
 import { readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = new URL('../../dist/', import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: handles spaces and Windows drive letters.
+const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
+
+/** dist-relative path with '/' separators on every OS, so prefix checks work on Windows. */
+const toPosix = (/** @type {string} */ full) => relative(DIST, full).split(sep).join('/');
 
 const FORBIDDEN_EXTENSIONS = [
   '.jpg',
@@ -30,7 +35,7 @@ const FORBIDDEN_SEGMENTS = ['reference', 'recordings'];
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = join(dir, entry.name);
-    return entry.isDirectory() ? walk(full) : [relative(DIST, full)];
+    return entry.isDirectory() ? walk(full) : [toPosix(full)];
   });
 }
 
@@ -46,7 +51,7 @@ function main() {
   }
   const violations = files.filter((path) => {
     const lower = path.toLowerCase();
-    const segments = lower.split(/[\\/]/);
+    const segments = lower.split('/');
     return (
       FORBIDDEN_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
       segments.some((s) => FORBIDDEN_SEGMENTS.includes(s))

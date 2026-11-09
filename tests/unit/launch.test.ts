@@ -37,10 +37,18 @@ describe('readLaunchSignals', () => {
       location: { search },
     }) as unknown as Window;
 
-  it('detects fullscreen and standalone display modes', () => {
-    expect(readLaunchSignals(fakeWindow(['(display-mode: fullscreen)'], '')).standalone).toBe(true);
+  it('detects standalone and minimal-ui display modes', () => {
     expect(readLaunchSignals(fakeWindow(['(display-mode: standalone)'], '')).standalone).toBe(true);
+    expect(readLaunchSignals(fakeWindow(['(display-mode: minimal-ui)'], '')).standalone).toBe(true);
     expect(readLaunchSignals(fakeWindow([], '')).standalone).toBe(false);
+  });
+  it('trusts fullscreen only when launched from the installed start_url', () => {
+    const fullscreen = ['(display-mode: fullscreen)'];
+    expect(readLaunchSignals(fakeWindow(fullscreen, '?source=pwa')).standalone).toBe(true);
+    // A browser tab in F11 / full-screen view: no install bypass.
+    expect(readLaunchSignals(fakeWindow(fullscreen, '')).standalone).toBe(false);
+    // The start_url alone, opened in a normal tab, is not an installed app either.
+    expect(readLaunchSignals(fakeWindow([], '?source=pwa')).standalone).toBe(false);
   });
   it('honours Safari navigator.standalone', () => {
     expect(readLaunchSignals(fakeWindow([], '', true)).standalone).toBe(true);

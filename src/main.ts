@@ -1,12 +1,12 @@
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { strings } from './content/strings';
+import { getStrings } from './content/strings';
 import { renderInstallScreen } from './install/installScreen';
-import { captureGlobalErrors, createAppLog, type Logger } from './log';
+import { captureGlobalErrors, createAppLog, createSessionId, type Logger } from './log';
 import { detectInstallPlatform, readLaunchSignals, resolveLaunchMode } from './platform/launch';
 
-const sessionId = crypto.randomUUID();
-const { logger } = createAppLog(sessionId, import.meta.env.DEV);
+// No module imported above does work at import time, so the capture below sees every boot error.
+const { logger } = createAppLog(createSessionId(), import.meta.env.DEV);
 captureGlobalErrors(window, logger);
 
 function registerServiceWorker(log: Logger): void {
@@ -45,6 +45,7 @@ function main(): void {
   const root = document.getElementById('app');
   if (!root) throw new Error('#app root element missing from index.html');
 
+  const strings = getStrings();
   const signals = readLaunchSignals(window);
   const mode = resolveLaunchMode(signals);
   logger.info('app.launch', { mode, ...signals, version: __APP_VERSION__ });
@@ -68,4 +69,8 @@ function main(): void {
   });
 }
 
-main();
+try {
+  main();
+} catch (err) {
+  logger.error('app.boot_failed', err);
+}

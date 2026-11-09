@@ -11,19 +11,28 @@ export interface LaunchSignals {
 
 export const BROWSER_OVERRIDE_PARAM = 'browser';
 
+/** The manifest's start_url carries this, so only a launch from the installed app sets it. */
+export const LAUNCH_SOURCE_PARAM = 'source';
+export const LAUNCH_SOURCE_INSTALLED = 'pwa';
+export const INSTALLED_START_URL = `/?${LAUNCH_SOURCE_PARAM}=${LAUNCH_SOURCE_INSTALLED}`;
+
 /** PRD US-OFF-01: a plain browser tab gets SCR-INSTALL instead of the game. */
 export function resolveLaunchMode(signals: LaunchSignals): LaunchMode {
   return signals.standalone || signals.browserOverride ? 'game' : 'install';
 }
 
 export function readLaunchSignals(win: Window): LaunchSignals {
-  const displayModes = ['fullscreen', 'standalone', 'minimal-ui'];
+  const params = new URLSearchParams(win.location.search);
+  const matches = (mode: string): boolean => win.matchMedia(`(display-mode: ${mode})`).matches;
   const standalone =
-    displayModes.some((mode) => win.matchMedia(`(display-mode: ${mode})`).matches) ||
+    matches('standalone') ||
+    matches('minimal-ui') ||
+    // A browser tab in F11/full-screen view also matches "fullscreen"; only trust it together with
+    // the installed app's start_url.
+    (matches('fullscreen') && params.get(LAUNCH_SOURCE_PARAM) === LAUNCH_SOURCE_INSTALLED) ||
     // Safari's legacy flag for Dock / home-screen apps.
     (win.navigator as Navigator & { standalone?: boolean }).standalone === true;
-  const browserOverride =
-    new URLSearchParams(win.location.search).get(BROWSER_OVERRIDE_PARAM) === '1';
+  const browserOverride = params.get(BROWSER_OVERRIDE_PARAM) === '1';
   return { standalone, browserOverride };
 }
 

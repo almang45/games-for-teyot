@@ -1,5 +1,11 @@
 import * as Phaser from 'phaser';
-import { depthKey, toScreen, type IsoProjection, type ScreenPoint } from '../engine/iso/projection';
+import {
+  depthKey,
+  toScreen,
+  type IsoProjection,
+  type ScreenPoint,
+  type WorldPoint,
+} from '../engine/iso/projection';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
 import {
@@ -22,6 +28,8 @@ export class HouseScene extends Phaser.Scene {
   private log!: Logger;
   private theia!: Phaser.GameObjects.Arc;
   private roomLayer!: Phaser.GameObjects.Container;
+  /** Theia's position is kept as a room, not screen pixels, so it survives every resize. */
+  private theiaRoom: PlaceholderRoom | undefined;
 
   constructor() {
     super(HouseScene.KEY);
@@ -32,6 +40,8 @@ export class HouseScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(pal.sky);
     this.roomLayer = this.add.container(0, 0);
     this.theia = this.add.circle(0, 0, 40, pal.theia).setStrokeStyle(6, pal.outline);
+    this.theia.setDepth(1000);
+    this.theiaRoom = placeholderRooms[0];
 
     const redraw = (): void => {
       this.draw();
@@ -46,14 +56,13 @@ export class HouseScene extends Phaser.Scene {
     this.log.info('scene.ready', { rooms: placeholderRooms.length });
   }
 
+  /** Centers the house, walls included, in the current camera view. */
   private projection(): IsoProjection {
     const { centerX, centerY } = this.cameras.main;
-    const gridHeight = GRID_TILES * (TILE_WIDTH / 2);
-    const wallRise = PLACEHOLDER_WALL_HEIGHT * (TILE_WIDTH / 2);
-    return {
-      tileWidth: TILE_WIDTH,
-      origin: { x: centerX, y: centerY - (gridHeight - wallRise) / 2 },
-    };
+    const atOrigin: IsoProjection = { tileWidth: TILE_WIDTH, origin: { x: 0, y: 0 } };
+    const top = toScreen({ x: 0, y: 0, z: PLACEHOLDER_WALL_HEIGHT }, atOrigin).y;
+    const bottom = toScreen({ x: GRID_TILES, y: GRID_TILES }, atOrigin).y;
+    return { tileWidth: TILE_WIDTH, origin: { x: centerX, y: centerY - (top + bottom) / 2 } };
   }
 
   private draw(): void {
@@ -65,35 +74,42 @@ export class HouseScene extends Phaser.Scene {
     for (const room of sorted) {
       this.roomLayer.add(this.drawRoom(room, proj));
     }
-    const start = placeholderRooms[0];
-    if (start) this.theia.setPosition(...centerOf(start, proj)).setDepth(1000);
+    // A walk in progress was tweening toward old screen coordinates: land her in its target room.
+    this.tweens.killTweensOf(this.theia);
+    if (this.theiaRoom) this.theia.setPosition(...centerOf(this.theiaRoom, proj));
+    this.log.info('house.layout', {
+      width: this.scale.width,
+      height: this.scale.height,
+      theiaRoom: this.theiaRoom?.id ?? null,
+    });
   }
 
   private drawRoom(room: PlaceholderRoom, proj: IsoProjection): Phaser.GameObjects.Graphics {
-    const corners = [
-      toScreen({ x: room.x, y: room.y }, proj),
-      toScreen({ x: room.x + room.w, y: room.y }, proj),
-      toScreen({ x: room.x + room.w, y: room.y + room.d }, proj),
-      toScreen({ x: room.x, y: room.y + room.d }, proj),
-    ] as const;
-    const outline = corners.map(toVec);
+    const floor: readonly WorldPoint[] = [
+      { x: room.x, y: room.y },
+      { x: room.x + room.w, y: room.y },
+      { x: room.x + room.w, y: room.y + room.d },
+      { x: room.x, y: room.y + room.d },
+    ];
+    const outline = floor.map((p) => toVec(toScreen(p, proj)));
     const g = this.add.graphics();
 
-    // Cutaway: only back walls (on the far edges of the house) are drawn.
-    if (room.y === 0) fillWall(g, corners[0], corners[1], proj, pal.wallRight);
-    if (room.x === 0) fillWall(g, corners[0], corners[3], proj, pal.wallLeft);
-
-    const paint = (color: number): void => {
-      g.fillStyle(color, 1);
+    // Repaints from scratch so hover never accumulates draw commands in the Graphics buffer.
+    const paint = (floorColor: number): void => {
+      g.clear();
+      // Cutaway: only back walls (on the far edges of the house) are drawn.
+      const [back, right, , left] = floor;
+      if (back && right && room.y === 0) fillWall(g, back, right, proj, pal.wallRight);
+      if (back && left && room.x === 0) fillWall(g, back, left, proj, pal.wallLeft);
+      g.fillStyle(floorColor, 1);
       g.fillPoints(outline, true);
       g.lineStyle(4, pal.outline, 1);
       g.strokePoints(outline, true);
     };
     paint(pal.floor);
 
-    const hit = new Phaser.Geom.Polygon(outline);
     g.setInteractive({
-      hitArea: hit,
+      hitArea: new Phaser.Geom.Polygon(outline),
       hitAreaCallback: (area: Phaser.Geom.Polygon, x: number, y: number) => area.contains(x, y),
       useHandCursor: true,
     });
@@ -112,6 +128,7 @@ export class HouseScene extends Phaser.Scene {
   private walkTo(room: PlaceholderRoom, proj: IsoProjection): void {
     const [x, y] = centerOf(room, proj);
     this.log.info('house.room_tap', { room: room.id });
+    this.theiaRoom = room;
     this.tweens.killTweensOf(this.theia);
     // Straight-line stand-in; waypoint navigation (ARCHITECTURE §6) replaces it.
     this.tweens.add({ targets: this.theia, x, y, duration: 600, ease: 'Sine.easeInOut' });
@@ -129,13 +146,13 @@ function centerOf(room: PlaceholderRoom, proj: IsoProjection): [number, number] 
 
 function fillWall(
   g: Phaser.GameObjects.Graphics,
-  a: ScreenPoint,
-  b: ScreenPoint,
+  a: WorldPoint,
+  b: WorldPoint,
   proj: IsoProjection,
   color: number,
 ): void {
-  const rise = PLACEHOLDER_WALL_HEIGHT * (proj.tileWidth / 2);
-  const points = [a, b, { x: b.x, y: b.y - rise }, { x: a.x, y: a.y - rise }].map(toVec);
+  const h = PLACEHOLDER_WALL_HEIGHT;
+  const points = [a, b, { ...b, z: h }, { ...a, z: h }].map((p) => toVec(toScreen(p, proj)));
   g.fillStyle(color, 1);
   g.fillPoints(points, true);
   g.lineStyle(4, pal.outline, 1);
