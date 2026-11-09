@@ -274,15 +274,66 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 
 1. Does the 160 × 160 companion frame give Ocica's round body enough room, or should it be
    192 × 160?
+   - **Recommendation: 192 × 160 px** (width × height).
+   - **Reasoning:**
+     - Ocica is designed with a round, chubby, wide-body silhouette (40–50% of Theia's height). At ~110–120 px tall on baseline y = 150, a spherical body plus chubby arms in 2:1 isometric projection easily reaches 120–130 px in static width.
+     - More critically, her key animations require lateral movement: the `walk` waddle has a side-to-side sway/weight shift, `comfort` involves reaching wide for a hug, and `eat` involves holding food. A 160 px width leaves under 15 px margin per side, which risks clipping or forcing a compromised, squished silhouette.
+     - Standardizing both companions at 192 × 160 px (baseline y = 150) also benefits Bubu (providing comfortable clearance for `point` and `demo` paw gestures) while keeping companion spritesheet dimensions unified for texture atlas packing.
+
 2. Phone 2400 × 1080: should the house view use a single wide composition, or a tablet
    composition extended at the sides?
+   - **Recommendation: Tablet composition (1920 × 1200 / 16:10 source), extended at the sides for wider viewports.**
+   - **Reasoning:**
+     - *Single geometric source of truth:* The isometric cutaway diorama of the house (walls, room proportions, stairs, doors, waypoints, walk polygons, and occluders in `assets/house/layout.json`) remains completely identical across tablet, laptop, and phone. We avoid managing two divergent architectural models or distorted perspectives.
+     - *Consistent framing & zoom:* On phone (2400 × 1080), the house view opens zoomed into the current room with drag-to-pan / pinch-to-zoom (PRD US-HOUSE-05). When zoomed out to view the entire house, scaling to the 1080 px height leaves ~240 px of horizontal space on each side. We extend `house/bg.png` with lush ambient decoration (garden foliage, fence, trees, sky) beyond the 16:10 frame.
+     - *Safe areas & ergonomics:* All interactive elements and room tap polygons remain strictly inside the 1760 × 1080 safe area, safely away from phone edges to prevent accidental triggering of system gesture navigation.
+
 3. Day/night: are 4 sky looks plus tint values enough, or should rooms also get light layers (lamps
    switching on at dusk)?
+   - **Recommendation: 4 sky looks + tint values as the base, PLUS a dedicated indoor warm light overlay layer (`house/lights.png`).**
+   - **Reasoning:**
+     - Global tinting darkens both exterior and interior uniformly. At dusk and bedtime, a pure dark tint makes indoor rooms feel gloomy, muddy, and murky rather than cozy.
+     - In the isometric diorama style, warm glowing indoor lamps turning on ("lampu rumah dinyalakan") are the signature visual cue that daytime play is winding down. It provides high-contrast warmth that makes the transition soothing rather than sad for a 3-year-old.
+     - *Implementation cost is minimal:* A single additive/screen overlay layer (`house/lights.png`) covering lamp and window glows. The engine can simply tween its opacity from 0.0 to 1.0 during the last 2 minutes of the session (dusk), and dim it off during the bedtime sequence in `SCR-BEDTIME`.
+
 4. Which rooms does the floor plan suggest for the 3 M1 activities?
+   - **Answer**: Based on the complete architectural denah in `reference/rumah/denah/` (`denah-lt-0.png`, `denah-lt-1.png`, `denah-lt-2.png`, `tampak-depan-dengan-ukuran-tinggi.png`), the house is a split-level design. Following Papa's final decisions, we map the rooms as follows (using exact stable room ids):
+     - **Tracing (`SCR-TRACE` — Menulis)**: **`kamar-tidur`** (R. TIDUR UTAMA, Lt. Atas, FFL +3.400).
+       - *Framing*: Theia's study desk / chalkboard in the master bedroom.
+       - *Why*: Quiet, focused learning corner. Crucially, the bedroom directly hosts the session bedtime sequence (`SCR-BEDTIME`: Theia, Bubu, and Ocica falling asleep in bed), creating a unified narrative and spatial anchor. Walking up the stairs (`walk` + `stairs` animation) to her bedroom gives an endearing sense of journey.
+     - **Counting (`SCR-COUNT` — Berhitung)**: **`dapur`** (kitchen, including the dining table, Lt. Dasar, FFL ±0.000; DAPUR + R. MAKAN on the denah).
+       - *Framing*: The open kitchen counter and dining table.
+       - *Why*: Perfectly suits food-based counting objects (telur, apel, kue) and containers (mangkuk, piring). Ocica "eating" the counted cookies fits naturally at the kitchen table.
+     - **Coloring (`SCR-COLOR-PICK` / `SCR-COLOR` — Mewarnai)**: **`ruang-keluarga`** (living room, Lt. Dasar, FFL ±0.000; R. TAMU on the denah).
+       - *Framing*: The living room floor/rug and drawing easel under the high-ceiling void.
+       - *Why*: Central creative play area. Finished coloring pages hang on the fridge (`house.fridge`), which sits in the adjacent dining/kitchen area in direct visual line-of-sight in this open plan. Also hosts the M1 tidy-up break (`SCR-TIDY`: Beberes scattered toys on the floor).
+     - **Future rooms (locked in M1)**: Drawn and present in `layout.json` (dimmed / sleepy look; tap = soft "zzz" sound + Ocica yawns):
+       - **`kantor-papa`**: Mezzanine 1, FFL +2.400 (Papa's office, overlooking the void). Reserved for M2/M3 letter recognition & reading (`R1–R6`).
+       - **`kamar-anak`**: The small upstairs bedroom, MEZZANINE 2, FFL +4.800 (confirmed by Papa as the children's room, reference in `reference/rumah/mezzanine-2-kamar-anak/`).
+     - **Garden note (M4)**: Ground-floor front and back garden activities stay reserved for M4 without room ids yet.
+
 5. Isometric pipeline: is painting over the SVG blockout workable with your image tools, or would
    you prefer another structure guide (for example a depth map rendered from the blockout)?
+   - **Status: Waiting on Claude's `house:blockout` tool.**
+   - **What is needed:** We need Claude to implement and run `npm run house:blockout` (US-REF-02 in M0) against the floor plan data to generate the 3840 × 2400 SVG blockout.
+   - **Preferred guide format:** An SVG blockout with clean strokes and grouped layers (floors, back walls, stairs, door openings) is an excellent primary structural wireframe for vector/raster painting. If the tool can also export a rendered 3840 × 2400 raster line guide PNG (or flat color-coded surface ID pass), that will additionally allow direct depth/ControlNet conditioning in our generative passes. We will validate this hands-on as soon as the blockout tool outputs its first artifact.
+
 6. Anything in the contracts (`ASSETS.md`, upcoming `contracts/`) that blocks your preferred
    workflow or tools?
+   - **Status: Waiting on the contracts v1 PR.**
+   - **What is needed:** We need to review the zod schemas and generated JSON Schemas in `contracts/` (manifest, layout, tokens, motion, ui props) once Claude opens the contracts PR.
+   - **Current assessment:** `ASSETS.md` is clean, specific, and fully aligned with our design system approach. The strict coloring rules (closed line art ≥ 6 px, gaps ≤ 2 px, regions ≥ 40 px) and manifest keys are completely clear. The 192 × 160 companion frame size, `house.lights` key, and `ruang-keluarga` start room will land in contracts v1, which Antigravity will co-sign.
+
+### Blocking questions from Antigravity for Gate 1 / Phase 2 kickoff
+
+1. **Reference photos in `reference/` (Google Drive)**:
+   - *Status: Resolved.* Full reference sets for Theia, Mama, Papa, Bubu, Ocica (including 360° turn videos), style inspiration, and house denah/photos confirmed ready in `reference/`. Reference material stays strictly local and gitignored.
+2. **Surface styling vs. token contrast in Tracing (`SCR-TRACE`)**:
+   - *Status: Resolved.* Confirmed by Claude: all guide, path, ink, and hint-glow colors are driven strictly by semantic tokens in `design/tokens.json` (`tracing.*`). Base surface color will be defined as a token, and the design validator checks contrast against it automatically.
+3. **Audio-visual coordination on error/comfort**:
+   - *Status: Resolved.* Confirmed by Claude: ink fades out (~400 ms), Ocica `comfort` animation and narrator hint ("Hampir! Coba lagi ya.") play simultaneously. Bubu's demo step replays only after the spoken clip ends, respecting US-AUD-01 (no overlapping voice clips).
+4. **Asset validation tooling during Phase 2**:
+   - *Status: Resolved.* Confirmed by Claude: `npm run validate:design` and `npm run validate:assets` ship in the contracts v1 PR (M0), available for local verification before Phase 2 begins.
 
 ## 8. Sign-off
 
