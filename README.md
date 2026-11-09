@@ -67,5 +67,5 @@ production hostname (`workers_dev` is off), through the `production` environment
 token.
 
 After the 1-month Access session expires, a parent opens `https://rct.amns.my.id/masuk` to log in
-again; the offline shell answers `/` from cache, so only that path reaches the Access login. (Not possible inside the macOS Safari Dock app yet: see ARCHITECTURE §8.3.) `npm run deploy` builds first, but it bypasses the CI
+again; the offline shell answers `/` from cache, so only that path reaches the Access login. (Not possible inside the macOS Safari Dock app yet: see ARCHITECTURE §8.3.) `npm run deploy` validates and builds first, but it bypasses the other CI
 gates, so it is for the very first deploy only. Roll back with `npx wrangler rollback <version-id>`.

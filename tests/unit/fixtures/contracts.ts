@@ -117,14 +117,14 @@ export function screenFixture(screen: LayoutScreen = 'SCR-TRACE'): ScreenLayout 
     screen,
     devices: {
       tablet: [
-        element('hud-home', [100, 1000, 140, 140], { interactive: 'secondary', asset: 'ui.home' }),
-        element('hud-speaker', [100, 80, 200, 200]),
+        element('hud-home', [100, 1000, 140, 140], { interactive: 'primary', asset: 'ui.home' }),
+        element('hud-speaker', [100, 80, 200, 200], { interactive: 'secondary' }),
         element('parent-gate', [1700, 80, 120, 120], { interactive: 'secondary' }),
         element('main', [400, 150, 1100, 900], { depth: 1, anchor: [0.5, 1] }),
       ],
       phone: [
-        element('hud-home', [100, 900, 220, 220], { interactive: 'secondary', asset: 'ui.home' }),
-        element('hud-speaker', [100, 80, 200, 200]),
+        element('hud-home', [100, 860, 280, 280], { interactive: 'primary', asset: 'ui.home' }),
+        element('hud-speaker', [100, 80, 220, 220], { interactive: 'secondary' }),
         element('parent-gate', [1610, 80, 220, 220], { interactive: 'secondary' }),
         element('main', [400, 150, 1100, 900], { depth: 1 }),
       ],

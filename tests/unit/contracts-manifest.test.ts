@@ -121,7 +121,7 @@ describe('checkManifest', () => {
     ]);
   });
 
-  it('checks frames, animation names, frame counts, order and looping', () => {
+  it('checks frames, animation names, frame counts, order, rate and looping', () => {
     const m = manifestFixture();
     const sheet = entry(m, 'character.theia.default');
     if (sheet.type !== 'spritesheet') throw new Error('fixture sheet');
@@ -129,6 +129,7 @@ describe('checkManifest', () => {
     sheet.animations = {
       'idle.fr': { frames: [0, 2], fps: 6, loop: true },
       'idle.br': { frames: [8, 4], fps: 6, loop: true },
+      'walk.fr': { frames: [10, 17], fps: 30, loop: true },
       'celebrate.fr': { frames: [4, 9], fps: 12, loop: true },
       'celebrate.br': { frames: [4, 9], fps: 12, loop: false },
       wave: { frames: [0, 5], fps: 8, loop: false },
@@ -137,6 +138,7 @@ describe('checkManifest', () => {
       'error assets[0].frame: character frames are 256 × 256',
       'error assets[0].animations.idle.fr.frames: idle.fr has 4 frames, got 3',
       'error assets[0].animations.idle.br.frames: last frame comes before the first',
+      'error assets[0].animations.walk.fr.fps: walk.fr plays at 12 fps, got 30',
       'error assets[0].animations.celebrate.fr.loop: celebrate.fr must not loop',
       expect.stringMatching(
         /^error assets\[0\]\.animations\.celebrate\.br: not an animation of character: use idle\.fr, idle\.br/,

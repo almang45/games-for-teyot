@@ -17,12 +17,12 @@ import { ROOM_IDS, roomId } from './rooms.ts';
 
 /** Relative to `assets/`: kebab-case folders and names (ASSETS.md §7), no `..`, no leading `/`. */
 const pathFor = (ext: string) =>
-  z
-    .string()
-    .regex(
-      new RegExp(String.raw`^(?:[a-z0-9]+(?:-[a-z0-9]+)*/)*[a-z0-9]+(?:-[a-z0-9]+)*\.${ext}$`),
-      `must be a kebab-case path relative to assets/, ending in .${ext}`,
-    );
+  z.string().regex(
+    // Only ever called with the literal extensions below, never with input.
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+    new RegExp(String.raw`^(?:[a-z0-9]+(?:-[a-z0-9]+)*/)*[a-z0-9]+(?:-[a-z0-9]+)*\.${ext}$`),
+    `must be a kebab-case path relative to assets/, ending in .${ext}`,
+  );
 
 const bundle = z.union([z.literal('global'), roomId]);
 
@@ -106,29 +106,42 @@ export type Manifest = z.infer<typeof manifest>;
 export interface AnimationSpec {
   readonly frames: number;
   readonly loop: boolean | null;
+  /** Playback rate where ASSETS.md fixes one; `null` leaves it to the art (1–30). */
+  readonly fps: number | null;
   /** `both`: `fr` + `br`. `fr`: front-right only. `none`: no facing suffix (portraits). */
   readonly facings: 'both' | 'fr' | 'none';
 }
 
 type AnimationSet = Readonly<Record<string, AnimationSpec>>;
 
-const both = (frames: number, loop: boolean): AnimationSpec => ({ frames, loop, facings: 'both' });
-const fr = (frames: number, loop: boolean): AnimationSpec => ({ frames, loop, facings: 'fr' });
+const both = (frames: number, loop: boolean, fps: number | null = null): AnimationSpec => ({
+  frames,
+  loop,
+  fps,
+  facings: 'both',
+});
+const fr = (frames: number, loop: boolean, fps: number | null = null): AnimationSpec => ({
+  frames,
+  loop,
+  fps,
+  facings: 'fr',
+});
 const plain = (frames: number, loop: boolean | null): AnimationSpec => ({
   frames,
   loop,
+  fps: null,
   facings: 'none',
 });
 
 /** ASSETS.md §3.2. */
 export const THEIA_ANIMATIONS: AnimationSet = {
-  idle: both(4, true),
-  walk: both(8, true),
-  stairs: both(8, true),
-  celebrate: fr(6, false),
-  point: fr(4, false),
-  think: fr(4, true),
-  sleep: fr(4, true),
+  idle: both(4, true, 6),
+  walk: both(8, true, 12),
+  stairs: both(8, true, 10),
+  celebrate: fr(6, false, 12),
+  point: fr(4, false, 8),
+  think: fr(4, true, 6),
+  sleep: fr(4, true, 4),
 };
 
 /** ASSETS.md §3.3. */
@@ -182,6 +195,8 @@ export interface KeyFamily {
 
 const ID = '[a-z0-9]+(?:-[a-z0-9]+)*';
 const ROOM = `(?:${ROOM_IDS.join('|')})`;
+// Sources are the literals in KEY_FAMILIES below, built from ID and ROOM_IDS; never input.
+// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
 const key = (source: string) => new RegExp(`^${source}$`);
 
 /** The full 3840 × 2400 source canvas: the camera zooms into rooms (ASSETS.md §4.1). */
@@ -381,6 +396,9 @@ function checkAnimations(
     }
     if (spec.loop !== null && anim.loop !== spec.loop) {
       issues.push(error(`${at}.loop`, `${name} must ${spec.loop ? '' : 'not '}loop`));
+    }
+    if (spec.fps !== null && anim.fps !== spec.fps) {
+      issues.push(error(`${at}.fps`, `${name} plays at ${spec.fps} fps, got ${anim.fps}`));
     }
   }
   const missing = [...allowed.keys()].filter((name) => !(name in entry.animations));

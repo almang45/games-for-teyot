@@ -89,14 +89,15 @@ describe('screen layout', () => {
 
   it('keeps tap areas big enough and inside the safe area', () => {
     const l = screenFixture();
-    tabletElement(l, 'hud-home').bounds = [100, 1000, 90, 140];
+    tabletElement(l, 'hud-home').bounds = [100, 1000, 120, 140];
+    tabletElement(l, 'hud-speaker').hit = [100, 80, 90, 200];
     tabletElement(l, 'parent-gate').hit = [1750, 20, 120, 120];
-    tabletElement(l, 'main').interactive = 'primary';
-    tabletElement(l, 'hud-speaker').hit = [0, 0, 10, 10];
+    tabletElement(l, 'main').hit = [0, 0, 10, 10];
     expect(messages(checkScreenLayout(l))).toEqual([
-      'devices.tablet[0].hit: secondary tap area on tablet must be at least 99 × 99 frame px (72 dp)',
-      'devices.tablet[1].hit: only interactive elements have a hit area',
+      'devices.tablet[0].hit: primary tap area on tablet must be at least 132 × 132 frame px (96 dp)',
+      'devices.tablet[1].hit: secondary tap area on tablet must be at least 99 × 99 frame px (72 dp)',
       'devices.tablet[2].hit: tap area must stay inside the safe area 80, 60, 1760, 1080',
+      'devices.tablet[3].hit: only interactive elements have a hit area',
     ]);
   });
 
@@ -110,6 +111,13 @@ describe('screen layout', () => {
         'devices.phone: activity screens need the hud-speaker element',
       ]),
     );
+    const sizes = screenFixture();
+    tabletElement(sizes, 'hud-home').interactive = 'secondary';
+    delete tabletElement(sizes, 'parent-gate').interactive;
+    expect(messages(checkScreenLayout(sizes))).toEqual([
+      'devices.tablet.hud-home.interactive: hud-home is a primary target',
+      'devices.tablet.parent-gate.interactive: parent-gate is a touch target',
+    ]);
     const boot: ScreenLayout = {
       ...screenFixture('SCR-BOOT'),
       devices: {

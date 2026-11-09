@@ -75,12 +75,19 @@ export const screenLayout = z.strictObject({
 });
 export type ScreenLayout = z.infer<typeof screenLayout>;
 
-/** Fixed HUD slots on every activity screen, with the quadrant each must sit in (brief §1). */
+/**
+ * Fixed HUD slots on every activity screen (brief §1), with the quadrant each sits in and the
+ * touch target it needs. Home is her way out, so it gets the primary size. Tapping the speaker
+ * replays the clip and the parent gate is held by a grown-up, so either size will do.
+ */
 export const HUD_SLOTS = {
-  'hud-home': { left: true, top: false },
-  'hud-speaker': { left: true, top: true },
-  'parent-gate': { left: false, top: true },
-} as const;
+  'hud-home': { left: true, top: false, interactive: 'primary' },
+  'hud-speaker': { left: true, top: true, interactive: 'any' },
+  'parent-gate': { left: false, top: true, interactive: 'any' },
+} as const satisfies Record<
+  string,
+  { left: boolean; top: boolean; interactive: Interactive | 'any' }
+>;
 
 const hitRect = (e: LayoutElement): Rect => e.hit ?? e.bounds;
 
@@ -124,7 +131,13 @@ function checkHudSlots(
     const cy = y + h / 2;
     const inQuadrant = cx < FRAME.width / 2 === slot.left && cy < FRAME.height / 2 === slot.top;
     const where = `${slot.top ? 'top' : 'bottom'} ${slot.left ? 'left' : 'right'}`;
-    return inQuadrant ? [] : [error(`${path}.${key}`, `${key} sits ${where}`)];
+    const issues = inQuadrant ? [] : [error(`${path}.${key}`, `${key} sits ${where}`)];
+    if (e.interactive === undefined) {
+      issues.push(error(`${path}.${key}.interactive`, `${key} is a touch target`));
+    } else if (slot.interactive !== 'any' && e.interactive !== slot.interactive) {
+      issues.push(error(`${path}.${key}.interactive`, `${key} is a ${slot.interactive} target`));
+    }
+    return issues;
   });
 }
 

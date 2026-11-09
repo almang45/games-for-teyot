@@ -5,7 +5,7 @@
   "description": "Rumah Cici Theia: an Indonesian learning game for Theia (tracing, counting, reading, coloring).",
   "type": "module",
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run validate && npm run build && wrangler deploy",
     "validate": "npm run validate:design && npm run validate:assets",
     "validate:design": "node tools/validate/validate-design.ts",
     "validate:assets": "node tools/validate/validate-assets.ts",
