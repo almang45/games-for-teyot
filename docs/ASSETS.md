@@ -308,14 +308,19 @@ Pages use **raster line art with runtime flood fill**, so AI-generated art works
   grey in large patches**. Light anti-aliasing on the line edges is fine.
 - Lines **≥ 6 px** thick at 1920 × 1200.
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
-  pass when the page loads, so bigger gaps leak.
-- Regions **≥ 40 × 40 px**. Smaller details are just drawn lines, not fillable areas.
+  pass when the page loads, so bigger gaps leak. An opening between two areas is either a gap
+  (≤ 2 px) or a deliberate passage (> 8 px), never in between.
+- Every fillable region holds a **40 × 40 px square**: her finger has to fit inside. Thin strips
+  and smaller details are just drawn lines, not fillable areas. A margin around the subject
+  counts only if it is that wide too.
 - 6–15 regions per page at age 3.
 - One subject per page, tied to a word: `coloring/ayam.png` (A), `coloring/bola.png` (B)…
-- `npm run validate:assets` runs the game's own fill code (`src/engine/fill/`): it closes 2 px
-  gaps, counts the regions of at least 40 × 40 px, and fails the page outside 6–15. A gap wider
-  than 2 px merges two regions, so a leak shows up as a missing region. It also fails pages with
-  transparency, colour, grey patches away from the lines, or lines thinner than 6 px.
+- `npm run validate:assets` runs the game's own fill code (`src/engine/fill/`) and fails a page
+  that:
+  - has fewer than 6 or more than 15 fillable regions after closing 2 px gaps
+  - leaks: it also closes openings up to 8 px, and a region that falls apart into separate areas
+    (or into the background) had a gap the game won't close. The report names the region's box.
+  - has transparency, colour, grey patches away from the lines, or lines thinner than 6 px
 
 ## 7. Export rules
 

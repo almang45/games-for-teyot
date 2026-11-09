@@ -145,6 +145,15 @@ function unfilter(raw: Buffer, width: number, height: number, bpp: number): Uint
   return out;
 }
 
+/**
+ * Gray and RGB PNGs mark one colour fully transparent with tRNS: a 16-bit sample per channel
+ * (PNG spec §11.3.2.1), of which an 8-bit image uses the low byte.
+ */
+function keyed(trns: Buffer | undefined, sample: readonly number[]): number {
+  if (!trns || trns.length < sample.length * 2) return 255;
+  return sample.every((value, k) => trns.readUInt16BE(k * 2) === value) ? 0 : 255;
+}
+
 function toRgba(
   pixels: Uint8Array,
   count: number,
@@ -158,8 +167,8 @@ function toRgba(
     const s = i * bpp;
     const v = (k: number): number => pixels[s + k] ?? 0;
     let px: Rgba;
-    if (colorType === 0) px = [v(0), v(0), v(0), 255];
-    else if (colorType === 2) px = [v(0), v(1), v(2), 255];
+    if (colorType === 0) px = [v(0), v(0), v(0), keyed(alpha, [v(0)])];
+    else if (colorType === 2) px = [v(0), v(1), v(2), keyed(alpha, [v(0), v(1), v(2)])];
     else if (colorType === 4) px = [v(0), v(0), v(0), v(1)];
     else if (colorType === 3) {
       const p = v(0) * 3;

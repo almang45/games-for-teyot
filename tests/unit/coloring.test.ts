@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   closeGaps,
   dilate,
-  disc,
   erode,
   labelRegions,
   lineMask,
+  regionsHoldingSquare,
   type Mask,
 } from '../../src/engine/fill/regions';
 import type { Rgba } from '../../tools/build/png';
@@ -32,10 +32,52 @@ describe('fill regions', () => {
     expect([...lineMask(rgba, 4, 1).data]).toEqual([1, 1, 0, 0]);
   });
 
-  it('builds round structuring elements', () => {
-    expect(disc(0)).toHaveLength(1);
-    expect(disc(1)).toHaveLength(5);
-    expect(disc(2)).toHaveLength(13);
+  it('matches brute-force disc morphology exactly', () => {
+    // Deterministic noise, so a failure reproduces.
+    let seed = 7;
+    const rand = (): number => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return seed / 2 ** 31;
+    };
+    const [width, height] = [37, 23];
+    const m: Mask = {
+      width,
+      height,
+      data: Uint8Array.from({ length: width * height }, () => (rand() < 0.2 ? 1 : 0)),
+    };
+    const brute = (radius: number, grow: boolean): number[] =>
+      Array.from({ length: width * height }, (_, i) => {
+        const [x, y] = [i % width, Math.floor(i / width)];
+        let hit = false;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > radius * radius) continue;
+            const [nx, ny] = [x + dx, y + dy];
+            const v =
+              nx < 0 || ny < 0 || nx >= width || ny >= height ? 0 : (m.data[ny * width + nx] ?? 0);
+            if (v === (grow ? 1 : 0)) hit = true;
+          }
+        }
+        return hit === grow ? 1 : 0;
+      });
+    for (const r of [0, 1, 2, 3, 5]) {
+      expect([...dilate(m, r).data], `dilate ${r}`).toEqual(brute(r, true));
+      expect([...erode(m, r).data], `erode ${r}`).toEqual(brute(r, false));
+    }
+  });
+
+  it('finds the regions a square fits in', () => {
+    const m = mask([
+      '......#.......',
+      '......#.......',
+      '......#.......',
+      '##############',
+      '..............',
+    ]);
+    const labels = labelRegions(m);
+    // Left 6 × 3 holds 3 × 3, right 7 × 3 too; the bottom strip is 1 px tall.
+    expect([...regionsHoldingSquare(labels, m.width, 3)].sort()).toEqual([1, 2]);
+    expect([...regionsHoldingSquare(labels, m.width, 4)]).toEqual([]);
   });
 
   it('dilates and erodes, treating outside the page as paper', () => {
@@ -70,27 +112,58 @@ describe('checkColoringPage', () => {
   it('accepts a closed page with 6–15 regions', () => {
     const report = checkColoringPage(gridPage({ cols: 3, rows: 3 }), 'p');
     expect(report.issues).toEqual([]);
-    expect(report.regions).toBe(10);
+    expect(report.regions).toBe(9);
   });
 
   it('closes 2 px gaps but catches a leak', () => {
-    const base = { height: 400, cols: 1, rows: 5 } as const;
-    expect(checkColoringPage(gridPage(base), 'p').regions).toBe(6);
+    const base = { height: 400, cols: 2, rows: 5 } as const;
+    expect(checkColoringPage(gridPage(base), 'p').regions).toBe(10);
     // The first divider runs at y = 96..103; a 2 px slit through it is closed when the page loads.
     expect(
       checkColoringPage(gridPage({ ...base, gap: { x: 200, y: 96, size: 2 } }), 'p').issues,
     ).toEqual([]);
     const leaky = checkColoringPage(gridPage({ ...base, gap: { x: 200, y: 96, size: 8 } }), 'p');
-    expect(leaky.regions).toBe(5);
+    // Two cells merge, which leaves 9 regions: inside 6–15, so only the leak probe catches it.
+    expect(leaky.regions).toBe(9);
     expect(leaky.issues.map((i) => i.message)).toEqual([
-      expect.stringContaining('5 fillable regions') as string,
+      '2 areas in [49, 39, 186, 123] join through an opening of 3–8 px: close the gap, or widen a deliberate passage past 8 px',
     ]);
+  });
+
+  it('catches a leak into the background even when the count still passes', () => {
+    // 9 cells; a 4 px opening in the left frame line merges the top-left cell with the margin.
+    const hole = (x: number, y: number): Rgba | undefined =>
+      x >= 40 && x < 48 && y >= 60 && y < 64 ? WHITE : undefined;
+    const leaky = checkColoringPage(gridPage({ cols: 3, rows: 3, extra: hole }), 'p');
+    expect(leaky.regions).toBe(9);
+    expect(leaky.issues.map((i) => i.message)).toEqual([
+      expect.stringMatching(
+        /^2 areas in \[0, 0, 480, 300\] join through an opening of 3–8 px, leaking into the background/,
+      ) as string,
+    ]);
+  });
+
+  it('accepts a deliberate passage wider than the leak probe', () => {
+    const open = checkColoringPage(
+      gridPage({ cols: 3, rows: 3, gap: { x: 36, y: 60, size: 30 } }),
+      'p',
+    );
+    expect(open.issues).toEqual([]);
+  });
+
+  it('does not count slivers as fillable', () => {
+    // Concentric frames 12 px apart: big bounding boxes, nothing a 40 px finger fits in.
+    const rings = page(480, 300, (x, y) => {
+      const edge = Math.min(x, y, 479 - x, 299 - y);
+      return edge >= 40 && edge < 100 && (edge - 40) % 20 < 8 ? BLACK : WHITE;
+    });
+    expect(checkColoringPage(rings, 'p').regions).toBe(2);
   });
 
   it('ignores pockets smaller than 40 × 40 px', () => {
     const report = checkColoringPage(gridPage({ width: 480, height: 300, cols: 12, rows: 1 }), 'p');
-    // 12 columns of ~27 px are too narrow to fill: only the background counts.
-    expect(report.regions).toBe(1);
+    // 12 columns of ~27 px are too narrow to fill, and so is the 30–40 px margin around them.
+    expect(report.regions).toBe(0);
   });
 
   it('rejects thin lines', () => {

@@ -112,6 +112,28 @@ describe('decodePng', () => {
     });
     expect([...decodePng(gray).rgba]).toEqual([0, 0, 0, 255, 200, 200, 200, 255]);
 
+    // tRNS on gray and RGB keys one colour out: white paper that would render see-through.
+    const keyedGray = filteredPng({
+      width: 2,
+      height: 1,
+      colorType: 0,
+      bpp: 1,
+      rows: [[0, 255]],
+      filters: [0],
+      extra: [pngChunk('tRNS', Buffer.from([0, 255]))],
+    });
+    expect([...decodePng(keyedGray).rgba]).toEqual([0, 0, 0, 255, 255, 255, 255, 0]);
+    const keyedRgb = filteredPng({
+      width: 2,
+      height: 1,
+      colorType: 2,
+      bpp: 3,
+      rows: [[255, 255, 255, 255, 255, 254]],
+      filters: [0],
+      extra: [pngChunk('tRNS', Buffer.from([0, 255, 0, 255, 0, 255]))],
+    });
+    expect([...decodePng(keyedRgb).rgba]).toEqual([255, 255, 255, 0, 255, 255, 254, 255]);
+
     const grayAlpha = filteredPng({
       width: 1,
       height: 1,
