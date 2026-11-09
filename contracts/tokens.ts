@@ -22,6 +22,12 @@ export const tokens = z.strictObject({
       hint: hexColor,
       locked: hexColor,
     }),
+    /**
+     * What the frame sits on where no art reaches: the sides of screens without a painted
+     * background (count, color pick, overlays), and past the 2688 px backdrops on screens wider
+     * than ~2.24:1. The engine fades art into it with a soft vignette.
+     */
+    backdrop: hexColor,
     /** Tracing colours; the surface base is the art's average tone, for the contrast check. */
     tracing: z.strictObject({
       surface: hexColor,

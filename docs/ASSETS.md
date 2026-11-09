@@ -282,19 +282,36 @@ Rules (`npm run validate:assets` checks all of them):
 
 ## 5. Activity art
 
+**Wide screens.** Every device shows the whole 1920 × 1200 frame, and wider screens show more at
+the sides. Full-screen backgrounds are therefore **2688 × 1200**: the middle 1920 px lines up with
+the frame, plus 384 px on each side, which covers a 20:9 phone. Keep anything important inside the
+middle. Where no art reaches, the game fills with the `color.backdrop` token and fades the art into
+it with a soft vignette.
+
+| Screen | Sides on wide screens |
+|---|---|
+| `SCR-HOUSE`, `SCR-BOOT` | `house.bg` and `house.sky.*` (2688 × 1200, §4.1) |
+| `SCR-TRACE` | `tracing.surface` and `tracing.theme.*` (2688 × 1200) |
+| `SCR-COUNT`, `SCR-COLOR-PICK` | `color.backdrop` with a soft vignette, no painted background |
+| `SCR-COLOR` | `coloring.desk` (2688 × 1200) behind the 1920 × 1200 page |
+| `SCR-TIDY` | More of the zoomed house room, then `color.backdrop` |
+| `SCR-BEDTIME` | `bedtime.room` (2688 × 1200) |
+| `OVL-CELEBRATE`, `OVL-RECOVER` | Translucent over the screen below; `OVL-RECOVER` dims with `color.backdrop` |
+
 | Asset | Path | Spec |
 |---|---|---|
-| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1200, centre safe area 1080 × 1000 kept plain |
-| Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
+| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 2688 × 1200, the frame's centre safe area 1080 × 1000 kept plain |
+| Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | 2688 × 1200. Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
 | Countable objects | `counting/objects/<id>.png` | 192 × 192, clear silhouette, each readable at 96 px. Ids: `apel`, `telur`, `kue`, `bola`, `ikan`, `bunga`… |
 | Containers | `counting/containers/<id>.png` | Bowl, plate, basket, 512 × 384. The drop zone is the entry's `dropZone` in the manifest (image px). |
 | Dot cards | `counting/dots/<n>.png` | 256 × 256, n = 1–10. Key `counting.dots.<n>`. |
 | Stickers | `rewards/stickers/<item-id>.png` | 256 × 256, one per learnable item, no letters baked in (the game overlays the glyph) |
 | Coloring pages | `coloring/<id>.png` | See §6 |
+| Coloring desk | `coloring/desk.png` | `coloring.desk`, 2688 × 1200: the wooden desk the page lies on, with quiet props in the margins |
 | Tidy-up toys | `tidy/toys/<id>.png` | 192 × 192, same rules as countable objects |
 | Toy box | `tidy/toybox.png` | 512 × 384, with its `dropZone` in the manifest |
 | Mess overlays | `house/mess/<room-id>.png` | See §4.1 |
-| Bedtime | `bedtime/room.png` + props | `bedtime.room` is 1920 × 1200 (her bedroom at night). Props (`bedtime.bed`, `bedtime.moon`, …) up to 1920 × 1200. |
+| Bedtime | `bedtime/room.png` + props | `bedtime.room` is 2688 × 1200 (her bedroom at night). Props (`bedtime.bed`, `bedtime.moon`, …) up to 2688 × 1200. |
 | UI | `ui/*.png` | Back (home) button, parent-gate corner icon, swatch frame, keypad, tiles. 144–1024 px per side. |
 | Cursor | `ui/cursor-<state>.png` | `ui.cursor.normal` and `ui.cursor.pressed`, 64 × 64 with a `hotspot` in the manifest. The build makes the 32 × 32 version. |
 | App icons | `icons/` | `icons.app.192`, `icons.app.512`, `icons.app.maskable-512` (safe zone respected), `icons.app.apple-touch-180` |
@@ -305,7 +322,8 @@ Rules (`npm run validate:assets` checks all of them):
 Pages use **raster line art with runtime flood fill**, so AI-generated art works as is:
 
 - 1920 × 1200 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
-  grey in large patches**. Light anti-aliasing on the line edges is fine.
+  grey in large patches**. Light anti-aliasing on the line edges is fine. Pages never get the
+  wide-screen extension (fill runs on their pixels); `coloring.desk` fills the sides instead.
 - Lines **≥ 6 px** thick at 1920 × 1200.
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
   pass when the page loads, so bigger gaps leak. An opening between two areas is either a gap

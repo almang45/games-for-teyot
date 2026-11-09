@@ -38,6 +38,7 @@ describe('key families', () => {
     ['tracing.theme.zigzag', 'tracing'],
     ['counting.dots.10', 'counting.dots'],
     ['coloring.ayam', 'coloring'],
+    ['coloring.desk', 'coloring.desk'],
     ['tidy.toybox', 'tidy.toybox'],
     ['rewards.stickers.apel', 'sticker'],
     ['bedtime.room', 'bedtime.room'],
@@ -205,17 +206,25 @@ describe('checkImageSize', () => {
     ]);
   });
 
-  it('wants garden and sky wide enough for a 20:9 phone', () => {
-    const bg: ManifestEntry = {
-      key: 'house.bg',
-      type: 'image',
-      path: 'house/bg.png',
+  it.each(['house.bg', 'tracing.surface', 'tracing.theme.zigzag', 'coloring.desk', 'bedtime.room'])(
+    '%s is wide enough for a 20:9 phone',
+    (key) => {
+      const bg: ManifestEntry = { key, type: 'image', path: 'bg/x.png', room: 'global' };
+      expect(checkImageSize(bg, [2688, 1200], 'a')).toEqual([]);
+      expect(messages(checkImageSize(bg, [1920, 1200], 'a'))).toEqual([
+        `error a: ${key} must be 2688 × 1200 px, got 1920 × 1200`,
+      ]);
+    },
+  );
+
+  it('keeps coloring pages frame-sized', () => {
+    const page: ManifestEntry = {
+      key: 'coloring.ayam',
+      type: 'coloring',
+      path: 'c/a.png',
       room: 'global',
     };
-    expect(checkImageSize(bg, [2688, 1200], 'a')).toEqual([]);
-    expect(messages(checkImageSize(bg, [1920, 1200], 'a'))).toEqual([
-      'error a: house.bg must be 2688 × 1200 px, got 1920 × 1200',
-    ]);
+    expect(checkImageSize(page, [1920, 1200], 'a')).toEqual([]);
   });
 
   it('checks the sheet grid and the frames it holds', () => {

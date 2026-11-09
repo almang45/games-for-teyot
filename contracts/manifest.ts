@@ -203,13 +203,15 @@ const key = (source: string) => new RegExp(`^${source}$`);
 export const HOUSE_SOURCE: Size = [3840, 2400];
 /** The 1920 × 1200 game export, also the layout.json coordinate space. */
 export const HOUSE_EXPORT: Size = [1920, 1200];
-/**
- * Garden and sky extend 384 px past each side of the export so a 20:9 phone fitting the house to its
- * height (2667 px wide at frame scale) never shows an edge (M1 design brief §7 Q2).
- */
-export const HOUSE_BACKDROP_BLEED = 384;
-export const HOUSE_BACKDROP: Size = [HOUSE_EXPORT[0] + 2 * HOUSE_BACKDROP_BLEED, HOUSE_EXPORT[1]];
 export const SCREEN: Size = [1920, 1200];
+/**
+ * Full-screen backgrounds extend 384 px past each side of the 1920 × 1200 frame, so a 20:9 phone
+ * fitting the frame to its height (2667 px wide at frame scale) never shows an edge. Their middle
+ * 1920 px lines up with the frame. Wider screens fall back to `color.backdrop` (M1 design brief
+ * §7 Q2, PR #8 co-sign).
+ */
+export const BACKDROP_BLEED = 384;
+export const BACKDROP: Size = [SCREEN[0] + 2 * BACKDROP_BLEED, SCREEN[1]];
 
 const exact = (w: number, h: number): SizeRule => ({ exact: [w, h] });
 
@@ -255,7 +257,7 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     id: 'house.backdrop',
     pattern: key('house\\.(?:bg|sky\\.(?:morning|noon|afternoon|dusk))'),
     type: 'image',
-    size: { exact: HOUSE_BACKDROP },
+    size: { exact: BACKDROP },
   },
   {
     id: 'house.layer',
@@ -275,7 +277,7 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     id: 'tracing',
     pattern: key(`tracing\\.(?:surface|theme\\.${ID})`),
     type: 'image',
-    size: { exact: SCREEN },
+    size: { exact: BACKDROP },
   },
   {
     id: 'counting.object',
@@ -296,6 +298,13 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'image',
     size: exact(256, 256),
   },
+  // The desk the page lies on; pages stay frame-sized because fill runs on their pixels.
+  {
+    id: 'coloring.desk',
+    pattern: key('coloring\\.desk'),
+    type: 'image',
+    size: { exact: BACKDROP },
+  },
   { id: 'coloring', pattern: key(`coloring\\.${ID}`), type: 'coloring', size: { exact: SCREEN } },
   { id: 'tidy.toy', pattern: key(`tidy\\.toys\\.${ID}`), type: 'image', size: exact(192, 192) },
   {
@@ -311,12 +320,12 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'image',
     size: exact(256, 256),
   },
-  { id: 'bedtime.room', pattern: key('bedtime\\.room'), type: 'image', size: { exact: SCREEN } },
+  { id: 'bedtime.room', pattern: key('bedtime\\.room'), type: 'image', size: { exact: BACKDROP } },
   {
     id: 'bedtime.prop',
     pattern: key(`bedtime\\.${ID}`),
     type: 'image',
-    size: { min: [64, 64], max: SCREEN },
+    size: { min: [64, 64], max: BACKDROP },
   },
   {
     id: 'ui.cursor',

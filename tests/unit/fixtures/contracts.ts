@@ -149,6 +149,7 @@ const TOKENS: Tokens = {
       '#ffffff',
     ],
     semantic: { interactive: '#ffb300', success: '#66bb6a', hint: '#fff59d', locked: '#b0bec5' },
+    backdrop: '#fff8e7',
     tracing: {
       surface: '#1e3a34',
       guide: '#3f6b60',
