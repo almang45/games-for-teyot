@@ -320,9 +320,8 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 
 6. Anything in the contracts (`ASSETS.md`, upcoming `contracts/`) that blocks your preferred
    workflow or tools?
-   - **Status: Waiting on the contracts v1 PR.**
-   - **What is needed:** We need to review the zod schemas and generated JSON Schemas in `contracts/` (manifest, layout, tokens, motion, ui props) once Claude opens the contracts PR.
-   - **Current assessment:** `ASSETS.md` is clean, specific, and fully aligned with our design system approach. The strict coloring rules (closed line art ≥ 6 px, gaps ≤ 2 px, regions ≥ 40 px) and manifest keys are completely clear. The 192 × 160 companion frame size, `house.lights` key, and `ruang-keluarga` start room will land in contracts v1, which Antigravity will co-sign.
+   - **Status: Resolved in PR #8 (contracts v1).**
+   - **Assessment:** Reviewed `contracts/` and `docs/ASSETS.md` on master. All requested specifications (192 × 160 companion frame, `house.lights` layer, `ruang-keluarga` start room, 2688 × 1200 wide backdrop bleed, token schemas, motion caps, UI component prop interfaces, and `validate:*` tools) are in place and verified. No blockers for Phase 2.
 
 ### Blocking questions from Antigravity for Gate 1 / Phase 2 kickoff
 
@@ -337,5 +336,5 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
 
 ## 8. Sign-off
 
-- [ ] Antigravity: brief understood, questions answered
+- [x] Antigravity: brief understood, questions answered
 - [ ] Papa: approved (Gate 1)
