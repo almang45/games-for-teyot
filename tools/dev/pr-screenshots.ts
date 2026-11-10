@@ -1,6 +1,6 @@
 // Not a test: captures PR screenshots at the AGENTS.md viewports.
 // Usage: npm run build && (npx vite preview --port 4173 &) && npx tsx tools/dev/pr-screenshots.ts <outDir>
-import { chromium } from '@playwright/test';
+import { chromium, type Page } from '@playwright/test';
 
 // CSS size × scale must equal the AGENTS.md device pixels exactly, so each scale divides both sides.
 const VIEWPORTS = [
@@ -31,11 +31,37 @@ async function main(outDir: string): Promise<void> {
       await page.locator('body[data-scene="House"]').waitFor();
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${outDir}/${vp.name}-house.png` });
+      await traceSpike(page, `${outDir}/${vp.name}`);
       await context.close();
     }
   } finally {
     await browser.close();
   }
+}
+
+/** US-TRACE-00: the spike with its debug panel, then a circle traced halfway with the panel folded. */
+async function traceSpike(page: Page, prefix: string): Promise<void> {
+  await page.goto('http://localhost:4173/?browser=1&spike=tracing');
+  await page.locator('body[data-scene="TracingSpike"]').waitFor();
+  await page.getByRole('button', { name: 'Circle', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${prefix}-spike-panel.png` });
+  await page.getByRole('button', { name: 'Debug' }).click();
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('canvas missing');
+  // The glyph box is 72% of the height, centred; the circle starts at its top and runs left.
+  const size = box.height * 0.72;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const r = size * 0.45;
+  await page.mouse.move(cx, cy - r);
+  await page.mouse.down();
+  for (let a = 0; a <= Math.PI; a += 0.1) {
+    await page.mouse.move(cx - r * Math.sin(a), cy - r * Math.cos(a));
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${prefix}-spike-tracing.png` });
 }
 
 main(process.argv[2] ?? '.').catch((err: unknown) => {
