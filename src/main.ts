@@ -10,7 +10,13 @@ import {
   serializeError,
   type Logger,
 } from './log';
-import { detectInstallPlatform, readLaunchSignals, resolveLaunchMode } from './platform/launch';
+import {
+  detectInstallPlatform,
+  readLaunchSignals,
+  requestedSpike,
+  resolveLaunchMode,
+  type Spike,
+} from './platform/launch';
 import { renderFailureScreen } from './shell/failureScreen';
 import { AUTO_RELOAD_DELAY_MS, claimAutoReload } from './shell/recovery';
 
@@ -86,13 +92,18 @@ async function requestPersistentStorage(log: Logger): Promise<void> {
   log.info('storage.persist', { persisted });
 }
 
-async function startGame(root: HTMLElement, log: Logger): Promise<void> {
-  // Phaser is loaded lazily so SCR-INSTALL stays light.
-  const { createGame } = await import('./game/createGame');
+async function startGame(root: HTMLElement, log: Logger, spike: Spike | undefined): Promise<void> {
+  // Phaser is loaded lazily so SCR-INSTALL stays light, and the spike only when asked for.
+  const [{ createGame }, scenes] = await Promise.all([
+    import('./game/createGame'),
+    spike === 'tracing'
+      ? import('./scenes/TracingSpikeScene').then((m) => [m.TracingSpikeScene])
+      : undefined,
+  ]);
   // fail() may have run while the chunk loaded; a game built now would run hidden under its screen.
   if (failed) return;
   const audio = new AudioContext({ latencyHint: 'interactive' });
-  const started = createGame(root, { logger: log, audio });
+  const started = createGame(root, { logger: log, audio }, scenes);
   started.events.once('destroy', () => {
     log.info('game.destroyed');
     audio.close().catch((err: unknown) => {
@@ -125,7 +136,10 @@ function main(root: HTMLElement): void {
   requestPersistentStorage(logger).catch((err: unknown) => {
     logger.error('storage.persist_failed', err);
   });
-  startGame(root, logger).catch((err: unknown) => {
+  const spike = requestedSpike(location.search);
+  if (spike === 'unknown') logger.warn('app.spike_unknown', { search: location.search });
+  else if (spike) logger.info('app.spike', { spike });
+  startGame(root, logger, spike === 'unknown' ? undefined : spike).catch((err: unknown) => {
     logger.error('app.start_failed', err);
     fail();
   });

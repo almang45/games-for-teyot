@@ -19,6 +19,18 @@ export const INSTALLED_START_URL = `/?${LAUNCH_SOURCE_PARAM}=${LAUNCH_SOURCE_INS
 /** Set on the first launch from the installed start_url; later in-scope launches lack the param. */
 export const INSTALLED_FLAG_KEY = 'rct.launchedInstalled';
 
+/** `?spike=tracing` opens the tracing spike (PRD US-TRACE-00) instead of the game flow. */
+export const SPIKE_PARAM = 'spike';
+export const SPIKES = ['tracing'] as const;
+export type Spike = (typeof SPIKES)[number];
+
+/** The spike a URL asks for. An unknown name is returned as `unknown`, so it can be logged. */
+export function requestedSpike(search: string): Spike | 'unknown' | undefined {
+  const name = new URLSearchParams(search).get(SPIKE_PARAM);
+  if (name === null || name === '') return undefined;
+  return SPIKES.find((s) => s === name) ?? 'unknown';
+}
+
 /** PRD US-OFF-01: a plain browser tab gets SCR-INSTALL instead of the game. */
 export function resolveLaunchMode(signals: LaunchSignals): LaunchMode {
   return signals.standalone || signals.browserOverride ? 'game' : 'install';

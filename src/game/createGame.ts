@@ -8,7 +8,14 @@ import { provideServices, type GameServices } from './services';
 export const DESIGN_WIDTH = 1920;
 export const DESIGN_HEIGHT = 1200;
 
-export function createGame(parent: HTMLElement, services: GameServices): Phaser.Game {
+/** The game flow; the tracing spike (US-TRACE-00) passes its own scene instead. */
+const GAME_SCENES: Phaser.Types.Scenes.SceneType[] = [BootScene, HouseScene];
+
+export function createGame(
+  parent: HTMLElement,
+  services: GameServices,
+  scenes: Phaser.Types.Scenes.SceneType[] = GAME_SCENES,
+): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -26,7 +33,7 @@ export function createGame(parent: HTMLElement, services: GameServices): Phaser.
     audio: { noAudio: true },
     input: { activePointers: 3 },
     render: { antialias: true, powerPreference: 'high-performance' },
-    scene: [BootScene, HouseScene],
+    scene: scenes,
     callbacks: {
       // Before boot, so every scene's create() can rely on the services being present.
       preBoot: (game) => {
