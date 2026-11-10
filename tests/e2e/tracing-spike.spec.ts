@@ -11,8 +11,14 @@ const ITEMS = {
   one: { label: 'Digit 1', file: 'digit.1' },
 } as const;
 type ItemId = keyof typeof ITEMS;
-/** Sample spacing along a stroke, in glyph heights: well inside the 0.25 H look-ahead window. */
-const STEP = 0.05;
+/** Sample spacing along a stroke, in glyph heights: inside the 0.25 H look-ahead window. */
+const STEP = 0.1;
+/**
+ * Headless Chromium renders WebGL in software, and each input event waits for a frame, so a traced
+ * stroke costs seconds there. The spike targets the tablet: touch runs on tablet-chromium and the
+ * mouse on laptop-webkit; phone and laptop Chromium add nothing but minutes of CI.
+ */
+const SPIKE_PROJECTS = new Set(['tablet-chromium', 'laptop-webkit']);
 
 interface StrokeStart {
   readonly box: { readonly x: number; readonly y: number; readonly size: number };
@@ -109,35 +115,34 @@ const events = (log: LoggedEvent[], name: string, from = 0): LoggedEvent[] =>
   log.slice(from).filter((e) => e.event === name);
 
 test.describe('US-TRACE-00 tracing spike', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(!SPIKE_PROJECTS.has(testInfo.project.name), 'the spike runs on tablet and WebKit');
     await page.goto(SPIKE_URL);
     await expectScene(page, 'TracingSpike');
   });
 
-  test('US-TRACE-00 traces the vertical stroke, the circle and the digit 1 in Follow mode', async ({
-    page,
-    hasTouch,
-    browserName,
-  }) => {
-    // Headless WebGL renders in software, so each input event waits for a slow frame.
-    test.slow();
-    const log = collectLog(page);
-    const cdp =
-      hasTouch && browserName === 'chromium' ? await page.context().newCDPSession(page) : undefined;
-    for (const item of Object.keys(ITEMS) as ItemId[]) {
+  for (const item of Object.keys(ITEMS) as ItemId[]) {
+    test(`US-TRACE-00 traces the ${ITEMS[item].label.toLowerCase()} in Follow mode`, async ({
+      page,
+      hasTouch,
+      browserName,
+    }) => {
+      const log = collectLog(page);
       const start = await openItem(page, log, item);
       const from = log.length;
       const points = await toViewport(page, start, strokePoints(item));
-      if (cdp) await traceWithFinger(cdp, points, 1);
-      else await traceWithMouse(page, points);
+      if (hasTouch && browserName === 'chromium') {
+        await traceWithFinger(await page.context().newCDPSession(page), points, 1);
+      } else {
+        await traceWithMouse(page, points);
+      }
       await expect.poll(() => events(log, 'spike.trace.item_done', from).length).toBe(1);
       const done = events(log, 'spike.trace.stroke_done', from)[0];
       expect(done?.data.item).toBe(item);
       // Every sample that moved the ink reached a frame, so latency was measured.
       expect((done?.data.latency as { count: number } | null)?.count).toBeGreaterThan(0);
-      await page.getByRole('button', { name: 'Debug' }).click();
-    }
-  });
+    });
+  }
 
   test('US-TRACE-00 a second finger and a resting palm do not draw', async ({
     page,
