@@ -1,9 +1,11 @@
+import type { RoomId } from '../../contracts/rooms.ts';
+
 /**
- * Placeholder floor plan until `house:blockout` produces design/layouts/house.json from the real
- * floor plan (PRD US-REF-02). Room ids are provisional; the layout contract will own them.
+ * Placeholder floor plan until `house:blockout` drafts assets/house/layout.json from the real
+ * floor plan (PRD US-REF-02). Room ids come from the layout contract; the grid is a stand-in.
  */
 export interface PlaceholderRoom {
-  readonly id: string;
+  readonly id: RoomId;
   /** Floor footprint in tiles: [x, y] of the back corner, then width and depth. */
   readonly x: number;
   readonly y: number;
@@ -12,10 +14,10 @@ export interface PlaceholderRoom {
 }
 
 export const placeholderRooms: readonly PlaceholderRoom[] = [
-  { id: 'kamar-theia', x: 0, y: 0, w: 4, d: 4 },
-  { id: 'ruang-belajar', x: 4, y: 0, w: 4, d: 4 },
+  { id: 'kamar-tidur', x: 0, y: 0, w: 4, d: 4 },
+  { id: 'kantor-papa', x: 4, y: 0, w: 4, d: 4 },
   { id: 'dapur', x: 0, y: 4, w: 4, d: 4 },
-  { id: 'ruang-tamu', x: 4, y: 4, w: 4, d: 4 },
+  { id: 'ruang-keluarga', x: 4, y: 4, w: 4, d: 4 },
 ];
 
 export const PLACEHOLDER_WALL_HEIGHT = 1.2;

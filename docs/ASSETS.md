@@ -36,7 +36,9 @@ reference/
 ├── bubu/       front/  side/  back/  video/      ← 360° turn video recommended
 ├── ocica/      front/  side/  back/  video/
 ├── style/      inspiration images (e.g. the isometric sticker-book dioramas Theia likes)
-├── rumah/      denah/  <room-id>/                ← room-id matches layout.json, e.g. kamar-theia
+├── rumah/      denah/  <lantai>-<room-id>/  tangga/  video/
+│                ← lantai: bawah, mezzanine-1, atas, mezzanine-2; room-id from contracts/rooms.ts,
+│                  e.g. atas-kamar-tidur, mezzanine-2-kamar-anak. Other rooms (kamar-mandi) are fine.
 └── frames/     (generated)
 ```
 
@@ -78,8 +80,8 @@ goes into git or the deployed site.
   higher saturation for things she can interact with, so tappable items stand out.
 - **Character**: chibi proportions (head ≈ 40% of height), large eyes, recognisably *her* (hair,
   skin tone, face shape), no exaggerated features.
-- **Palette**: define once in `assets/style/palette.json` (≤ 24 colours plus the 10 coloring
-  swatches) and reuse it everywhere.
+- **Palette**: define once in `design/tokens.json` (`color.palette`, ≤ 24 colours, plus the 10
+  `color.swatches` for coloring) and reuse it everywhere. The game and the art read the same file.
 - **No text inside images.** Every letter and word is rendered by the game, so Indonesian text and
   curriculum changes never need new art.
 - **Consistency gate**: each new asset is reviewed side by side with `assets/style/reference-sheet.png`
@@ -107,6 +109,8 @@ Every later character asset must match this sheet.
   directions. Animations marked *fr only* are drawn just facing front-right.
 - Frame size **256 × 256 px**. Feet on a fixed baseline at y = 240, with her body centred
   horizontally.
+- Frames sit in a grid, read left to right, top to bottom. The manifest names each animation
+  `<animation>.<facing>` (`walk.br`) with its first and last frame (§7).
 - Transparent background, PNG, premultiplied alpha off.
 
 | Animation key | Frames | FPS | Loop | Notes |
@@ -135,7 +139,8 @@ traits (colour, ear shape, any stitching or accessories).
   - Ocica's white needs a warm off-white fill plus the standard outline so she doesn't vanish on
     light walls.
 - Same rules as §3.2: `walk` and `idle` in `fr` + `br`, everything else *fr only*, transparent
-  PNG. Frame size **160 × 160**, feet on baseline y = 150.
+  PNG. Frame size **192 × 160** (width × height), feet on baseline y = 150. The extra width gives
+  Ocica's round body room for her `walk` sway, `comfort` hug and `eat`; Bubu uses the same frame.
 
 | Animation key | Bubu | Ocica | Frames | Loop | Notes |
 |---|---|---|---|---|---|
@@ -160,7 +165,8 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 
 **Portrait** (M1, used in activity scenes while a voice clip plays):
 - Bust in a soft circular frame, **384 × 384** per frame, transparent outside the frame.
-- Keys: `parent.mama.portrait`, `parent.papa.portrait`.
+- Keys: `parent.mama.portrait`, `parent.papa.portrait`. Portraits have no facing, so their
+  animations are named plainly (`talk`, not `talk.fr`).
 
 | Animation | Frames | Loop | Notes |
 |---|---|---|---|
@@ -178,7 +184,7 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 | `idle` | 4 | yes | |
 | `wave` | 6 | no | When she enters their room |
 | `clap` | 6 | no | At level mastery |
-| `tuck_in` | 8 | no | Bedtime ending. Bends over the bed. |
+| `tuck-in` | 8 | no | Bedtime ending. Bends over the bed. |
 
 ## 4. House
 
@@ -195,94 +201,153 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   exact projection. Antigravity paints over it (structure guide or img2img), so every room shares
   one geometry and `layout.json` lines up with the art.
 - Design canvas **3840 × 2400 px** (16:10, matching Theia's Galaxy Tab S10+ and the laptops).
-  Export at 50% (1920 × 1200) for the game and keep the source at full size. Rooms are also exported at **full source resolution**, because the camera
-  zooms into a room on arrival (§4.3).
-- Layers, each a separate PNG at the same canvas size:
-  - `house/bg.png`: sky and outside. The game tints it for day and night.
-  - `house/structure.png`: walls, floors, stairs, everything *behind* the characters
-  - `house/rooms/<room-id>.png`: furniture in each room that stands behind the characters
-  - `house/rooms/<room-id>_dim.png`: the locked look for each room
-  - `house/occluders/<id>.png`: anything that must be drawn **in front of** a character walking
-    behind it (railings, a sofa back, a front table edge). Each has a sort line in `layout.json`.
+  `layout.json` uses the 1920 × 1200 half-size space; the game draws the full-size layers at 50%,
+  so the camera can zoom into a room on arrival (§4.3) without blur.
+- Layers, each a separate PNG. Layers of one size share the same canvas, so they stack without
+  offsets:
+
+  | Key | Path (suggested) | Size | What |
+  |---|---|---|---|
+  | `house.bg` | `house/bg.png` | 2688 × 1200 | Outside around the house: garden, fence, trees. The middle 1920 px lines up with the 1920 × 1200 export space; 384 px of extra garden on each side fills a 20:9 phone. |
+  | `house.sky.<look>` | `house/sky/<look>.png` | 2688 × 1200 | One per look: `morning`, `noon`, `afternoon`, `dusk`. The game blends them with the `color.sky` tints. Same side extension as `house.bg`. |
+  | `house.structure` | `house/structure.png` | 3840 × 2400 | Walls, floors, stairs, everything *behind* the characters |
+  | `house.lights` | `house/lights.png` | 3840 × 2400 | Warm lamp and window glow. The game fades it in at dusk and dims it at bedtime. |
+  | `house.rooms.<room-id>` | `house/rooms/<room-id>.png` | 3840 × 2400 | Furniture in each room that stands behind the characters |
+  | `house.rooms.<room-id>.dim` | `house/rooms/<room-id>-dim.png` | 3840 × 2400 | The locked look for each room |
+  | `house.occluders.<id>` | `house/occluders/<id>.png` | 3840 × 2400 | Anything drawn **in front of** a character walking behind it (railings, a sofa back, a front table edge). Each has a sort line in `layout.json`. |
+  | `house.mess.<room-id>` | `house/mess/<room-id>.png` | 3840 × 2400 | Drawn on top of the room while it's messy (tidy-up) |
+  | `house.fridge`, `house.sticker-wall` | `house/fridge.png`, … | 64–1024 px per side | The fridge display and her sticker wall, placed at `spots` in `layout.json` |
 - Walkable areas are **floor polygons** on each storey. Stairs run along one isometric axis.
 
 ### 4.2 `assets/house/layout.json`
 
-Coordinates are in the 1920 × 1200 export space, with the origin at the top left.
+Manifest key `house.layout`. Coordinates are in the 1920 × 1200 export space, with the origin at
+the top left. Schema: `contracts/houseLayout.ts`.
 
 ```jsonc
 {
+  "version": 1,
   "size": [1920, 1200],
   "rooms": [
     {
-      "id": "kamar-theia",                 // kebab-case, stable forever
-      "activity": "tracing",               // tracing | counting | coloring | reading | words | garden | bedtime
-      "polygon": [[120, 80], [700, 80], [700, 480], [120, 480]],   // tap area (screen space)
-      "walk": [[180, 420], [520, 250], [700, 340], [360, 510]],    // walkable floor polygon (iso diamond)
-      "stand": [410, 470],                 // character feet position on arrival
-      "storey": 1,                         // 0 = ground floor
-      "focus": [100, 60, 640, 460]         // camera zoom rect for this room (x, y, w, h)
+      "id": "kamar-tidur",                    // from contracts/rooms.ts, stable forever
+      "activities": ["tracing", "bedtime"],   // tracing | counting | coloring | tidy | bedtime | reading | words | garden
+      "polygon": [[1100, 280], [1650, 280], [1650, 520], [1100, 520]],   // tap area (screen space)
+      "walk": [[1100, 320], [1600, 320], [1600, 480], [1100, 480]],      // walkable floor polygon
+      "stand": [1350, 400],                   // Theia's feet on arrival
+      "storey": 2,                            // see the storey list below
+      "focus": [1000, 200, 700, 400],         // camera zoom rect for this room (x, y, w, h)
+      "parking": { "bubu": [1250, 400], "ocica": [1450, 400] }           // where they wait
     }
   ],
+  "spots": {
+    "fridge": { "room": "dapur", "rect": [500, 650, 120, 160] },          // finished coloring pages
+    "sticker-wall": { "room": "kamar-tidur", "rect": [1200, 250, 100, 60] }
+  },
   "occluders": [
-    { "key": "house.occluders.railing-loft", "sortY": 488 }   // drawn in front of characters with feet y < sortY
+    { "key": "house.occluders.railing-tangga", "sortY": 488 }   // in front of characters with feet y < sortY
   ],
   "waypoints": [
-    { "id": "door-kamar", "pos": [700, 470] },
-    { "id": "stairs-top", "pos": [900, 470] },
-    { "id": "stairs-bottom", "pos": [1100, 990] }
+    { "id": "pintu-dapur", "pos": [1100, 900], "storey": 0 },
+    { "id": "tangga-bawah", "pos": [1550, 850], "storey": 0, "stair": true },
+    { "id": "tangga-atas", "pos": [1550, 400], "storey": 2, "stair": true }
   ],
-  "edges": [["kamar-theia", "door-kamar"], ["door-kamar", "stairs-top"], ["stairs-top", "stairs-bottom"]],
-  "start": "ruang-tamu"
+  "edges": [["ruang-keluarga", "tangga-bawah"], ["tangga-bawah", "tangga-atas"], ["tangga-atas", "kamar-tidur"]],
+  "start": "ruang-keluarga"
 }
 ```
 
-Rules:
-- Room ids and waypoint ids together are unique.
-- Every room is reachable from `start`.
-- Every waypoint lies inside a walkable polygon, or on a stair.
-- Every edge stays inside one storey's walkable area, or runs along a stair.
-- Every room's `stand` lies inside its `walk` polygon.
+Rooms (`contracts/rooms.ts`; a new room is a contract change):
 
-The `tools/assets` validator checks all of these.
+| Id | Denah | Storey | M1 |
+|---|---|---|---|
+| `ruang-keluarga` | R. TAMU | 0 | Coloring, tidy-up. The start room. |
+| `dapur` | DAPUR + R. MAKAN | 0 | Counting. Holds the fridge. |
+| `kantor-papa` | MEZZANINE 1 | 1 | Locked |
+| `kamar-tidur` | R. TIDUR UTAMA | 2 | Tracing, bedtime. Holds the sticker wall. |
+| `kamar-anak` | MEZZANINE 2 | 3 | Locked |
+
+Storeys are numbered in elevation order of the split-level house: 0 Lt Dasar (±0.000),
+1 Mezzanine 1 (+2.400), 2 Lt Atas (+3.400), 3 Mezzanine 2 (+4.800).
+
+Rules (`npm run validate:assets` checks all of them):
+- Room ids and waypoint ids together are unique. Each activity lives in one room only.
+- Every room is reachable from `start`.
+- Every waypoint lies inside a walkable polygon of its storey, unless it is marked `stair`.
+- An edge within one storey stays on that storey's walkable floor. An edge between storeys joins
+  two `stair` waypoints.
+- Every room's `stand` and both `parking` spots lie inside its `walk` polygon.
+- Polygons have an area, don't cross themselves, and stay on the canvas. So do `focus` and `spots`.
+- Every occluder key is registered in the manifest.
 
 ## 5. Activity art
 
+**Wide screens.** Every device shows the whole 1920 × 1200 frame, and wider screens show more at
+the sides. Full-screen backgrounds are therefore **2688 × 1200**: the middle 1920 px lines up with
+the frame, plus 384 px on each side, which covers a 20:9 phone. Keep anything important inside the
+middle. Where no art reaches, the game fills with the `color.backdrop` token and fades the art into
+it with a soft vignette.
+
+| Screen | Sides on wide screens |
+|---|---|
+| `SCR-HOUSE`, `SCR-BOOT` | `house.bg` and `house.sky.*` (2688 × 1200, §4.1) |
+| `SCR-TRACE` | `tracing.surface` and `tracing.theme.*` (2688 × 1200) |
+| `SCR-COUNT`, `SCR-COLOR-PICK` | `color.backdrop` with a soft vignette, no painted background |
+| `SCR-COLOR` | `coloring.desk` (2688 × 1200) behind the 1920 × 1200 page |
+| `SCR-TIDY` | More of the zoomed house room, then `color.backdrop` |
+| `SCR-BEDTIME` | `bedtime.room` (2688 × 1200) |
+| `OVL-CELEBRATE`, `OVL-RECOVER` | Translucent over the screen below; `OVL-RECOVER` dims with `color.backdrop` |
+
 | Asset | Path | Spec |
 |---|---|---|
-| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 1920 × 1200, centre safe area 1080 × 1000 kept plain |
-| Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
+| Tracing surface (chalkboard / paper) | `tracing/surface.png` | 2688 × 1200, the frame's centre safe area 1080 × 1000 kept plain |
+| Pre-writing stroke themes | `tracing/themes/<stroke-id>.png` | 2688 × 1200. Decoration around the path (rain clouds, road, ball). The path itself is drawn by the game. |
 | Countable objects | `counting/objects/<id>.png` | 192 × 192, clear silhouette, each readable at 96 px. Ids: `apel`, `telur`, `kue`, `bola`, `ikan`, `bunga`… |
-| Containers | `counting/containers/<id>.png` | Bowl, plate, basket, 512 × 384, with the drop zone marked in `counting/containers.json` |
+| Containers | `counting/containers/<id>.png` | Bowl, plate, basket, 512 × 384. The drop zone is the entry's `dropZone` in the manifest (image px). |
+| Dot cards | `counting/dots/<n>.png` | 256 × 256, n = 1–10. Key `counting.dots.<n>`. |
 | Stickers | `rewards/stickers/<item-id>.png` | 256 × 256, one per learnable item, no letters baked in (the game overlays the glyph) |
 | Coloring pages | `coloring/<id>.png` | See §6 |
+| Coloring desk | `coloring/desk.png` | `coloring.desk`, 2688 × 1200: the wooden desk the page lies on, with quiet props in the margins |
 | Tidy-up toys | `tidy/toys/<id>.png` | 192 × 192, same rules as countable objects |
-| Toy box | `tidy/toybox.png` | 512 × 384, drop zone marked in `tidy/toybox.json` |
-| Mess overlays | `house/mess/<room-id>.png` | Same canvas as the house layers. Drawn on top of the room while it's messy. |
-| UI | `ui/*.png` | Back (home) button, parent-gate corner icon, color swatches frame. All ≥ 144 × 144 px source. |
-| App icons | `icons/` | 512 × 512 maskable plus 192 × 192, safe zone respected |
+| Toy box | `tidy/toybox.png` | 512 × 384, with its `dropZone` in the manifest |
+| Mess overlays | `house/mess/<room-id>.png` | See §4.1 |
+| Bedtime | `bedtime/room.png` + props | `bedtime.room` is 2688 × 1200 (her bedroom at night). Props (`bedtime.bed`, `bedtime.moon`, …) up to 2688 × 1200. |
+| UI | `ui/*.png` | Back (home) button, parent-gate corner icon, swatch frame, keypad, tiles. 144–1024 px per side. |
+| Cursor | `ui/cursor-<state>.png` | `ui.cursor.normal` and `ui.cursor.pressed`, 64 × 64 with a `hotspot` in the manifest. The build makes the 32 × 32 version. |
+| App icons | `icons/` | `icons.app.192`, `icons.app.512`, `icons.app.maskable-512` (safe zone respected), `icons.app.apple-touch-180` |
+| Fonts | `fonts/<id>.woff2` | `font.<id>`, bundled locally (no remote fonts). Referenced from `design/tokens.json`. |
 
 ## 6. Coloring pages (strict)
 
 Pages use **raster line art with runtime flood fill**, so AI-generated art works as is:
 
 - 1920 × 1200 PNG, white background (`#FFFFFF`), line colour pure `#000000`, **no anti-aliasing
-  grey in large patches**. Light anti-aliasing on the line edges is fine.
+  grey in large patches**. Light anti-aliasing on the line edges is fine. Pages never get the
+  wide-screen extension (fill runs on their pixels); `coloring.desk` fills the sides instead.
 - Lines **≥ 6 px** thick at 1920 × 1200.
 - **Every fillable region is closed.** No gaps wider than 2 px. The game runs a 2 px gap-closing
-  pass when the page loads, so bigger gaps leak.
-- Regions **≥ 40 × 40 px**. Smaller details are just drawn lines, not fillable areas.
+  pass when the page loads, so bigger gaps leak. An opening between two areas is either a gap
+  (≤ 2 px) or a deliberate passage (> 8 px), never in between.
+- Every fillable region holds a **40 × 40 px square** of paper inside its lines (corners may be
+  rounded): her finger has to fit inside. Thin strips
+  and smaller details are just drawn lines, not fillable areas. A margin around the subject
+  counts only if it is that wide too.
 - 6–15 regions per page at age 3.
 - One subject per page, tied to a word: `coloring/ayam.png` (A), `coloring/bola.png` (B)…
-- CI checks closure by flood-filling from a grid of seed points and flagging any region that
-  touches the image border unexpectedly.
+- `npm run validate:assets` runs the game's own fill code (`src/engine/fill/`) and fails a page
+  that:
+  - has fewer than 6 or more than 15 fillable regions after closing 2 px gaps
+  - leaks: it also closes openings up to 8 px, and a region that falls apart into separate areas
+    (or into the background) had a gap the game won't close. The report names the region's box.
+  - has transparency, colour, grey patches away from the lines, or lines thinner than 6 px
 
 ## 7. Export rules
 
 - Format: PNG for sources in `assets/`. The build step packs them into **texture atlases**
   (≤ 2048 × 2048, WebP) per room, so do not hand-pack atlases.
 - File names: `kebab-case`, ASCII only, no spaces.
-- Every asset is registered in `assets/manifest.json`:
+- Every asset is registered in `assets/manifest.json`. Only the reference sheets in
+  `assets/style/` stay unregistered: they are for review and never ship.
 
 ```jsonc
 {
@@ -290,18 +355,37 @@ Pages use **raster line art with runtime flood fill**, so AI-generated art works
   "assets": [
     {
       "key": "character.theia.default",
-      "type": "spritesheet",                 // image | spritesheet | coloring | layout | palette
-      "path": "character/theia/default.png",
+      "type": "spritesheet",                 // image | spritesheet | coloring | layout | font
+      "path": "character/theia/default.png", // relative to assets/, kebab-case
       "frame": [256, 256],
-      "animations": { "idle": [0, 3], "walk": [4, 11] },
-      "room": "global"                       // global | <room-id> — decides which bundle it ships in
+      "animations": {
+        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
+        "walk.fr": { "frames": [4, 11], "fps": 12, "loop": true }
+      },
+      "room": "global"                       // global | <room-id>: which bundle it ships in
+    },
+    {
+      "key": "counting.containers.mangkuk",
+      "type": "image",
+      "path": "counting/containers/mangkuk.png",
+      "dropZone": [96, 96, 320, 192],        // x, y, w, h in image px
+      "room": "dapur"
     }
   ]
 }
 ```
 
-Claude owns the zod schema for this manifest in `contracts/manifest.ts`. Additions to the
-schema go through a PR that touches both files.
+- Each key belongs to a **key family** (`KEY_FAMILIES` in `contracts/manifest.ts`), which fixes
+  its type, size, frame and animation set as listed in §3–§6. A key that matches no family fails
+  validation: new kinds of art start with a contract change.
+- Animations: the names and facings from the tables in §3, the exact frame count, and the loop
+  flag. Missing animations are warnings, since art arrives in stages (§9) and placeholders fill in.
+- `npm run contracts:schema` writes JSON Schemas to `contracts/schema/` (gitignored). Point an
+  editor at them with `"$schema": "../contracts/schema/manifest.schema.json"`. They cover the
+  structure only; `npm run validate:assets` checks the rest.
+
+Claude owns the zod schemas in `contracts/` (manifest, house layout, screen layouts, tokens,
+motion, `ui/` props). Changes follow `WORKFLOW.md` §7.
 
 ## 8. Review checklist (before merging an asset PR)
 

@@ -1,16 +1,56 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
+import { manifest } from '../../contracts/manifest.ts';
+import { resolveWithoutLinks } from './no-links.ts';
 import { encodePng, type Rgba } from './png.ts';
 
-/** Sizes from ASSETS.md §5 (`icons/`); contracts v1 pins these names in the asset manifest. */
+/**
+ * App icons by manifest key (contracts/manifest.ts, `icons.app.*`). `file` is the public URL the
+ * web manifest and index.html point at, so it stays fixed whatever path the art is stored under.
+ */
 export const ICONS = [
-  { file: 'icons/icon-192.png', size: 192, inset: 0.12 },
-  { file: 'icons/icon-512.png', size: 512, inset: 0.12 },
+  { key: 'icons.app.192', file: 'icons/icon-192.png', size: 192, inset: 0.12 },
+  { key: 'icons.app.512', file: 'icons/icon-512.png', size: 512, inset: 0.12 },
   // Maskable icons keep their content inside the central 80% safe zone.
-  { file: 'icons/maskable-512.png', size: 512, inset: 0.24 },
-  { file: 'icons/apple-touch-icon-180.png', size: 180, inset: 0.14 },
+  { key: 'icons.app.maskable-512', file: 'icons/maskable-512.png', size: 512, inset: 0.24 },
+  {
+    key: 'icons.app.apple-touch-180',
+    file: 'icons/apple-touch-icon-180.png',
+    size: 180,
+    inset: 0.14,
+  },
 ] as const;
+
+type Icon = (typeof ICONS)[number];
+
+/**
+ * Where each icon's delivered art lives: `assets/<path>` from the manifest entry with its key.
+ * Unregistered keys fall back to the placeholder. A broken manifest, or a registered icon that is
+ * missing or reached through a symlink, fails the build: validate:assets reports the details, and
+ * shipping placeholders over real art would hide the breakage.
+ */
+export function deliveredIconPaths(root: string): ReadonlyMap<string, string> {
+  // lstat, not existsSync: a dangling link must fail the build, not look like "no art yet".
+  const lane = lstatSync(resolve(root, 'assets'), { throwIfNoEntry: false });
+  if (!lane) return new Map();
+  const manifestFile = lstatSync(resolve(root, 'assets', 'manifest.json'), {
+    throwIfNoEntry: false,
+  });
+  if (!lane.isSymbolicLink() && !manifestFile) return new Map();
+  const file = resolveWithoutLinks(root, 'assets/manifest.json');
+  const parsed = manifest.safeParse(JSON.parse(readFileSync(file, 'utf8')));
+  if (!parsed.success) {
+    throw new Error(
+      `assets/manifest.json is invalid (run npm run validate:assets): ${parsed.error.message}`,
+    );
+  }
+  return new Map(
+    parsed.data.assets
+      .filter((a) => ICONS.some((i) => i.key === a.key))
+      .map((a) => [a.key, resolveWithoutLinks(root, `assets/${a.path}`)]),
+  );
+}
 
 const BACKGROUND: Rgba = [255, 214, 222, 255];
 const WALL: Rgba = [255, 250, 240, 255];
@@ -43,13 +83,15 @@ export function drawPlaceholderIcon(size: number, inset: number): Buffer {
 }
 
 /**
- * Serves placeholder icons in dev and emits them into the build. A real icon in assets/icons/
- * with the same name takes precedence, so swapping in final art needs no code change.
+ * Serves app icons in dev and emits them into the build: the delivered art when the manifest
+ * registers the key, the placeholder otherwise, so swapping in final art needs no code change.
  */
 export function placeholderIcons(root: string): Plugin {
-  const load = (file: string, size: number, inset: number): Buffer => {
-    const delivered = resolve(root, 'assets', file);
-    return existsSync(delivered) ? readFileSync(delivered) : drawPlaceholderIcon(size, inset);
+  const load = (icon: Icon): Buffer => {
+    const delivered = deliveredIconPaths(root).get(icon.key);
+    return delivered === undefined
+      ? drawPlaceholderIcon(icon.size, icon.inset)
+      : readFileSync(delivered);
   };
   return {
     name: 'rct-placeholder-icons',
@@ -62,7 +104,7 @@ export function placeholderIcons(root: string): Plugin {
           return;
         }
         res.setHeader('Content-Type', 'image/png');
-        res.end(load(icon.file, icon.size, icon.inset));
+        res.end(load(icon));
       });
     },
     generateBundle() {
@@ -70,7 +112,7 @@ export function placeholderIcons(root: string): Plugin {
         this.emitFile({
           type: 'asset',
           fileName: icon.file,
-          source: load(icon.file, icon.size, icon.inset),
+          source: load(icon),
         });
       }
     },

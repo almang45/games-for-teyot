@@ -37,16 +37,20 @@ npm run check        # typecheck + lint + unit tests with coverage
 npm run build        # production build + size budget + privacy check
 npx playwright install chromium webkit   # once
 npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKit
+npm run validate     # design/, ui/ and assets/ against contracts/ (validate:design, validate:assets)
+npm run contracts:schema   # JSON Schemas for editors, into contracts/schema/ (gitignored)
 ```
 
 | Path | Contents |
 |---|---|
 | `src/` | Game shell: Phaser scenes, engine modules, structured log, placeholders |
 | `content/` | Indonesian copy and curriculum data |
+| `contracts/` | zod schemas both agents build against: manifest, layouts, tokens, motion, `ui/` props |
 | `tools/build/` | Placeholder icons, `_headers` parsing, budget and privacy checks |
+| `tools/validate/` | `validate:design` and `validate:assets` |
 | `tests/unit/`, `tests/e2e/` | Vitest and Playwright. E2E tests are named after PRD story IDs. |
 | `public/` | `_headers` (CSP, caching), `robots.txt` |
-| `.github/workflows/ci.yml` | lint → test → build → e2e → Semgrep + osv-scanner → SonarQube Cloud gate → deploy |
+| `.github/workflows/ci.yml` | lint → test → build → validate + e2e → Semgrep + osv-scanner → SonarQube Cloud gate → deploy |
 
 ### CI secrets
 
@@ -63,5 +67,5 @@ production hostname (`workers_dev` is off), through the `production` environment
 token.
 
 After the 1-month Access session expires, a parent opens `https://rct.amns.my.id/masuk` to log in
-again; the offline shell answers `/` from cache, so only that path reaches the Access login. (Not possible inside the macOS Safari Dock app yet: see ARCHITECTURE §8.3.) `npm run deploy` builds first, but it bypasses the CI
+again; the offline shell answers `/` from cache, so only that path reaches the Access login. (Not possible inside the macOS Safari Dock app yet: see ARCHITECTURE §8.3.) `npm run deploy` validates and builds first, but it bypasses the other CI
 gates, so it is for the very first deploy only. Roll back with `npx wrangler rollback <version-id>`.

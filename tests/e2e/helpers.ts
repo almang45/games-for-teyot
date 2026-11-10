@@ -57,7 +57,7 @@ export async function emulateAutoplayPolicy(page: Page): Promise<void> {
   });
 }
 
-/** 200 design px below the center lands in the front room (ruang-tamu) of the placeholder house. */
+/** 200 design px below the center lands in the front room (ruang-keluarga) of the placeholder house. */
 export const FRONT_ROOM_OFFSET = 200;
 
 /** Design-frame height; Scale.EXPAND keeps it on every 16:10-or-wider test viewport. */

@@ -47,6 +47,18 @@ export default defineConfig(
     rules: { 'no-console': 'off' },
   },
   {
+    // Node runs these by stripping types, which fails on TypeScript that emits code.
+    files: ['tools/**/*.ts', 'contracts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/parameter-properties': ['error', { prefer: 'class-property' }],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'TSEnumDeclaration', message: 'Node strips types only: use a const object.' },
+        { selector: 'TSModuleDeclaration', message: 'Node strips types only: use a module.' },
+      ],
+    },
+  },
+  {
     // Logger sinks are the one place allowed to write to the console directly.
     files: ['src/log/**'],
     rules: { 'no-console': 'off' },

@@ -1,6 +1,22 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
-import { ICONS, drawPlaceholderIcon, placeholderIcons } from '../../tools/build/placeholder-icons';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  ICONS,
+  deliveredIconPaths,
+  drawPlaceholderIcon,
+  placeholderIcons,
+} from '../../tools/build/placeholder-icons';
 import { encodePng } from '../../tools/build/png';
 
 function readIhdr(png: Buffer): { width: number; height: number; colorType: number } {
@@ -72,5 +88,95 @@ describe('placeholderIcons plugin', () => {
       placeholderIcons('/nonexistent-root').generateBundle as unknown as (this: typeof ctx) => void
     ).call(ctx);
     expect(emitted).toEqual(ICONS.map((i) => i.file));
+  });
+});
+
+describe('delivered icons', () => {
+  const roots: string[] = [];
+  const makeRoot = (manifestJson?: string, files: Record<string, Buffer> = {}): string => {
+    // Real path: the temp dir is itself a symlink on macOS (/var → /private/var).
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'rct-icons-')));
+    roots.push(root);
+    if (manifestJson !== undefined) {
+      mkdirSync(join(root, 'assets'), { recursive: true });
+      writeFileSync(join(root, 'assets', 'manifest.json'), manifestJson);
+    }
+    for (const [file, bytes] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, 'assets', file)), { recursive: true });
+      writeFileSync(join(root, 'assets', file), bytes);
+    }
+    return root;
+  };
+  afterEach(() => {
+    for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true });
+  });
+
+  const emit = (root: string): Map<string, Buffer> => {
+    const out = new Map<string, Buffer>();
+    const ctx = {
+      emitFile: (f: { fileName: string; source: Buffer }) => out.set(f.fileName, f.source),
+    };
+    (placeholderIcons(root).generateBundle as unknown as (this: typeof ctx) => void).call(ctx);
+    return out;
+  };
+
+  it('uses the art registered under the icon key, at the fixed public URL', () => {
+    const art = encodePng(192, 192, () => [1, 2, 3, 255]);
+    const manifestJson = JSON.stringify({
+      version: 1,
+      assets: [
+        { key: 'icons.app.192', type: 'image', path: 'brand/app-icon-small.png', room: 'global' },
+        { key: 'ui.home', type: 'image', path: 'ui/home.png', room: 'global' },
+      ],
+    });
+    const root = makeRoot(manifestJson, { 'brand/app-icon-small.png': art });
+    expect(deliveredIconPaths(root)).toEqual(
+      new Map([['icons.app.192', join(root, 'assets', 'brand/app-icon-small.png')]]),
+    );
+    const emitted = emit(root);
+    expect(emitted.get('icons/icon-192.png')).toEqual(art);
+    const placeholder = emitted.get('icons/icon-512.png');
+    expect(placeholder && readIhdr(placeholder).width).toBe(512);
+  });
+
+  it('falls back to placeholders without a manifest', () => {
+    expect(deliveredIconPaths(makeRoot())).toEqual(new Map());
+  });
+
+  it('refuses icons reached through a symlink, so private files never reach dist/', () => {
+    const manifestJson = JSON.stringify({
+      version: 1,
+      assets: [{ key: 'icons.app.192', type: 'image', path: 'brand/icon.png', room: 'global' }],
+    });
+    const root = makeRoot(manifestJson, {
+      'private/icon.png': encodePng(1, 1, () => [0, 0, 0, 255]),
+    });
+    symlinkSync(join(root, 'assets', 'private'), join(root, 'assets', 'brand'));
+    expect(() => deliveredIconPaths(root)).toThrow('brand/icon.png goes through a symlink');
+  });
+
+  it('refuses a symlinked assets/ folder', () => {
+    const manifestJson = JSON.stringify({
+      version: 1,
+      assets: [{ key: 'icons.app.192', type: 'image', path: 'brand/icon.png', room: 'global' }],
+    });
+    const root = makeRoot(manifestJson, {
+      'brand/icon.png': encodePng(1, 1, () => [0, 0, 0, 255]),
+    });
+    renameSync(join(root, 'assets'), join(root, 'reference'));
+    symlinkSync(join(root, 'reference'), join(root, 'assets'));
+    expect(() => deliveredIconPaths(root)).toThrow('assets/manifest.json goes through a symlink');
+  });
+
+  it('refuses a dangling assets/ link instead of falling back to placeholders', () => {
+    const root = makeRoot();
+    rmSync(join(root, 'assets'), { recursive: true, force: true });
+    symlinkSync(join(root, 'reference-not-here'), join(root, 'assets'));
+    expect(() => deliveredIconPaths(root)).toThrow('assets/manifest.json goes through a symlink');
+  });
+
+  it('fails the build on an invalid manifest instead of hiding the art', () => {
+    const root = makeRoot(JSON.stringify({ version: 1, assets: [{ key: 'icons.app.192' }] }));
+    expect(() => deliveredIconPaths(root)).toThrow(/assets\/manifest\.json is invalid/);
   });
 });
