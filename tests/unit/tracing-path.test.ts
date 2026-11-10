@@ -5,6 +5,7 @@ import {
   pointAt,
   polyline,
   project,
+  segmentAt,
   slice,
 } from '../../src/engine/tracing/path';
 import { loadGlyph } from '../../src/engine/tracing/glyph';
@@ -29,6 +30,22 @@ describe('stroke paths (ARCHITECTURE.md §4.1)', () => {
     expect(line.points.at(-1)).toEqual({ x: 0.1, y: 0.5 });
   });
 
+  it('reads compact SVG: signs as separators and repeated arguments without the letter', () => {
+    expect(parseStroke('M0.5-0.1L.5.9').points).toEqual([
+      { x: 0.5, y: -0.1 },
+      { x: 0.5, y: 0.9 },
+    ]);
+    // Pairs after M are lines, and L repeats; so does C.
+    expect(parseStroke('M 0 0 1 0 L 1 1 0 1').points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ]);
+    const twice = parseStroke('M 0 0 C 0 1 1 1 1 0 1 -1 2 -1 2 0');
+    expect(twice.points.at(-1)).toEqual({ x: 2, y: 0 });
+  });
+
   it('flattens cubic and quadratic curves through their end points', () => {
     const quarter = parseStroke('M 1 0.5 C 1 0.776 0.776 1 0.5 1');
     expect(quarter.points.at(-1)).toEqual({ x: 0.5, y: 1 });
@@ -42,7 +59,11 @@ describe('stroke paths (ARCHITECTURE.md §4.1)', () => {
   });
 
   it.each([
-    ['', 'unsupported path command ""'],
+    ['', 'a stroke starts with M'],
+    ['  ,', 'a stroke starts with M'],
+    ['0 0 1 1', 'unsupported path command ""'],
+    ['M 0 0 L 1 1 #', 'unexpected "#"'],
+    ['M 0 0 L 1 -', 'unexpected "-"'],
     ['L 0 0 L 1 1', 'a stroke starts with M'],
     ['M 0 0 L 1 1 M 0 1 L 1 0', 'only its first command is M'],
     ['M 0 0 l 1 1', 'unsupported path command "l"'],
@@ -91,6 +112,13 @@ describe('stroke paths (ARCHITECTURE.md §4.1)', () => {
     expect(project(ring, start, 0, 0.25).s).toBe(0);
     expect(project(ring, start, 0, ring.length).s).toBe(0);
     expect(project(ring, start, ring.length - 0.25, ring.length).s).toBeCloseTo(ring.length, 9);
+  });
+
+  it('finds the segment that holds an arc length, clamped to the stroke', () => {
+    const line = parseStroke('M 0 0 L 1 0 L 1 1 L 0 1');
+    expect([-1, 0, 0.5, 1, 1.5, 2.5, 3, 9].map((s) => segmentAt(line, s))).toEqual([
+      0, 0, 0, 1, 1, 2, 2, 2,
+    ]);
   });
 
   it('slices the stroke between two arc lengths', () => {

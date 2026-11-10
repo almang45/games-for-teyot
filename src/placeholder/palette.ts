@@ -23,4 +23,19 @@ export function cssHex(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }
 
+/**
+ * `top` drawn at `alpha` over `bottom`, as one opaque color. Overlapping shapes in one Graphics
+ * would otherwise blend twice where they meet.
+ */
+export function mixColor(top: number, bottom: number, alpha: number): number {
+  const a = Math.min(1, Math.max(0, alpha));
+  let mixed = 0;
+  for (const shift of [16, 8, 0]) {
+    const t = (top >> shift) & 0xff;
+    const b = (bottom >> shift) & 0xff;
+    mixed |= Math.round(t * a + b * (1 - a)) << shift;
+  }
+  return mixed;
+}
+
 export const placeholderFont = 'system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';

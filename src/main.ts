@@ -94,11 +94,12 @@ async function requestPersistentStorage(log: Logger): Promise<void> {
 
 async function startGame(root: HTMLElement, log: Logger, spike: Spike | undefined): Promise<void> {
   // Phaser is loaded lazily so SCR-INSTALL stays light, and the spike only when asked for.
-  const { createGame } = await import('./game/createGame');
-  const scenes =
+  const [{ createGame }, scenes] = await Promise.all([
+    import('./game/createGame'),
     spike === 'tracing'
-      ? [(await import('./scenes/TracingSpikeScene')).TracingSpikeScene]
-      : undefined;
+      ? import('./scenes/TracingSpikeScene').then((m) => [m.TracingSpikeScene])
+      : undefined,
+  ]);
   // fail() may have run while the chunk loaded; a game built now would run hidden under its screen.
   if (failed) return;
   const audio = new AudioContext({ latencyHint: 'interactive' });

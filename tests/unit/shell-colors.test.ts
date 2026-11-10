@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cssHex, placeholderPalette } from '../../src/placeholder/palette';
+import { cssHex, mixColor, placeholderPalette } from '../../src/placeholder/palette';
 
 const read = (path: string): string =>
   readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -13,6 +13,16 @@ describe('shell colors come from the placeholder palette', () => {
   it('formats palette numbers as CSS hex', () => {
     expect(cssHex(0xfff4e6)).toBe('#fff4e6');
     expect(cssHex(0x00ff00)).toBe('#00ff00');
+  });
+
+  it('pre-blends a color over another into one opaque color', () => {
+    expect(mixColor(0xff0000, 0x0000ff, 1)).toBe(0xff0000);
+    expect(mixColor(0xff0000, 0x0000ff, 0)).toBe(0x0000ff);
+    expect(mixColor(0xffffff, 0x000000, 0.5)).toBe(0x808080);
+    expect(mixColor(0x204060, 0x406080, 0.25)).toBe(0x385878);
+    // Out-of-range alphas clamp instead of overflowing a channel.
+    expect(mixColor(0xffffff, 0x000000, 2)).toBe(0xffffff);
+    expect(mixColor(0xffffff, 0x000000, -1)).toBe(0x000000);
   });
 
   it('styles.css uses only palette colors, and the page background is the sky', () => {

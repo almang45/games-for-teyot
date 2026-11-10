@@ -41,8 +41,4 @@ export class PointerGate {
     this.active = undefined;
     return true;
   }
-
-  reset(): void {
-    this.active = undefined;
-  }
 }

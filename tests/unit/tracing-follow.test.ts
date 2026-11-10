@@ -112,7 +112,7 @@ describe('pointer gate (US-TRACE-05)', () => {
     expect(gate.down({ id: 4, type: 'pen', width: 200, height: 200 }, true, 90).accepted).toBe(
       true,
     );
-    gate.reset();
+    expect(gate.release(4)).toBe(true);
     expect(gate.owns(4)).toBe(false);
     expect(gate.down({ id: 5, type: 'mouse', width: 200, height: 200 }, true, 90).accepted).toBe(
       true,

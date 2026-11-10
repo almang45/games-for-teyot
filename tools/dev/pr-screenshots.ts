@@ -43,10 +43,13 @@ async function main(outDir: string): Promise<void> {
 async function traceSpike(page: Page, prefix: string): Promise<void> {
   await page.goto('http://localhost:4173/?browser=1&spike=tracing');
   await page.locator('body[data-scene="TracingSpike"]').waitFor();
+  const debug = page.getByRole('button', { name: 'Debug' });
+  // Small screens start with the panel folded.
+  if ((await debug.getAttribute('aria-expanded')) === 'false') await debug.click();
   await page.getByRole('button', { name: 'Circle', exact: true }).click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${prefix}-spike-panel.png` });
-  await page.getByRole('button', { name: 'Debug' }).click();
+  await debug.click();
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('canvas missing');
   // The glyph box is 72% of the height, centred; the circle starts at its top and runs left.

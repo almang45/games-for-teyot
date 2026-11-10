@@ -21,6 +21,8 @@ export interface PanelOptions {
   readonly onSettled: (settings: SpikeSettings) => void;
   readonly onItem: (id: string) => void;
   readonly onRestart: () => void;
+  /** Starts folded, so on a small screen the panel doesn't cover the glyph. */
+  readonly collapsed?: boolean;
 }
 
 export interface TracingPanel {
@@ -52,8 +54,13 @@ export function createTracingPanel(parent: HTMLElement, options: PanelOptions): 
   toggle.className = 'spike-panel__toggle';
   const body = el('div');
   body.className = 'spike-panel__body';
+  const fold = (hidden: boolean): void => {
+    body.hidden = hidden;
+    toggle.setAttribute('aria-expanded', String(!hidden));
+  };
+  fold(options.collapsed ?? false);
   toggle.addEventListener('click', () => {
-    body.hidden = !body.hidden;
+    fold(!body.hidden);
   });
 
   const items = el('div');
@@ -139,7 +146,7 @@ export function formatReadout(r: PanelReadout): string {
   const ignored = `palm ${r.ignored.palm} · 2nd finger ${r.ignored['second-pointer']} · away ${r.ignored['out-of-reach']}`;
   return [
     `${r.item}, stroke ${r.stroke}`,
-    `input→frame ${latency}`,
+    `input→vsync ${latency}`,
     `last touch ${contact}`,
     `ignored ${ignored}`,
     `${Math.round(r.fps)} fps`,

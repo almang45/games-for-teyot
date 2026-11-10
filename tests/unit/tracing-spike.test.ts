@@ -114,8 +114,22 @@ describe('tracing spike panel', () => {
     buttons.find((b) => b.textContent === 'Restart')?.click();
     expect(options.onRestart).toHaveBeenCalledTimes(1);
     const body = document.querySelector<HTMLElement>('.spike-panel__body');
-    buttons.find((b) => b.textContent === 'Debug')?.click();
+    const debug = buttons.find((b) => b.textContent === 'Debug');
+    expect(body?.hidden).toBe(false);
+    expect(debug?.getAttribute('aria-expanded')).toBe('true');
+    debug?.click();
     expect(body?.hidden).toBe(true);
+    expect(debug?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('starts folded when asked, for small screens, and opens on tap', () => {
+    createTracingPanel(document.body, { ...options, collapsed: true });
+    const body = document.querySelector<HTMLElement>('.spike-panel__body');
+    const debug = document.querySelector<HTMLButtonElement>('.spike-panel__toggle');
+    expect(body?.hidden).toBe(true);
+    expect(debug?.getAttribute('aria-expanded')).toBe('false');
+    debug?.click();
+    expect(body?.hidden).toBe(false);
   });
 
   it('shows the readout and is removed on destroy', () => {
@@ -131,13 +145,13 @@ describe('tracing spike panel', () => {
   it('formats latency, contact size and ignored touches', () => {
     expect(formatReadout(readout).split('\n')).toEqual([
       'Circle, stroke 1/1',
-      'input→frame p50 9.5 · p95 18 · max 22.4 ms (n 12)',
+      'input→vsync p50 9.5 · p95 18 · max 22.4 ms (n 12)',
       'last touch touch 22×24 px',
       'ignored palm 1 · 2nd finger 2 · away 3',
       '120 fps',
     ]);
     expect(formatReadout({ ...readout, latency: undefined, contact: undefined })).toContain(
-      'input→frame no samples yet\nlast touch none yet',
+      'input→vsync no samples yet\nlast touch none yet',
     );
   });
 });

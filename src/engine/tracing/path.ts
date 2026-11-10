@@ -20,8 +20,11 @@ export interface Projection {
   readonly distance: number;
 }
 
-/** Curves flatten to segments about this long: ~4 px on an 800 px glyph. */
-const FLATTEN_STEP = 0.005;
+/**
+ * Curves flatten to chords this long: a circle of radius 0.45 H then strays 0.0001 H (0.1 px) from
+ * the true curve in about 140 points. Score mode (§4.3) resamples to its own fixed count instead.
+ */
+const FLATTEN_STEP = 0.02;
 /** Each command's points (as argument offsets): the controls, then the end point. */
 const COMMANDS: Readonly<Record<string, readonly number[]>> = {
   M: [0],
@@ -29,32 +32,40 @@ const COMMANDS: Readonly<Record<string, readonly number[]>> = {
   Q: [0, 2],
   C: [0, 2, 4],
 };
+/** A command letter, or a number; separators are optional where SVG allows (`M0.5-0.1`). */
+const TOKEN = /[\s,]*(?:([A-Za-z])|([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?))/y;
 
-/** Parses one stroke (`M` then any `L`/`Q`/`C`, absolute only) into a polyline. */
+/**
+ * Parses one stroke into a polyline: `M`, then `L`/`Q`/`C`, absolute only. As in SVG, a command's
+ * arguments may repeat without the letter, and pairs after `M` are lines.
+ */
 export function parseStroke(d: string): Polyline {
-  const tokens = d
-    // Every letter but e, which belongs to numbers like 1e-3.
-    .replaceAll(/[A-DF-Za-df-z]/g, (letter) => ` ${letter} `)
-    .trim()
-    .split(/[\s,]+/);
+  const tokens = tokenize(d);
   const points: Point[] = [];
-  let at = 0;
+  let command: string | undefined;
   let pen: Point | undefined;
+  let at = 0;
   while (at < tokens.length) {
-    const command = tokens[at] ?? '';
-    const offsets = COMMANDS[command];
-    if (!offsets) throw new Error(`unsupported path command "${command}" in "${d}"`);
+    const token = tokens[at];
+    if (typeof token === 'string') {
+      command = token;
+      at += 1;
+    }
+    const offsets = command === undefined ? undefined : COMMANDS[command];
+    if (!command || !offsets)
+      throw new Error(`unsupported path command "${command ?? ''}" in "${d}"`);
     const arity = offsets.length * 2;
-    const args = tokens.slice(at + 1, at + 1 + arity).map(Number);
-    if (args.length < arity || args.some((n) => !Number.isFinite(n))) {
+    const args = tokens.slice(at, at + arity);
+    if (args.length < arity || !args.every((a): a is number => typeof a === 'number')) {
       throw new Error(`${command} needs ${arity} numbers in "${d}"`);
     }
-    at += 1 + arity;
+    at += arity;
     const hull = offsets.map((i): Point => ({ x: args[i] ?? 0, y: args[i + 1] ?? 0 }));
     const end = hull.at(-1) ?? { x: 0, y: 0 };
     if (command === 'M') {
       if (pen) throw new Error(`a stroke is one line, so only its first command is M: "${d}"`);
       points.push(end);
+      command = 'L';
     } else if (pen) {
       points.push(...flatten([pen, ...hull]));
     } else {
@@ -62,7 +73,22 @@ export function parseStroke(d: string): Polyline {
     }
     pen = end;
   }
+  if (!pen) throw new Error(`a stroke starts with M: "${d}"`);
   return polyline(points);
+}
+
+function tokenize(d: string): (string | number)[] {
+  const tokens: (string | number)[] = [];
+  const scanner = new RegExp(TOKEN.source, 'y');
+  while (scanner.lastIndex < d.length) {
+    const at = scanner.lastIndex;
+    if (d.slice(at).trim().replaceAll(',', '') === '') break;
+    const match = scanner.exec(d);
+    if (!match) throw new Error(`unexpected "${d.slice(at).trim()}" in "${d}"`);
+    const [, letter, number] = match;
+    tokens.push(letter ?? Number(number));
+  }
+  return tokens;
 }
 
 /** Points after `hull[0]` along a line or Bézier curve with the given control hull. */
@@ -147,8 +173,8 @@ export function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-/** Index of the segment holding arc length `s` (binary search over `cumulative`). */
-function segmentAt(line: Polyline, s: number): number {
+/** Index `i` of the segment from `points[i]` to `points[i + 1]` that holds arc length `s`. */
+export function segmentAt(line: Polyline, s: number): number {
   let lo = 0;
   let hi = line.points.length - 2;
   while (lo < hi) {
