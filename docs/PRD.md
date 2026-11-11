@@ -80,7 +80,7 @@ analytics.
 
 | Milestone | Scope | Detail in |
 |---|---|---|
-| **M0 Foundations** | Repo, CI/CD, Cloudflare Workers + Access, installable offline shell, audio unlock, placeholder renderer, contracts v1, **tracing spike on the tablet**, reference tooling | §8.1 |
+| **M0 Foundations** | Repo, CI/CD, Cloudflare Workers + Access, installable offline shell, audio unlock, placeholder renderer, contracts v1, **tracing spike on Mama's phone**, reference tooling | §8.1 |
 | **M1 First playable** | House hub with 3 rooms. Tap-to-walk. Bubu and Ocica follow. Tracing T0 (pre-writing strokes) and T1 (digits 0–9). Counting C1–C4 for 1–5. Tap-to-fill coloring with 5 pages. **One tidy-up break: tidy the toys.** Speaker portraits. Voice clips. Session timer and bedtime. Basic parent area. Storage and export. | §8.2 |
 | M2 Letters | Lowercase then uppercase tracing (Theia's letters first), letter recognition and sounds, stickers, outfits, full parent dashboard, spaced repetition, **more tidy-up breaks** (make the bed, wipe spilled water, pair the shoes) | `docs/prd/M2.md` (later) |
 | M3 Reading | Syllables and words, counting to 10 and adding, remaining rooms, Mama and Papa full-body sprites | `docs/prd/M3.md` (later) |
@@ -176,8 +176,8 @@ The IDs are stable. Phase 4 E2E tests use these IDs as test names
 
 ### 8.1 M0: Foundations
 
-**US-OFF-01: Install and offline play.** As Papa, I install the app on the tablet and Theia can
-play without internet.
+**US-OFF-01: Install and offline play.** As Papa, I install the app on Mama's phone (and the
+other family devices) and Theia can play without internet.
 - Given the app has been opened online once, when the device is offline and the app is launched
   from the home screen, then `SCR-BOOT` loads in < 3 s and the placeholder house is playable.
 - Given it was opened in a normal browser tab, then `SCR-INSTALL` shows the install steps instead
@@ -199,12 +199,16 @@ play without internet.
 - `wrangler rollback` restores the previous version. The installed app runs it after its next cold
   start, and existing progress still loads.
 
-**US-TRACE-00: Tracing spike.** As Papa, I can judge on the real tablet whether finger tracing
-feels right before any art is drawn.
+**US-TRACE-00: Tracing spike.** As Papa, I can judge on Mama's phone (Galaxy A52s), Theia's main
+device, whether finger tracing feels right before any art is drawn.
 - The spike offers one vertical stroke, a circle, and the digit **1**, in Follow mode.
 - Input-to-ink latency is < 30 ms (measured with Chrome remote debugging).
 - Palm and second-finger touches don't draw.
 - Tolerance can be adjusted live in a debug panel.
+- The spike settles the corridor's smallest width on screen, in millimetres. A glyph on the
+  phone is about 2.5× smaller than on the tablet, so a width in glyph heights alone gets too
+  narrow for her finger there.
+- Also tried on the Pixel 6. The tablet is optional.
 - **Exit:** Papa (and Theia, informally) confirm it feels right. Otherwise tracing is reworked
   before M1 design starts.
 
@@ -247,8 +251,9 @@ every room shares one perspective.
 - The last 2 minutes are dusk, which gives Theia a visual heads-up before bedtime.
 
 **US-HOUSE-05: Phone layout.**
-- On the phone (2400 × 1080), the hub opens zoomed to Theia's current room. She can drag to pan,
-  and pinch-out shows the whole house.
+- On the phone (2400 × 1080), Theia's main device, the hub opens zoomed to her current room. She
+  can drag to pan, and tapping a room that is partly on screen brings it into view, so she
+  never needs to pinch. Pinch-out shows the whole house.
 - On the tablet (Galaxy Tab S10+, 16:10) and the laptops, the whole house fits on screen.
 - Tap areas never shrink below 72 dp on either device.
 
@@ -469,13 +474,13 @@ Music ducks while a voice clip plays.
 
 | ID | Requirement |
 |---|---|
-| NFR-PERF-01 | 60 fps on the family tablet. Tracing input-to-ink < 30 ms. Room transition < 1 s after the first visit. |
+| NFR-PERF-01 | 60 fps on Mama's Galaxy A52s, the main and slowest touch device. Tracing input-to-ink < 30 ms. Room transition < 1 s after the first visit. |
 | NFR-PERF-02 | First load ≤ 3 MB. Each room bundle ≤ 4 MB. Atlases ≤ 2048². |
 | NFR-OFF-01 | Every M1 feature works fully offline after the first online launch. Updates apply on the next cold start only. |
 | NFR-REL-01 | No blank or frozen screen. Every error is logged as structured JSON and recovered from (§7.5). |
 | NFR-DATA-01 | Progress survives app updates and rollbacks (additive schema). Export and import round-trip without loss. |
 | NFR-PRIV-01 | No third-party requests. No photos or raw recordings in git or in the build. Access-protected hosting. Strict CSP. |
-| NFR-COMPAT-01 | **Primary**: Theia's **Samsung Galaxy Tab S10+** (2800 × 1752, 16:10), current Chrome, landscape, installed fullscreen. **Phones**: Google Pixel 6 and Samsung Galaxy A52s (2400 × 1080), current Chrome. **Laptops** (no touchscreen): MacBook M4 (Chrome, Safari 17+ via Add to Dock) and Lenovo 14" Windows (Chrome, Edge), installed app fullscreen. **S Pen** (included with the Tab S10+): `pointerType: "pen"` is treated exactly like touch and counts toward mastery. |
+| NFR-COMPAT-01 | **Primary**: Mama's **Samsung Galaxy A52s** (2400 × 1080, 20:9), current Chrome, landscape, installed fullscreen. **Occasional**: Papa's Google Pixel 6 (2400 × 1080) and the **Samsung Galaxy Tab S10+** (2800 × 1752, 16:10), current Chrome. The 1920 × 1200 design frame fits every device: phones show it at full height with decoration at the sides. **Laptops** (no touchscreen): MacBook M4 (Chrome, Safari 17+ via Add to Dock) and Lenovo 14" Windows (Chrome, Edge), installed app fullscreen. **S Pen** (included with the Tab S10+): `pointerType: "pen"` is treated exactly like touch and counts toward mastery. |
 | NFR-UX-01 | Touch targets ≥ 72 dp (≥ 96 dp for primary actions). No text-only instructions for Theia. No failure sounds. No timers she can see. |
 | NFR-MAINT-01 | Engine code has unit tests. Every acceptance criterion has an E2E test. Design artifacts are validated against `contracts/`. |
 
@@ -483,8 +488,8 @@ Music ducks while a voice clip plays.
 
 - **When**: end of Phase 4 for each milestone, and 1–2 extra sessions during Phase 3 if a build is
   stable.
-- **Setup**: tablet, app pinning on, Do Not Disturb, a parent sitting nearby but **not helping**
-  unless she asks twice.
+- **Setup**: Mama's phone, app pinning on, Do Not Disturb, a parent sitting nearby but **not
+  helping** unless she asks twice.
 - **Observe and note** in `docs/handoff/M<n>-playtest.md`:
   - which room she picks first
   - where she hesitates for > 5 s
@@ -503,7 +508,7 @@ Music ducks while a voice clip plays.
 | Google Drive reference folder set up and mirrored. `reference` symlink created. | Everything visual | Start of M0 |
 | Floor plan sketch + room photos | House layout, room mapping | Before M1 Phase 2 |
 | Photos of Theia, Mama, and Papa. Photos and 360° videos of Bubu and Ocica. | Character and family sheet | Before M1 Phase 2 |
-| ~~Family device models~~ **Done**: Theia: Galaxy Tab S10+. Papa: Pixel 6, MacBook M4. Mama: Galaxy A52s, Lenovo 14" (Windows). | NFR-COMPAT-01, device tests | M0 |
+| ~~Family device models~~ **Done**: Theia plays mostly on Mama's Galaxy A52s, sometimes on Papa's Pixel 6 or the Galaxy Tab S10+. Laptops: MacBook M4 (Papa), Lenovo 14" Windows (Mama). | NFR-COMPAT-01, device tests | M0 |
 | Voice recording sessions (Mama full set, Papa praise and greetings) | M1 audio | During M1 Phase 3 |
 | Cloudflare account. Domain decided: **`rct.amns.my.id`**. The `amns.my.id` zone must be on Cloudflare DNS. | US-DEP-01 | M0 |
 
@@ -519,18 +524,20 @@ Music ducks while a voice clip plays.
 | 6 | Turning the cooldown off | Yes: a parent setting (US-SESSION-02) |
 | 7 | Coloring subjects | Dolls, dinosaurs, flowers, animals. M1: `bubu`, `ocica`, `dinosaurus`, `bunga`, `kucing`. |
 | 8 | Progress per device | OK to keep it per device. JSON export/import stays the way to move progress. Sync stays an optional M4 item. |
+| 9 | Main device (2026-11-11) | **Mama's Galaxy A52s** is Theia's main device, and her progress lives there. The Pixel 6 and the tablet are occasional, with their own progress. Replaces the device priority in #2; the 1920 × 1200 frame stays. |
 | — | New request: tidy-up "refreshment" activities | Added as tidy-up breaks ("Beberes"): tidy the toys in M1, the rest in M2 (US-TIDY-01..04) |
 
 ### Still open
 1. The S Pen comes with the Tab S10+. Should tracing also *encourage* the S Pen later (M2+), since
-   it's closer to holding a pencil? Pen input already works and counts like touch.
+   it's closer to holding a pencil? Pen input already works and counts like touch. Lower priority
+   now that the tablet is occasional.
 
 ## 14. Out of scope (all milestones)
 
 - Accounts, multiple children, or any public distribution (Play Store, public URL)
 - Generated content at runtime (TTS, AI images, AI chat)
 - Leaderboards, competition, timers she can see, or any "fail" state
-- Devices other than the family's Android phone and tablet, MacBook, and Windows laptop. iOS and
+- Devices other than the family's Android phones and tablet, MacBook, and Windows laptop. iOS and
   Linux are not tested.
 
 ## 15. Approval (Gate 1)
@@ -539,4 +546,4 @@ Music ducks while a voice clip plays.
 - [ ] Mama has reviewed it
 - [ ] The M1 design brief (`docs/handoff/M1-design-brief.md`) covers every M1 screen in §6
 - [ ] Antigravity has acknowledged contracts v1 (follow-up PR) with no blocking questions
-- [ ] The tracing spike (US-TRACE-00) feels right on the tablet
+- [ ] The tracing spike (US-TRACE-00) feels right on Mama's phone

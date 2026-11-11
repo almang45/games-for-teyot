@@ -101,22 +101,22 @@ Rules for `ui/` components, enforced by lint and reviewed by Claude for code qua
    - its interactions
    - which text is rendered by the game and which pictures are art
    - voice cue timing
-   - touch-target minimums, safe areas for tablet and phone
+   - touch-target minimums, safe areas for phone and tablet
 6. **Contracts v1** (`contracts/`): the schemas for manifest, layout, tokens, motion, and UI props.
    Antigravity reviews these at the Phase 2 kickoff.
 7. **Technical foundation (M0 only)**:
    - repo scaffold and CI pipeline
    - placeholder renderer that draws any manifest key at the right size
    - schema validators
-   - a **tracing spike on the real Android tablet**. Tracing is the riskiest mechanic, so it gets
-     proven before any art is drawn.
+   - a **tracing spike on Mama's phone**, Theia's main device. Tracing is the riskiest
+     mechanic, so it gets proven before any art is drawn.
 
 **Gate 1 (Papa approves):**
 - [ ] The PRD and its stories are approved.
 - [ ] The design brief covers every screen in the milestone.
 - [ ] Antigravity has acknowledged the contracts: no blocking questions left in the brief's Q&A
   section.
-- [ ] (M0 only) The tracing spike feels right on the tablet.
+- [ ] (M0 only) The tracing spike feels right on Mama's phone.
 
 ### Phase 2: Visual UI/UX design (Antigravity)
 
@@ -137,12 +137,13 @@ Rules for `ui/` components, enforced by lint and reviewed by Claude for code qua
    - the UI component set in `ui/`: buttons, swatches, speaker portrait frame, sticker,
      progress display, parent-gate keypad
    - a component gallery in `prototype/`
-5. **Screen designs**: a mockup for every screen in the milestone, in every state, at tablet
-   (1920 × 1200, 16:10, also used by the laptops) and phone (2400 × 1080) sizes. Exported to `design/mockups/<screen-id>/`.
+5. **Screen designs**: a mockup for every screen in the milestone, in every state, at phone
+   (2400 × 1080, the main device) and tablet (1920 × 1200, 16:10, also used by the laptops)
+   sizes. Exported to `design/mockups/<screen-id>/`.
 6. **Motion spec**: `motion.json` plus short reference videos or GIFs for the key moments (walk
    start and stop, stroke snap, celebration, Ocica comfort, day-to-night fade).
 7. **Clickable prototype** (`prototype/`): runs with `npm run proto`. Covers the milestone's main
-   flow on mock data, so Papa can try it on the tablet.
+   flow on mock data, so Papa can try it on Mama's phone.
 8. **Production assets**: final exports in `assets/` per `ASSETS.md`, registered in the
    manifest.
 
@@ -157,7 +158,7 @@ Rules for `ui/` components, enforced by lint and reviewed by Claude for code qua
 Unit tests are written alongside.
 
 **Gate 2 (Papa approves, Claude checks the contracts):**
-- [ ] Papa has tried the prototype on the tablet and approved it.
+- [ ] Papa has tried the prototype on Mama's phone and approved it.
 - [ ] Claude's **handoff review**:
   - `npm run validate:design` and `validate:assets` pass: schemas, sizes, closed coloring pages,
     atlas limits.
@@ -184,7 +185,7 @@ Unit tests are written alongside.
 - [ ] Every screen in the milestone is integrated.
 - [ ] No open `blocker` issues.
 - [ ] CI is green.
-- [ ] The preview deploy runs on the tablet and the phone.
+- [ ] The preview deploy runs on Mama's phone, Papa's phone, and the tablet.
 
 ### Phase 4: Testing (Claude)
 
@@ -192,11 +193,11 @@ Unit tests are written alongside.
 |---|---|---|
 | Unit | Engine: tracing scorer (recorded-stroke fixtures), scheduler, nav, flood fill, session timer, storage migrations | Vitest |
 | Component | `ui/` components in every state, events fire with the right payloads | Vitest + Svelte Testing Library |
-| E2E | **At least one test for each acceptance criterion**, using the story ID as the test ID. Includes first launch, session to bedtime, parent gate, export/import. | Playwright: tablet and phone viewports with touch, plus laptop viewports (1440 × 900, 1920 × 1200) with mouse, on Chromium and WebKit |
+| E2E | **At least one test for each acceptance criterion**, using the story ID as the test ID. Includes first launch, session to bedtime, parent gate, export/import. | Playwright: phone and tablet viewports with touch, plus laptop viewports (1440 × 900, 1920 × 1200) with mouse, on Chromium and WebKit |
 | Visual regression | Screenshot of every screen and state, compared to the baselines approved in Phase 5 | Playwright `toHaveScreenshot` |
 | Offline & update | Install, go offline, play a full session, push an update, apply it on next launch only | Playwright + Workbox test mode |
 | Privacy | Assert **zero** requests to any origin besides our own. No photos or raw recordings in the build output. | Playwright request log, build-output scan |
-| Device | Real tablet and phone: fps, tracing input latency, memory, audio unlock, install, app pinning. Real MacBook (Safari Dock app + Chrome) and Windows laptop (Chrome/Edge): install, audio, mouse play, practice-only tracing. | Chrome remote debugging, checklist in `docs/handoff/M<n>-device-test.md` |
+| Device | Mama's phone first (the fps and latency baseline), then Papa's phone and the tablet: fps, tracing input latency, memory, audio unlock, install, app pinning. Real MacBook (Safari Dock app + Chrome) and Windows laptop (Chrome/Edge): install, audio, mouse play, practice-only tracing. | Chrome remote debugging, checklist in `docs/handoff/M<n>-device-test.md` |
 | Playtest | Theia plays, and a parent observes using the PRD success metrics (protocol in the PRD) | Parent notes in `docs/handoff/M<n>-playtest.md` |
 
 There is a **traceability matrix** (`docs/handoff/M<n>-traceability.md`): story → acceptance
@@ -238,7 +239,7 @@ up on its next cold start. Progress data survives because the schema only change
 |---|---|---|
 | PRD, design brief, handoffs, reviews | Markdown in `docs/`, one PR each | Line comments from Papa and Mama (GitHub mobile app works). The author revises in the same PR. **Approve = gate passed.** |
 | Concepts, mockups, assets | Images in `design/concepts/`, `design/mockups/`, `assets/`. Stylized art only. | Images render inline in the PR. Comment per image. |
-| Prototype and integrated build | Preview deploy (PR) or `npm run proto` | Papa tries it on the tablet and the phone, then leaves feedback as a PR comment |
+| Prototype and integrated build | Preview deploy (PR) or `npm run proto` | Papa tries it on Mama's phone (and the tablet when it matters), then leaves feedback as a PR comment |
 | Original photos and videos | Private Google Drive folder → `reference/` symlink (`ASSETS.md` §1.1) | Never in git, never in a PR |
 
 
@@ -294,6 +295,6 @@ Contracts are the one place both agents depend on, so changes follow a strict pr
 | The agents drift apart, with art that doesn't fit the code or code that assumes art that doesn't exist | Contracts as code, plus validators in CI. Placeholders use the same keys and sizes. Gate 2 includes a contract check. |
 | Design is finished before anyone learns how Theia actually plays | A loop per milestone, a playtest in every Phase 4, and a tracing spike before any art exists |
 | The prototype becomes a second codebase | The prototype only *uses* the shipped artifacts (tokens, layouts, `ui/`, assets). It contains no logic worth keeping, and it never ships. |
-| Papa becomes a bottleneck | Each gate is a single checklist. Agents prepare everything so approving takes minutes, and Papa can approve on the tablet. |
+| Papa becomes a bottleneck | Each gate is a single checklist. Agents prepare everything so approving takes minutes, and Papa can approve from his phone. |
 | Antigravity can't open the preview behind Cloudflare Access | Design QA uses the CI screenshot artifacts or a local `npm run preview`, so it needs no Access login |
 | Private photos leak through an agent | `reference/` is gitignored, CI scans the build output, and the rule appears in both agents' instruction files |
