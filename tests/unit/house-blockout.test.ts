@@ -462,7 +462,8 @@ describe('US-REF-02 draft layout', () => {
     ]);
     expect(tw / th).toBeCloseTo(1.6, 1);
     // Against the far corner, rounding must not push the rect past the frame.
-    for (let d = 0; d < 1; d += 0.1) {
+    for (let tenth = 0; tenth < 10; tenth++) {
+      const d = tenth / 10;
       const [ex, ey, ew, eh] = focusRect([
         [1700 + d, 1050 + d],
         [1919.6, 1050 + d],

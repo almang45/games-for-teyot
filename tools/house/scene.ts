@@ -244,7 +244,7 @@ const centreDepth = (k: Box): number =>
 export function drawOrder(solids: readonly Solid[]): Solid[] {
   const n = solids.length;
   const after: number[][] = solids.map(() => []);
-  const blockers = new Array<number>(n).fill(0);
+  const blockers = solids.map(() => 0);
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const a = solids[i];
@@ -258,15 +258,17 @@ export function drawOrder(solids: readonly Solid[]): Solid[] {
     }
   }
   const depth = solids.map((s) => centreDepth(s.box));
-  const done = new Set<number>();
+  const open = new Set(solids.keys());
   const out: Solid[] = [];
-  while (out.length < n) {
-    const open = [...Array(n).keys()].filter((i) => !done.has(i));
-    const ready = open.filter((i) => blockers[i] === 0);
+  while (open.size > 0) {
+    const ready = [...open].filter((i) => blockers[i] === 0);
     // A cycle can only come from interpenetrating boxes; draw the farthest of them first.
-    const pool = ready.length > 0 ? ready : open;
-    const next = pool.reduce((best, i) => ((depth[i] ?? 0) < (depth[best] ?? 0) ? i : best));
-    done.add(next);
+    const pool = ready.length > 0 ? ready : [...open];
+    let next = -1;
+    for (const i of pool) {
+      if (next < 0 || (depth[i] ?? 0) < (depth[next] ?? 0)) next = i;
+    }
+    open.delete(next);
     const solid = solids[next];
     if (solid) out.push(solid);
     for (const k of after[next] ?? []) blockers[k] = (blockers[k] ?? 0) - 1;
