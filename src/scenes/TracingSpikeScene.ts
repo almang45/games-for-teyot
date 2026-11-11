@@ -122,10 +122,10 @@ export class TracingSpikeScene extends Phaser.Scene {
       },
       onItem: (id) => {
         const item = SPIKE_ITEMS.find((i) => i.id === id);
-        if (item) this.startItem(item);
+        if (item) this.startItem(item, { fresh: true });
       },
       onRestart: () => {
-        this.startItem(this.item);
+        this.startItem(this.item, { fresh: true });
       },
     });
     const readout = this.time.addEvent({
@@ -151,7 +151,7 @@ export class TracingSpikeScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
 
     this.layout();
-    this.startItem(this.item);
+    this.startItem(this.item, { fresh: true });
     markActiveScene(TracingSpikeScene.KEY);
     this.log.info('scene.ready', {
       items: SPIKE_ITEMS.map((i) => i.id),
@@ -266,12 +266,18 @@ export class TracingSpikeScene extends Phaser.Scene {
     if (moved && this.follow.done) this.completeStroke();
   }
 
-  private startItem(item: SpikeItem): void {
+  /**
+   * `fresh` (an item picked or restarted in the panel) clears the panel's latency and ignore
+   * counts. The automatic repeat keeps them, so they add up over a whole tracing session.
+   */
+  private startItem(item: SpikeItem, { fresh }: { fresh: boolean }): void {
     this.repeat?.remove();
     this.repeat = undefined;
     this.item = item;
-    this.ignored = noIgnores();
-    this.meter = new LatencyMeter();
+    if (fresh) {
+      this.ignored = noIgnores();
+      this.meter = new LatencyMeter();
+    }
     this.shapes = this.buildShapes();
     this.startStroke(0);
   }
@@ -321,7 +327,7 @@ export class TracingSpikeScene extends Phaser.Scene {
       this.log.info('spike.trace.item_done', { item });
     });
     this.repeat = this.time.delayedCall(ITEM_REPEAT_MS, () => {
-      this.startItem(this.item);
+      this.startItem(this.item, { fresh: false });
     });
   }
 
