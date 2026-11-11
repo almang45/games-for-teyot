@@ -25,12 +25,8 @@ export const THEIA_HEIGHT_M = 0.95;
 const num = (v: number): string => String(Math.round(v * 10) / 10);
 const pts = (points: readonly Point[]): string =>
   points.map(([x, y]) => `${num(x)},${num(y)}`).join(' ');
-const esc = (s: string): string =>
-  s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
+/** Ids are kebab-case already; this keeps any other text from breaking out of the XML. */
+const esc = (s: string): string => s.replaceAll(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function faceElement(f: Face, fit: Fit): string {
   const fill = FILL[f.kind][f.outdoor ? 1 : 0];
