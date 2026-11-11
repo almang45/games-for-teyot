@@ -1,66 +1,78 @@
 import type { Vec3 } from './iso.ts';
-import type { PlanRect } from './plan.ts';
-import type { Occluder } from './scene.ts';
+import { EPS, type Solid } from './scene.ts';
 
-/** Ignores contact: a point on a face's edge, or a solid touching the point, does not hide it. */
-const EPS = 1e-3;
+/** Ignores contact: a solid touching the point, or grazed along an edge, does not hide it. */
+const GRAZE = 1e-3;
 
-const strictlyInside = (v: number, lo: number, hi: number): boolean => v > lo + EPS && v < hi - EPS;
+const inside = (v: number, lo: number, hi: number): boolean => v > lo + GRAZE && v < hi - GRAZE;
 
 /**
- * In the 2:1 projection a point (x, y, z) lands on the same pixel as (x + d, y + d, z + d), so the
- * ray to the camera runs along (1, 1, 1). A solid hides the point when that ray passes through it.
+ * In the 2:1 projection a point (x, y, z) lands on the same pixel as (x + t, y + t, z + t), so the
+ * ray to the camera runs along (1, 1, 1). A box hides the point when the ray runs through it for
+ * more than a graze; a wall, which has no thickness, when the ray crosses it outside its doors.
  */
-function hides(o: Occluder, p: Vec3): boolean {
-  if (o.kind === 'slab') {
-    const [x, y, w, d] = o.rect;
-    // Checking the top and bottom faces covers a slab as thin as a floor.
-    return [o.top, o.bottom].some((face) => {
-      const t = face - p.z;
-      return t > EPS && strictlyInside(p.x + t, x, x + w) && strictlyInside(p.y + t, y, y + d);
-    });
+function hides(s: Solid, p: Vec3): boolean {
+  const { box } = s;
+  if (s.kind === 'wall-x0' || s.kind === 'wall-y0') {
+    const t = s.kind === 'wall-x0' ? box.x0 - p.x : box.y0 - p.y;
+    if (t <= GRAZE) return false;
+    const along = (s.kind === 'wall-x0' ? p.y : p.x) + t;
+    const [lo, hi] = s.kind === 'wall-x0' ? [box.y0, box.y1] : [box.x0, box.x1];
+    const z = p.z + t;
+    if (!inside(along, lo, hi) || !inside(z, box.z0, box.z1)) return false;
+    return !s.openings.some((o) => inside(along, o.from, o.to) && inside(z, o.bottom, o.top));
   }
-  const t = o.at - (o.side === 'x0' ? p.x : p.y);
-  const along = (o.side === 'x0' ? p.y : p.x) + t;
-  return t > EPS && strictlyInside(along, o.from, o.to) && strictlyInside(p.z + t, o.bottom, o.top);
+  const enter = Math.max(box.x0 - p.x, box.y0 - p.y, box.z0 - p.z, EPS);
+  const leave = Math.min(box.x1 - p.x, box.y1 - p.y, box.z1 - p.z);
+  return leave - enter > GRAZE;
 }
 
 /** The first solid hiding `p`, if any. */
-export const hiddenBy = (p: Vec3, occluders: readonly Occluder[]): Occluder | undefined =>
-  occluders.find((o) => hides(o, p));
+export const hiddenBy = (p: Vec3, solids: readonly Solid[]): Solid | undefined =>
+  solids.find((s) => hides(s, p));
 
 export interface HiddenSamples {
-  /** Share of the sampled floor that is hidden, 0–1. */
+  /** Share of the samples that are hidden, 0–1. */
   readonly fraction: number;
   readonly points: readonly Vec3[];
   /** Owners of the solids that hide something, sorted. */
   readonly by: readonly string[];
 }
 
-/** Samples a floor rect at height z on a grid of `step` metres (cell centres). */
-export function hiddenFloor(
-  rect: PlanRect,
-  z: number,
-  occluders: readonly Occluder[],
+/**
+ * Samples a flat quad (a corner, then its two neighbours along the edges) at cell centres about
+ * `step` metres apart. Serves floors and spots on a wall alike.
+ */
+export function hiddenQuad(
+  quad: readonly Vec3[],
+  solids: readonly Solid[],
   step = 0.1,
 ): HiddenSamples {
-  const [x, y, w, d] = rect;
-  const nx = Math.max(1, Math.round(w / step));
-  const ny = Math.max(1, Math.round(d / step));
+  const [p0, p1, , p3] = quad;
+  if (!p0 || !p1 || !p3) throw new Error('a quad needs four corners');
+  const length = (a: Vec3, b: Vec3): number => Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  const nu = Math.max(1, Math.round(length(p0, p1) / step));
+  const nv = Math.max(1, Math.round(length(p0, p3) / step));
   const points: Vec3[] = [];
   const by = new Set<string>();
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < ny; j++) {
-      const p = { x: x + ((i + 0.5) * w) / nx, y: y + ((j + 0.5) * d) / ny, z };
-      const o = hiddenBy(p, occluders);
-      if (o) {
+  for (let i = 0; i < nu; i++) {
+    for (let j = 0; j < nv; j++) {
+      const u = (i + 0.5) / nu;
+      const v = (j + 0.5) / nv;
+      const p = {
+        x: p0.x + u * (p1.x - p0.x) + v * (p3.x - p0.x),
+        y: p0.y + u * (p1.y - p0.y) + v * (p3.y - p0.y),
+        z: p0.z + u * (p1.z - p0.z) + v * (p3.z - p0.z),
+      };
+      const s = hiddenBy(p, solids);
+      if (s) {
         points.push(p);
-        by.add(o.owner);
+        by.add(s.owner);
       }
     }
   }
   return {
-    fraction: points.length / (nx * ny),
+    fraction: points.length / (nu * nv),
     points,
     by: [...by].sort((a, b) => a.localeCompare(b)),
   };

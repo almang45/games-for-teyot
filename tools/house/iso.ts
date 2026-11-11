@@ -1,4 +1,5 @@
 import type { Point } from '../../contracts/common.ts';
+import { toScreen } from '../../src/engine/iso/projection.ts';
 
 /** A plan point in metres; z is height above Lt Dasar's FFL. */
 export interface Vec3 {
@@ -13,14 +14,14 @@ export interface Fit {
   readonly origin: Point;
 }
 
-/**
- * The engine's 2:1 projection (src/engine/iso/projection.ts) with one metre as the tile and
- * tileWidth = 2 × scale: a unit test keeps the two identical.
- */
-export const project = (p: Vec3, fit: Fit): Point => [
-  fit.origin[0] + (p.x - p.y) * fit.scale,
-  fit.origin[1] + ((p.x + p.y) / 2 - p.z) * fit.scale,
-];
+/** The engine's 2:1 projection (src/engine/iso/projection.ts) with one metre as the tile. */
+export function project(p: Vec3, fit: Fit): Point {
+  const { x, y } = toScreen(p, {
+    tileWidth: 2 * fit.scale,
+    origin: { x: fit.origin[0], y: fit.origin[1] },
+  });
+  return [x, y];
+}
 
 /**
  * The largest whole px-per-metre scale that fits every point inside `size` minus `margin`, centred.

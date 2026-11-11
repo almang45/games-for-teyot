@@ -6,7 +6,7 @@ import { inFile, parseJsonFile, type FileIssue, type Report } from '../validate/
 import { fitToCanvas } from './iso.ts';
 import { CANVAS, draftLayout } from './layout.ts';
 import { checkPlan, floorPlan } from './plan.ts';
-import { buildFaces, buildOccluders } from './scene.ts';
+import { buildSolids, facesOf } from './scene.ts';
 import { blockoutSvg, guideSvg, THEIA_HEIGHT_M } from './svg.ts';
 
 export const OUTPUT_FILES = {
@@ -37,8 +37,8 @@ const LANE = 'house-blockout';
 
 /**
  * Reads the plan at `planArg`, writes the blockout SVGs and the draft layout.json into `outArg`
- * (both resolved against `root`). Layout contract findings are reported, but the files are still written so the guide
- * shows what to fix.
+ * (both resolved against `root`). Layout contract findings are reported, but the files are
+ * still written so the guide shows what to fix.
  */
 export function runBlockout(root: string, planArg: string, outArg: string): BlockoutResult {
   // Either may be absolute; reports and the summary show them relative to root.
@@ -50,13 +50,13 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
   const planIssues = checkPlan(plan).map(inFile(planFile));
   if (planIssues.length > 0) return { report: { lane: LANE, files: 1, issues: planIssues } };
 
-  const faces = buildFaces(plan);
+  const solids = buildSolids(plan);
   const fit = fitToCanvas(
-    faces.flatMap((f) => f.points),
+    solids.flatMap((s) => facesOf(s).flatMap((f) => f.points)),
     CANVAS,
     plan.marginPx,
   );
-  const draft = draftLayout(plan, fit, buildOccluders(plan));
+  const draft = draftLayout(plan, fit, solids);
   const layoutFile = `${outDir}/${OUTPUT_FILES.layout}`;
   const schema = houseLayout.safeParse(draft.layout);
   const layoutIssues: FileIssue[] = [
@@ -67,11 +67,11 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
   ];
 
   const outputs: [string, string][] = [
-    [OUTPUT_FILES.blockout, blockoutSvg(faces, fit, CANVAS)],
+    [OUTPUT_FILES.blockout, blockoutSvg(solids, fit, CANVAS)],
     [
       OUTPUT_FILES.guide,
       guideSvg({
-        faces,
+        solids,
         fit,
         size: CANVAS,
         layout: draft.layout,

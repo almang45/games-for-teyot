@@ -10,15 +10,17 @@ import { convexHull, project, type Fit, type Vec3 } from './iso.ts';
 import {
   ffl,
   floorZ,
+  inPlanRect,
   walkOf,
   wallHeightOf,
   type FloorPlan,
   type PlanArea,
   type PlanPoint,
   type PlanSpot,
+  type PlanWaypoint,
 } from './plan.ts';
-import { quadX, quadY, quadZ, type Occluder } from './scene.ts';
-import { hiddenBy, hiddenFloor } from './visibility.ts';
+import { quadX, quadY, quadZ, type Solid } from './scene.ts';
+import { hiddenBy, hiddenQuad } from './visibility.ts';
 
 /** The blockout canvas: the 1920 × 1200 layout space at 2× (ASSETS.md §4.1). */
 export const CANVAS: readonly [number, number] = [HOUSE_SIZE[0] * 2, HOUSE_SIZE[1] * 2];
@@ -51,12 +53,13 @@ export function focusRect(polygon: readonly Point[]): Rect {
   let h = bh + 2 * pad;
   if (w / h < FRAME_ASPECT) w = h * FRAME_ASPECT;
   else h = w / FRAME_ASPECT;
+  // Round the size before placing it, so the rounded rect can't poke 1 px past the frame.
+  w = Math.round(w);
+  h = Math.round(h);
   if (w > HOUSE_SIZE[0] || h > HOUSE_SIZE[1]) return [0, 0, HOUSE_SIZE[0], HOUSE_SIZE[1]];
-  const clamp = (v: number, size: number, max: number): number =>
-    Math.min(Math.max(v, 0), max - size);
-  const x = clamp(bx + bw / 2 - w / 2, w, HOUSE_SIZE[0]);
-  const y = clamp(by + bh / 2 - h / 2, h, HOUSE_SIZE[1]);
-  return [Math.round(x), Math.round(y), Math.round(w), Math.round(h)];
+  const place = (centre: number, size: number, max: number): number =>
+    Math.min(Math.max(Math.round(centre - size / 2), 0), max - size);
+  return [place(bx + bw / 2, w, HOUSE_SIZE[0]), place(by + bh / 2, h, HOUSE_SIZE[1]), w, h];
 }
 
 /** Floor plus the tops of its back walls: what a tap on the room should hit. */
@@ -78,36 +81,20 @@ function spotFace(spot: PlanSpot, a: PlanArea): Vec3[] {
     : quadY(y + spot.offset, x + spot.at, x + spot.at + spot.width, z, z + spot.height);
 }
 
-/** Share of a wall-parallel quad (bottom edge first) hidden, sampled on a grid of cell centres. */
-function hiddenFace(
-  face: readonly Vec3[],
-  occluders: readonly Occluder[],
-  cells = 6,
-): { fraction: number; by: string[] } {
-  const [p0, p1, , p3] = face;
-  if (!p0 || !p1 || !p3) throw new Error('a spot face needs four corners');
-  const by = new Set<string>();
-  let hidden = 0;
-  for (let i = 0; i < cells; i++) {
-    for (let j = 0; j < cells; j++) {
-      const u = (i + 0.5) / cells;
-      const v = (j + 0.5) / cells;
-      const p = {
-        x: p0.x + u * (p1.x - p0.x) + v * (p3.x - p0.x),
-        y: p0.y + u * (p1.y - p0.y) + v * (p3.y - p0.y),
-        z: p0.z + u * (p1.z - p0.z) + v * (p3.z - p0.z),
-      };
-      const o = hiddenBy(p, occluders);
-      if (o) {
-        hidden++;
-        by.add(o.owner);
-      }
-    }
-  }
-  return { fraction: hidden / cells ** 2, by: [...by].sort((x, y) => x.localeCompare(y)) };
+/** Never rounds a sliver to 0 % or a near miss to 100 %. */
+export function percent(fraction: number): string {
+  const p = Math.round(fraction * 100);
+  if (p === 0 && fraction > 0) return '<1%';
+  if (p === 100 && fraction < 1) return '>99%';
+  return `${p}%`;
 }
 
-const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
+/** A waypoint's height: given, else the floor of its storey's area under it, else the FFL. */
+function waypointZ(plan: FloorPlan, w: PlanWaypoint): number {
+  if (w.z !== undefined) return w.z;
+  const a = plan.areas.find((area) => area.storey === w.storey && inPlanRect(w.at, area.rect));
+  return a ? floorZ(a) : ffl(w.storey);
+}
 
 export interface HiddenFloor {
   readonly room: string;
@@ -127,11 +114,7 @@ export interface DraftLayout {
 /**
  * The draft `layout.json` for the blockout drawn with `fit`. Expects a plan that passed checkPlan.
  */
-export function draftLayout(
-  plan: FloorPlan,
-  fit: Fit,
-  occluders: readonly Occluder[],
-): DraftLayout {
+export function draftLayout(plan: FloorPlan, fit: Fit, solids: readonly Solid[]): DraftLayout {
   const areas = new Map(plan.areas.map((a) => [a.id, a]));
   const issues: Issue[] = [];
   const hidden: HiddenFloor[] = [];
@@ -142,7 +125,7 @@ export function draftLayout(
     const z = floorZ(a);
     const walk = walkOf(plan, room, a);
     stands.push(at(room.stand, z));
-    const covered = hiddenFloor(walk, z, occluders);
+    const covered = hiddenQuad(quadZ(z, walk), solids);
     if (covered.points.length > 0) {
       hidden.push({ room: room.id, points: covered.points });
       issues.push(
@@ -159,7 +142,7 @@ export function draftLayout(
       ['parking.ocica', room.parking.ocica],
     ];
     for (const [name, p] of named) {
-      const o = hiddenBy(at(p, z), occluders);
+      const o = hiddenBy(at(p, z), solids);
       if (o) issues.push(warning(`rooms[${i}].${name}`, `hidden behind ${o.owner}`));
     }
     const polygon = tapPolygon(plan, a, fit);
@@ -183,7 +166,9 @@ export function draftLayout(
     const a = areas.get(plan.rooms.find((r) => r.id === s.room)?.area ?? '');
     if (!a) throw new Error(`spots.${name}: ${s.room} has no area; run checkPlan first`);
     const face = spotFace(s, a);
-    const covered = hiddenFace(face, occluders);
+    // Zoomed into a room, the storeys above it fade out (PRD), so they can't hide its spots.
+    const below = solids.filter((solid) => solid.storey <= a.storey);
+    const covered = hiddenQuad(face, below);
     if (covered.fraction > 0) {
       issues.push(
         warning(
@@ -203,7 +188,7 @@ export function draftLayout(
     occluders: [],
     waypoints: plan.waypoints.map((w) => ({
       id: w.id,
-      pos: toLayout(at(w.at, w.z ?? ffl(w.storey)), fit),
+      pos: toLayout(at(w.at, waypointZ(plan, w)), fit),
       storey: w.storey,
       ...(w.stair === undefined ? {} : { stair: w.stair }),
     })),

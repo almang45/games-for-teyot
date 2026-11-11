@@ -1,4 +1,5 @@
 import type { Storey } from '../../contracts/rooms.ts';
+import { depthKey } from '../../src/engine/iso/projection.ts';
 import type { Vec3 } from './iso.ts';
 import {
   floorZ,
@@ -9,45 +10,49 @@ import {
   type PlanStair,
 } from './plan.ts';
 
-/** Draw order inside one storey: floors, then the back walls, their openings, then the stairs. */
-export const LAYERS = ['floors', 'walls', 'doors', 'stairs'] as const;
-export type Layer = (typeof LAYERS)[number];
+/** Contact, not overlap: solids that only touch neither hide nor order each other. */
+export const EPS = 1e-6;
+
+/** An axis-aligned box in plan metres. A wall is a box with no thickness. */
+export interface Box {
+  readonly x0: number;
+  readonly x1: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/** A hole in a wall: `from`–`to` along the wall, `bottom`–`top` in height. */
+export interface Opening {
+  readonly from: number;
+  readonly to: number;
+  readonly bottom: number;
+  readonly top: number;
+}
+
+export type SolidKind = 'slab' | 'wall-x0' | 'wall-y0' | 'step';
+
+/** One piece of the house: a floor slab, a back wall with its doors, or a stair step. */
+export interface Solid {
+  readonly kind: SolidKind;
+  /** The area or flight it belongs to. */
+  readonly owner: string;
+  readonly storey: Storey;
+  readonly outdoor: boolean;
+  readonly box: Box;
+  /** Door openings; walls only. */
+  readonly openings: readonly Opening[];
+}
 
 export type FaceKind =
   'floor' | 'slab-x' | 'slab-y' | 'wall-x0' | 'wall-y0' | 'door' | 'step' | 'step-x' | 'step-y';
 
 /** One flat polygon of the blockout, in plan metres. */
 export interface Face {
-  readonly layer: Layer;
   readonly kind: FaceKind;
-  readonly storey: Storey;
-  readonly outdoor: boolean;
-  /** The area or stair it belongs to. */
-  readonly owner: string;
   readonly points: readonly Vec3[];
 }
-
-/** A solid that can hide what is behind it from the camera. */
-export type Occluder =
-  | {
-      readonly kind: 'slab';
-      readonly owner: string;
-      readonly rect: PlanRect;
-      readonly bottom: number;
-      readonly top: number;
-    }
-  | {
-      readonly kind: 'wall';
-      readonly owner: string;
-      readonly side: 'x0' | 'y0';
-      /** The wall's plane: x for x0, y for y0. */
-      readonly at: number;
-      /** Extent along the wall. */
-      readonly from: number;
-      readonly to: number;
-      readonly bottom: number;
-      readonly top: number;
-    };
 
 /** The plane x = `x`, from y0 to y1 and z0 to z1. */
 export const quadX = (x: number, y0: number, y1: number, z0: number, z1: number): Vec3[] => [
@@ -78,7 +83,7 @@ export interface Step {
   readonly top: number;
 }
 
-/** The treads of a flight, first step first. */
+/** The treads of a flight, first step first. Expects from < to (checkPlan). */
 export function stepsOf(s: PlanStair): Step[] {
   const [x, y, w, d] = s.rect;
   const rise = (s.to - s.from) / s.steps;
@@ -95,111 +100,176 @@ export function stepsOf(s: PlanStair): Step[] {
   });
 }
 
-const stairBase = (s: PlanStair): number => Math.min(s.from, s.to);
+const boxOf = ([x, y, w, d]: PlanRect, z0: number, z1: number): Box => ({
+  x0: x,
+  x1: x + w,
+  y0: y,
+  y1: y + d,
+  z0,
+  z1,
+});
 
-function areaFaces(plan: FloorPlan, a: PlanArea): Face[] {
+function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
   const z = floorZ(a);
   const [x, y, w, d] = a.rect;
-  const h = wallHeightOf(plan, a);
-  const base = { storey: a.storey, outdoor: a.outdoor, owner: a.id };
-  const faces: Face[] = [
-    { ...base, layer: 'floors', kind: 'floor', points: quadZ(z, a.rect) },
-    { ...base, layer: 'floors', kind: 'slab-x', points: quadX(x + w, y, y + d, z - plan.slab, z) },
-    { ...base, layer: 'floors', kind: 'slab-y', points: quadY(y + d, x, x + w, z - plan.slab, z) },
+  const top = z + wallHeightOf(plan, a);
+  const base = { owner: a.id, storey: a.storey, outdoor: a.outdoor };
+  const openings = (side: 'x0' | 'y0'): Opening[] =>
+    plan.doors
+      .filter((door) => door.area === a.id && door.wall === side)
+      .map((door) => {
+        const start = (side === 'x0' ? y : x) + door.at;
+        return { from: start, to: start + door.width, bottom: z, top: z + door.height };
+      });
+  const solids: Solid[] = [
+    { ...base, kind: 'slab', box: boxOf(a.rect, z - plan.slab, z), openings: [] },
   ];
   if (a.walls.includes('x0')) {
-    faces.push({ ...base, layer: 'walls', kind: 'wall-x0', points: quadX(x, y, y + d, z, z + h) });
+    const box = { x0: x, x1: x, y0: y, y1: y + d, z0: z, z1: top };
+    solids.push({ ...base, kind: 'wall-x0', box, openings: openings('x0') });
   }
   if (a.walls.includes('y0')) {
-    faces.push({ ...base, layer: 'walls', kind: 'wall-y0', points: quadY(y, x, x + w, z, z + h) });
+    const box = { x0: x, x1: x + w, y0: y, y1: y, z0: z, z1: top };
+    solids.push({ ...base, kind: 'wall-y0', box, openings: openings('y0') });
   }
-  return faces;
+  return solids;
 }
 
-function stairFaces(s: PlanStair): Face[] {
-  const base = { storey: s.storey, outdoor: false, owner: s.id, layer: 'stairs' as const };
-  const z0 = stairBase(s);
-  return stepsOf(s).flatMap(({ rect, top }): Face[] => {
-    const [x, y, w, d] = rect;
-    return [
-      { ...base, kind: 'step', points: quadZ(top, rect) },
-      { ...base, kind: 'step-x', points: quadX(x + w, y, y + d, z0, top) },
-      { ...base, kind: 'step-y', points: quadY(y + d, x, x + w, z0, top) },
-    ];
+/** Every solid of the house. Throws on a door whose area is missing: run checkPlan first. */
+export function buildSolids(plan: FloorPlan): Solid[] {
+  const areas = new Set(plan.areas.map((a) => a.id));
+  plan.doors.forEach((door, i) => {
+    if (!areas.has(door.area)) {
+      throw new Error(`doors[${i}]: unknown area ${door.area}; run checkPlan first`);
+    }
   });
-}
-
-/** Every face of the blockout, unsorted. */
-export function buildFaces(plan: FloorPlan): Face[] {
-  const areas = new Map(plan.areas.map((a) => [a.id, a]));
-  const doors = plan.doors.flatMap((door): Face[] => {
-    const a = areas.get(door.area);
-    if (!a) return [];
-    const z = floorZ(a);
-    const [x, y] = a.rect;
-    const points =
-      door.wall === 'x0'
-        ? quadX(x, y + door.at, y + door.at + door.width, z, z + door.height)
-        : quadY(y, x + door.at, x + door.at + door.width, z, z + door.height);
-    return [
-      { layer: 'doors', kind: 'door', storey: a.storey, outdoor: false, owner: a.id, points },
-    ];
-  });
-  return [
-    ...plan.areas.flatMap((a) => areaFaces(plan, a)),
-    ...doors,
-    ...plan.stairs.flatMap(stairFaces),
-  ];
-}
-
-/** Painter's order: storey by storey, layer by layer, then back to front. */
-export function sortFaces(faces: readonly Face[]): Face[] {
-  const depth = (f: Face): number =>
-    f.points.reduce((sum, p) => sum + p.x + p.y + p.z * 1e-3, 0) / f.points.length;
-  const layer = (f: Face): number => LAYERS.indexOf(f.layer);
-  return [...faces].sort(
-    (a, b) => a.storey - b.storey || layer(a) - layer(b) || depth(a) - depth(b),
+  const steps = plan.stairs.flatMap((s) =>
+    stepsOf(s).map((step): Solid => ({
+      kind: 'step',
+      owner: s.id,
+      storey: s.storey,
+      outdoor: false,
+      box: boxOf(step.rect, Math.min(s.from, s.to), step.top),
+      openings: [],
+    })),
   );
+  return [...plan.areas.flatMap((a) => areaSolids(plan, a)), ...steps];
 }
 
-/** The solids that can hide floor from the camera: slabs, back walls and stair steps. */
-export function buildOccluders(plan: FloorPlan): Occluder[] {
-  const out: Occluder[] = [];
-  for (const a of plan.areas) {
-    const z = floorZ(a);
-    const [x, y, w, d] = a.rect;
-    const top = z + wallHeightOf(plan, a);
-    out.push({ kind: 'slab', owner: a.id, rect: a.rect, bottom: z - plan.slab, top: z });
-    if (a.walls.includes('x0')) {
-      out.push({
-        kind: 'wall',
-        owner: a.id,
-        side: 'x0',
-        at: x,
-        from: y,
-        to: y + d,
-        bottom: z,
-        top,
-      });
-    }
-    if (a.walls.includes('y0')) {
-      out.push({
-        kind: 'wall',
-        owner: a.id,
-        side: 'y0',
-        at: y,
-        from: x,
-        to: x + w,
-        bottom: z,
-        top,
-      });
+/** The faces the camera can see, in the order to draw them: the box's own faces never overlap. */
+export function facesOf(s: Solid): Face[] {
+  const { x0, x1, y0, y1, z0, z1 } = s.box;
+  const top: PlanRect = [x0, y0, x1 - x0, y1 - y0];
+  switch (s.kind) {
+    case 'slab':
+      return [
+        { kind: 'floor', points: quadZ(z1, top) },
+        { kind: 'slab-x', points: quadX(x1, y0, y1, z0, z1) },
+        { kind: 'slab-y', points: quadY(y1, x0, x1, z0, z1) },
+      ];
+    case 'step':
+      return [
+        { kind: 'step', points: quadZ(z1, top) },
+        { kind: 'step-x', points: quadX(x1, y0, y1, z0, z1) },
+        { kind: 'step-y', points: quadY(y1, x0, x1, z0, z1) },
+      ];
+    case 'wall-x0':
+      return [
+        { kind: 'wall-x0', points: quadX(x0, y0, y1, z0, z1) },
+        ...s.openings.map((o): Face => ({
+          kind: 'door',
+          points: quadX(x0, o.from, o.to, o.bottom, o.top),
+        })),
+      ];
+    case 'wall-y0':
+      return [
+        { kind: 'wall-y0', points: quadY(y0, x0, x1, z0, z1) },
+        ...s.openings.map((o): Face => ({
+          kind: 'door',
+          points: quadY(y0, o.from, o.to, o.bottom, o.top),
+        })),
+      ];
+  }
+}
+
+type Range = readonly [number, number];
+
+const overlaps = ([a0, a1]: Range, [b0, b1]: Range): boolean =>
+  Math.min(a1, b1) - Math.max(a0, b0) > EPS;
+
+/**
+ * A box projects to a hexagon whose edges run along the projected x, y and z axes, so two
+ * hexagons overlap exactly when their ranges of x − y, x − z and y − z all overlap.
+ */
+function screenOverlap(a: Box, b: Box): boolean {
+  const ranges = (k: Box): [Range, Range, Range] => [
+    [k.x0 - k.y1, k.x1 - k.y0],
+    [k.x0 - k.z1, k.x1 - k.z0],
+    [k.y0 - k.z1, k.y1 - k.z0],
+  ];
+  const ra = ranges(a);
+  const rb = ranges(b);
+  return ra.every((r, i) => {
+    const other = rb[i];
+    return other !== undefined && overlaps(r, other);
+  });
+}
+
+/**
+ * -1 when `a` must be drawn before `b`, 1 after, 0 when the order doesn't matter. The camera sits
+ * toward +x +y +z, so of two boxes split by a plane, the one on the low side is behind.
+ */
+function behind(a: Box, b: Box): -1 | 0 | 1 {
+  if (!screenOverlap(a, b)) return 0;
+  const axes: [number, number, number, number][] = [
+    [a.x0, a.x1, b.x0, b.x1],
+    [a.y0, a.y1, b.y0, b.y1],
+    [a.z0, a.z1, b.z0, b.z1],
+  ];
+  for (const [a0, a1, b0, b1] of axes) {
+    if (a1 <= b0 + EPS) return -1;
+    if (b1 <= a0 + EPS) return 1;
+  }
+  return 0;
+}
+
+const centreDepth = (k: Box): number =>
+  depthKey({ x: (k.x0 + k.x1) / 2, y: (k.y0 + k.y1) / 2, z: (k.z0 + k.z1) / 2 });
+
+/**
+ * Painter's order for the whole house, across storeys: a topological sort of the "is behind"
+ * relation between solids that overlap on screen, ties broken back to front. Interpenetrating
+ * boxes have no such relation and fall back to the depth key.
+ */
+export function drawOrder(solids: readonly Solid[]): Solid[] {
+  const n = solids.length;
+  const after: number[][] = solids.map(() => []);
+  const blockers = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const a = solids[i];
+      const b = solids[j];
+      if (!a || !b) continue;
+      const order = behind(a.box, b.box);
+      if (order === 0) continue;
+      const [first, second] = order < 0 ? [i, j] : [j, i];
+      after[first]?.push(second);
+      blockers[second] = (blockers[second] ?? 0) + 1;
     }
   }
-  for (const s of plan.stairs) {
-    const bottom = stairBase(s);
-    for (const step of stepsOf(s)) {
-      out.push({ kind: 'slab', owner: s.id, rect: step.rect, bottom, top: step.top });
-    }
+  const depth = solids.map((s) => centreDepth(s.box));
+  const done = new Set<number>();
+  const out: Solid[] = [];
+  while (out.length < n) {
+    const open = [...Array(n).keys()].filter((i) => !done.has(i));
+    const ready = open.filter((i) => blockers[i] === 0);
+    // A cycle can only come from interpenetrating boxes; draw the farthest of them first.
+    const pool = ready.length > 0 ? ready : open;
+    const next = pool.reduce((best, i) => ((depth[i] ?? 0) < (depth[best] ?? 0) ? i : best));
+    done.add(next);
+    const solid = solids[next];
+    if (solid) out.push(solid);
+    for (const k of after[next] ?? []) blockers[k] = (blockers[k] ?? 0) - 1;
   }
   return out;
 }

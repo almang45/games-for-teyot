@@ -119,6 +119,9 @@ export type FloorPlan = z.infer<typeof floorPlan>;
 /** Point equality slack in metres: plans are typed by hand from the denah. */
 const EPS = 1e-6;
 
+/** Stands and parking keep this far inside the walk, so a rounded px never lands on its edge. */
+export const STAND_MARGIN = 0.05;
+
 export const floorZ = (a: PlanArea): number => a.z ?? ffl(a.storey);
 
 export const ffl = (s: Storey): number => STOREYS[s].ffl;
@@ -177,8 +180,12 @@ function checkRoom(plan: FloorPlan, room: PlanRoom, i: number, a: PlanArea | und
     ['parking.bubu', room.parking.bubu],
     ['parking.ocica', room.parking.ocica],
   ];
+  const m = STAND_MARGIN;
+  const inner: PlanRect = [wx + m, wy + m, ww - 2 * m, wd - 2 * m];
   for (const [name, p] of points) {
-    if (!inPlanRect(p, walk)) issues.push(error(`${path}.${name}`, 'must lie inside the walk'));
+    if (!inPlanRect(p, inner)) {
+      issues.push(error(`${path}.${name}`, `must lie at least ${m * 100} cm inside the walk`));
+    }
   }
   return issues;
 }
@@ -210,15 +217,19 @@ export function checkPlan(plan: FloorPlan): Issue[] {
     issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a)));
   });
   plan.stairs.forEach((s, i) => {
-    if (s.from === s.to) issues.push(error(`stairs[${i}]`, 'a flight must climb: from equals to'));
+    if (s.from >= s.to) {
+      issues.push(error(`stairs[${i}]`, 'a flight climbs along rise: from must be below to'));
+    }
   });
   for (const [name, spot] of Object.entries(plan.spots)) {
     const room = plan.rooms.find((r) => r.id === spot.room);
-    const a = room && areas.get(room.area);
-    if (!a) {
+    if (!room) {
       issues.push(error(`spots.${name}.room`, `${spot.room} is not in rooms`));
       continue;
     }
+    // A room without its area is already reported under rooms[].
+    const a = areas.get(room.area);
+    if (!a) continue;
     issues.push(...checkOnWall(a, spot.wall, spot, `spots.${name}`, wallHeightOf(plan, a)));
     const depth = spot.wall === 'x0' ? a.rect[2] : a.rect[3];
     if (spot.offset >= depth) {

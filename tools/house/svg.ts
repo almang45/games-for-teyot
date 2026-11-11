@@ -3,7 +3,7 @@ import type { HouseLayout } from '../../contracts/houseLayout.ts';
 import { STOREYS } from '../../contracts/rooms.ts';
 import { project, type Fit, type Vec3 } from './iso.ts';
 import type { HiddenFloor } from './layout.ts';
-import { LAYERS, sortFaces, type Face, type FaceKind } from './scene.ts';
+import { drawOrder, facesOf, type Face, type FaceKind, type Solid } from './scene.ts';
 
 /** Neutral greys, lighter facing up and toward +x: Antigravity paints over them (ASSETS.md §4.1). */
 const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
@@ -28,29 +28,22 @@ const pts = (points: readonly Point[]): string =>
 /** Ids are kebab-case already; this keeps any other text from breaking out of the XML. */
 const esc = (s: string): string => s.replaceAll(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function faceElement(f: Face, fit: Fit): string {
-  const fill = FILL[f.kind][f.outdoor ? 1 : 0];
+function faceElement(f: Face, outdoor: boolean, fit: Fit): string {
+  const fill = FILL[f.kind][outdoor ? 1 : 0];
   const points = pts(f.points.map((p) => project(p, fit)));
-  return `<polygon data-owner="${esc(f.owner)}" data-kind="${f.kind}" points="${points}" fill="${fill}"/>`;
+  return `<polygon data-kind="${f.kind}" points="${points}" fill="${fill}"/>`;
 }
 
-/** The faces in painter's order, one group per storey and one sub-group per layer. */
-function structure(faces: readonly Face[], fit: Fit): string[] {
-  const sorted = sortFaces(faces);
-  return STOREYS.flatMap((s) => {
-    const own = sorted.filter((f) => f.storey === s.id);
-    if (own.length === 0) return [];
-    const layers = LAYERS.flatMap((layer) => {
-      const items = own.filter((f) => f.layer === layer);
-      if (items.length === 0) return [];
-      return [
-        `<g id="${s.name}-${layer}">`,
-        ...items.map((f) => `  ${faceElement(f, fit)}`),
-        '</g>',
-      ];
-    });
-    return [`<g id="${s.name}">`, ...layers.map((l) => `  ${l}`), '</g>'];
-  });
+/**
+ * One group per solid in painter's order for the whole house. Storeys interleave (a lower
+ * storey's front can cover an upper one's back), so the storey is an attribute, not a group.
+ */
+function structure(solids: readonly Solid[], fit: Fit): string[] {
+  return drawOrder(solids).flatMap((s) => [
+    `<g data-owner="${esc(s.owner)}" data-solid="${s.kind}" data-storey="${STOREYS[s.storey].name}">`,
+    ...facesOf(s).map((f) => `  ${faceElement(f, s.outdoor, fit)}`),
+    '</g>',
+  ]);
 }
 
 const open = (size: readonly [number, number]): string =>
@@ -62,7 +55,7 @@ const groupAttrs =
 
 /** The clean blockout: geometry only, no text (AGENTS.md: no text in images). */
 export function blockoutSvg(
-  faces: readonly Face[],
+  solids: readonly Solid[],
   fit: Fit,
   size: readonly [number, number],
 ): string {
@@ -70,7 +63,7 @@ export function blockoutSvg(
     '<?xml version="1.0" encoding="UTF-8"?>',
     open(size),
     `<g id="structure" ${groupAttrs}>`,
-    ...structure(faces, fit),
+    ...structure(solids, fit).map((l) => `  ${l}`),
     '</g>',
     '</svg>',
     '',
@@ -97,7 +90,7 @@ function scaleBar(fit: Fit): string[] {
 }
 
 export interface GuideInput {
-  readonly faces: readonly Face[];
+  readonly solids: readonly Solid[];
   readonly fit: Fit;
   readonly size: readonly [number, number];
   readonly layout: HouseLayout;
@@ -137,6 +130,7 @@ export function guideSvg(g: GuideInput): string {
   const edges = layout.edges.flatMap(([a, b]) => {
     const pa = nodes.get(a);
     const pb = nodes.get(b);
+    // checkHouseLayout reports edges to unknown nodes; the guide just leaves them out.
     if (!pa || !pb) return [];
     const [x1, y1] = canvas(pa);
     const [x2, y2] = canvas(pb);
@@ -164,7 +158,7 @@ export function guideSvg(g: GuideInput): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     open(g.size),
     `<g id="structure" ${groupAttrs}>`,
-    ...structure(g.faces, fit),
+    ...structure(g.solids, fit).map((l) => `  ${l}`),
     '</g>',
     ...group('guide-rooms', rooms),
     ...group('guide-hidden', hidden),

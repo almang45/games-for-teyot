@@ -5,12 +5,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout';
 import { toScreen } from '../../src/engine/iso/projection';
 import { convexHull, fitToCanvas, project, type Vec3 } from '../../tools/house/iso';
-import { CANVAS, draftLayout, focusRect } from '../../tools/house/layout';
+import { CANVAS, draftLayout, focusRect, percent } from '../../tools/house/layout';
 import { checkPlan, defaultWalk, floorPlan, type FloorPlan } from '../../tools/house/plan';
 import { runBlockout } from '../../tools/house/run';
-import { buildFaces, buildOccluders, sortFaces, stepsOf } from '../../tools/house/scene';
+import {
+  buildSolids,
+  drawOrder,
+  facesOf,
+  quadZ,
+  stepsOf,
+  type Solid,
+} from '../../tools/house/scene';
 import { blockoutSvg, guideSvg } from '../../tools/house/svg';
-import { hiddenBy, hiddenFloor } from '../../tools/house/visibility';
+import { hiddenBy, hiddenQuad } from '../../tools/house/visibility';
 
 /** A made-up two-storey house; the real plan stays in reference/ (AGENTS.md privacy rules). */
 function planInput(): Record<string, unknown> {
@@ -66,16 +73,34 @@ const plan = (patch: Record<string, unknown> = {}): FloorPlan =>
   floorPlan.parse({ ...planInput(), ...patch });
 
 function drafted(p: FloorPlan = plan()) {
-  const faces = buildFaces(p);
+  const solids = buildSolids(p);
   const fit = fitToCanvas(
-    faces.flatMap((f) => f.points),
+    solids.flatMap((s) => facesOf(s).flatMap((f) => f.points)),
     CANVAS,
     p.marginPx,
   );
-  return { faces, fit, draft: draftLayout(p, fit, buildOccluders(p)) };
+  return { solids, fit, draft: draftLayout(p, fit, solids) };
 }
 
-describe('projection', () => {
+const flight = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: 'tangga',
+  storey: 0,
+  rect: [4, 0, 1, 1],
+  rise: '+x',
+  from: 0,
+  to: 1,
+  steps: 2,
+  ...patch,
+});
+
+/** Draw-order position of the first solid of `owner` and `kind`. */
+function rank(order: readonly Solid[], owner: string, kind: Solid['kind']): number {
+  const i = order.findIndex((s) => s.owner === owner && s.kind === kind);
+  if (i < 0) throw new Error(`no ${kind} of ${owner}`);
+  return i;
+}
+
+describe('US-REF-02 projection', () => {
   it('matches the engine projection with one metre as the tile', () => {
     const fit = { scale: 150, origin: [1900, 800] as [number, number] };
     for (const p of [
@@ -141,7 +166,7 @@ describe('projection', () => {
   });
 });
 
-describe('floor plan', () => {
+describe('US-REF-02 floor plan', () => {
   it('fills defaults', () => {
     const p = plan();
     expect(p).toMatchObject({ wallHeight: 2.4, slab: 0.2, walkInset: 0.3, marginPx: 160 });
@@ -171,9 +196,7 @@ describe('floor plan', () => {
         { area: 'ruang-keluarga', wall: 'y0', at: 3.5, width: 1 },
         { area: 'kebun', wall: 'x0', at: 0, width: 0.8, height: 3 },
       ],
-      stairs: [
-        { id: 'datar', storey: 0, rect: [0, 0, 1, 1], rise: '+x', from: 1, to: 1, steps: 2 },
-      ],
+      stairs: [flight({ id: 'datar', from: 1, to: 1 }), flight({ id: 'turun', from: 1, to: 0 })],
       rooms: [
         {
           id: 'ruang-keluarga',
@@ -192,37 +215,45 @@ describe('floor plan', () => {
         },
       ],
     });
+    p.spots['sticker-wall'] = { ...p.spots['sticker-wall'], room: 'dapur' };
     const messages = checkPlan(p).map((i) => `${i.path}: ${i.message}`);
     expect(messages).toEqual(
       expect.arrayContaining([
         'areas: duplicate area kebun',
         'rooms[0].walk: walk leaves area ruang-keluarga',
-        'rooms[0].stand: must lie inside the walk',
+        'rooms[0].stand: must lie at least 5 cm inside the walk',
         'rooms[1].area: unknown area loteng',
         'doors[0].area: unknown area garasi',
         'doors[1]: runs past the end of the y0 wall of ruang-keluarga',
         'doors[2].wall: kebun has no x0 wall',
         'doors[2]: is taller than the x0 wall of kebun',
-        'stairs[0]: a flight must climb: from equals to',
-        'spots.sticker-wall.room: kamar-tidur is not in rooms',
+        'stairs[0]: a flight climbs along rise: from must be below to',
+        'stairs[1]: a flight climbs along rise: from must be below to',
+        'spots.sticker-wall.room: dapur is not in rooms',
         'spots.fridge.offset: stands outside area ruang-keluarga',
       ]),
     );
   });
 
+  it('keeps stands and parking off the edge of the walk', () => {
+    const [living, bedroom] = planInput().rooms as Record<string, unknown>[];
+    // The default walk starts 0.3 m from the x0 wall: on its edge is too close.
+    const edge = { ...living, stand: [0.3, 1.5], parking: { bubu: [0.36, 1], ocica: [2, 2] } };
+    const paths = checkPlan(plan({ rooms: [edge, bedroom] })).map((i) => i.path);
+    expect(paths).toEqual(['rooms[0].stand']);
+  });
+
+  it('reports a room without its area once, not again for its spot', () => {
+    const [living, bedroom] = planInput().rooms as Record<string, unknown>[];
+    const issues = checkPlan(plan({ rooms: [living, { ...bedroom, area: 'loteng' }] }));
+    expect(issues.map((i) => i.path)).toEqual(['rooms[1].area']);
+  });
+
   it('reports duplicate rooms, stairs and shared floors', () => {
     const input = planInput();
     const [living] = input.rooms as object[];
-    const flight = {
-      id: 'tangga',
-      storey: 0,
-      rect: [0, 0, 1, 1],
-      rise: '+x',
-      from: 0,
-      to: 1,
-      steps: 2,
-    };
-    const messages = checkPlan(plan({ rooms: [living, living], stairs: [flight, flight] })).map(
+    const stair = flight({ rect: [0, 0, 1, 1] });
+    const messages = checkPlan(plan({ rooms: [living, living], stairs: [stair, stair] })).map(
       (i) => i.message,
     );
     expect(messages).toEqual(
@@ -235,7 +266,7 @@ describe('floor plan', () => {
   });
 });
 
-describe('scene', () => {
+describe('US-REF-02 scene', () => {
   it('splits a flight into steps along its rise', () => {
     const flight = {
       id: 't',
@@ -251,30 +282,59 @@ describe('scene', () => {
     expect(stepsOf({ ...flight, rise: '-y' })[3]).toEqual({ rect: [0, 0, 2, 0.25], top: 1 });
   });
 
-  it('draws floors, back walls, doors and steps in painter order', () => {
-    const flight = {
-      id: 'tangga',
-      storey: 0,
-      rect: [4, 0, 1, 1],
-      rise: '+x',
-      from: 0,
-      to: 1,
-      steps: 2,
-    };
-    const faces = sortFaces(buildFaces(plan({ stairs: [flight] })));
-    const kinds = faces.map((f) => `${f.storey}:${f.layer}:${f.kind}`);
-    expect(kinds.filter((k) => k.endsWith(':door'))).toEqual(['0:doors:door']);
-    expect(kinds.filter((k) => k.includes(':stairs:'))).toHaveLength(6);
-    expect(kinds.indexOf('0:walls:wall-x0')).toBeGreaterThan(kinds.lastIndexOf('0:floors:floor'));
-    expect(kinds.at(-1)).toMatch(/^2:/);
-    // A storey draws back to front.
-    const floors = faces.filter((f) => f.storey === 0 && f.kind === 'floor').map((f) => f.owner);
-    expect(floors).toEqual(['ruang-keluarga', 'kebun']);
+  it('keeps a wall and its doors together, doors last', () => {
+    const wall = buildSolids(plan()).find(
+      (x) => x.kind === 'wall-x0' && x.owner === 'ruang-keluarga',
+    );
+    if (!wall) throw new Error('fixture has no living x0 wall');
+    expect(facesOf(wall).map((f) => f.kind)).toEqual(['wall-x0', 'door']);
+  });
+
+  it('draws a step in front of a back wall after the wall and its door', () => {
+    const order = drawOrder(buildSolids(plan({ stairs: [flight({ rect: [0.2, 1, 0.5, 0.5] })] })));
+    expect(rank(order, 'tangga', 'step')).toBeGreaterThan(rank(order, 'ruang-keluarga', 'wall-x0'));
+  });
+
+  it('orders across storeys: a mezzanine behind a ground-floor wall draws first', () => {
+    const areas = [
+      ...(planInput().areas as object[]),
+      { id: 'mezanin', storey: 1, rect: [-1, 0, 1, 1] },
+    ];
+    const order = drawOrder(buildSolids(plan({ areas })));
+    expect(rank(order, 'mezanin', 'slab')).toBeLessThan(rank(order, 'ruang-keluarga', 'wall-x0'));
+  });
+
+  it('draws a wide slab behind before a small one in front, whatever their centres', () => {
+    const p = plan();
+    const order = drawOrder(
+      buildSolids({
+        ...p,
+        areas: [
+          { id: 'teras', storey: 0, rect: [0, 0, 10, 1], walls: [], outdoor: false },
+          { id: 'ruang-keluarga', storey: 0, rect: [0, 1, 1, 1], walls: [], outdoor: false },
+        ],
+        doors: [],
+      }),
+    );
+    // By centre depth the small slab (x + y = 2) would come before the wide one (5.5).
+    expect(rank(order, 'teras', 'slab')).toBeLessThan(rank(order, 'ruang-keluarga', 'slab'));
+  });
+
+  it('still draws everything when boxes interpenetrate', () => {
+    const solids = buildSolids(plan({ stairs: [flight({ rect: [-0.5, 0.5, 1, 1], from: -0.5 })] }));
+    expect(drawOrder(solids)).toHaveLength(solids.length);
+  });
+
+  it('refuses a door whose area is missing', () => {
+    const p = plan();
+    expect(() =>
+      buildSolids({ ...p, doors: [{ area: 'garasi', wall: 'x0', at: 0, width: 1, height: 2 }] }),
+    ).toThrow('run checkPlan first');
   });
 });
 
-describe('visibility', () => {
-  const occluders = buildOccluders(
+describe('US-REF-02 visibility', () => {
+  const solids = buildSolids(
     plan({
       areas: [
         ...(planInput().areas as object[]),
@@ -285,41 +345,39 @@ describe('visibility', () => {
 
   it('hides floor behind a higher slab along the camera ray', () => {
     // (0.5, 0.5, 0) lands on the same pixel as (3.9, 3.9, 3.4), on the balcony.
-    expect(hiddenBy({ x: 0.5, y: 0.5, z: 0 }, occluders)?.owner).toBe('balkon');
-    expect(hiddenBy({ x: 2, y: 2, z: 0 }, occluders)).toBeUndefined();
+    expect(hiddenBy({ x: 0.5, y: 0.5, z: 0 }, solids)?.owner).toBe('balkon');
+    expect(hiddenBy({ x: 2, y: 2, z: 0 }, solids)).toBeUndefined();
   });
 
   it('hides what stands behind a back wall, never the wall’s own room', () => {
     // The bedroom's x0 wall stands at x = -3.4, y -3.4 to -0.4, z 3.4 to 5.8.
-    expect(hiddenBy({ x: -4, y: -2, z: 3 }, occluders)?.owner).toBe('kamar-tidur');
-    expect(hiddenBy({ x: -3.3, y: -2, z: 3.4 }, occluders)).toBeUndefined();
+    expect(hiddenBy({ x: -4, y: -2, z: 3 }, solids)?.owner).toBe('kamar-tidur');
+    expect(hiddenBy({ x: -3.3, y: -2, z: 3.4 }, solids)).toBeUndefined();
+  });
+
+  it('sees through a door, not past its jamb', () => {
+    // The living room's x0 door runs y 1 to 1.9 at x = 0; the ray from x = -0.5 meets it at t = 0.5.
+    expect(hiddenBy({ x: -0.5, y: 1, z: 0.5 }, solids)).toBeUndefined();
+    expect(hiddenBy({ x: -0.5, y: 0, z: 0.5 }, solids)?.kind).toBe('wall-x0');
   });
 
   it('hides floor behind a flight of stairs', () => {
-    const flight = {
-      id: 'tangga',
-      storey: 0,
-      rect: [4, 0, 1, 1],
-      rise: '+x',
-      from: 0,
-      to: 1,
-      steps: 2,
-    };
-    const withStairs = buildOccluders(plan({ stairs: [flight] }));
+    const withStairs = buildSolids(plan({ stairs: [flight()] }));
     // (3.8, 0.2, 0) lands on (4.3, 0.7, 0.5): inside the first step, whose tread is at 0.5.
     expect(hiddenBy({ x: 3.8, y: 0.2, z: 0 }, withStairs)?.owner).toBe('tangga');
   });
 
-  it('measures the hidden share of a floor', () => {
-    const hidden = hiddenFloor([0, 0, 4, 3], 0, occluders);
+  it('measures the hidden share of a quad', () => {
+    const hidden = hiddenQuad(quadZ(0, [0, 0, 4, 3]), solids);
     expect(hidden.fraction).toBeGreaterThan(0);
     expect(hidden.fraction).toBeLessThan(0.2);
     expect(hidden.by).toEqual(['balkon']);
-    expect(hiddenFloor([2, 2, 1, 1], 0, occluders).points).toEqual([]);
+    expect(hiddenQuad(quadZ(0, [2, 2, 1, 1]), solids).points).toEqual([]);
+    expect(() => hiddenQuad([], solids)).toThrow('four corners');
   });
 });
 
-describe('draft layout', () => {
+describe('US-REF-02 draft layout', () => {
   it('passes the house layout contract', () => {
     const { draft } = drafted();
     const parsed = houseLayout.parse(draft.layout);
@@ -362,15 +420,20 @@ describe('draft layout', () => {
     const covered = drafted(
       plan({ areas: [...areas, { id: 'atap', storey: 3, z: 6, rect: [7, 7, 2, 2] }] }),
     );
-    const shaded = drafted(
-      plan({ areas: [...areas, { id: 'atap-kulkas', storey: 3, z: 6, rect: [5, 4, 2, 2] }] }),
+    // A shelf on the fridge's own storey hides it; a roof above does not: it fades in the zoom.
+    const shelf = drafted(
+      plan({ areas: [...areas, { id: 'rak', storey: 0, z: 2.2, rect: [1.5, 0.5, 1, 1] }] }),
     );
-    expect(shaded.draft.issues).toContainEqual(
+    expect(shelf.draft.issues).toContainEqual(
       expect.objectContaining({
         path: 'spots.fridge',
-        message: expect.stringMatching(/^\d+% hidden behind atap-kulkas$/) as unknown,
+        message: expect.stringMatching(/^\d+% hidden behind rak$/) as unknown,
       }),
     );
+    const roof = drafted(
+      plan({ areas: [...areas, { id: 'atap-kulkas', storey: 3, z: 6, rect: [5, 4, 2, 2] }] }),
+    );
+    expect(roof.draft.issues.map((i) => i.path)).not.toContain('spots.fridge');
 
     const paths = covered.draft.issues.map((i) => i.path);
     expect(paths).toEqual(expect.arrayContaining(['rooms[0].stand', 'rooms[0].parking.bubu']));
@@ -398,31 +461,58 @@ describe('draft layout', () => {
       [10, 400],
     ]);
     expect(tw / th).toBeCloseTo(1.6, 1);
+    // Against the far corner, rounding must not push the rect past the frame.
+    for (let d = 0; d < 1; d += 0.1) {
+      const [ex, ey, ew, eh] = focusRect([
+        [1700 + d, 1050 + d],
+        [1919.6, 1050 + d],
+        [1919.6, 1199.7],
+      ]);
+      expect(ex + ew).toBeLessThanOrEqual(1920);
+      expect(ey + eh).toBeLessThanOrEqual(1200);
+    }
+  });
+
+  it('puts a waypoint on the floor of the area under it', () => {
+    const waypoints = [
+      ...(planInput().waypoints as object[]),
+      { id: 'kebun', at: [5, 1], storey: 0 },
+      { id: 'luar', at: [20, 20], storey: 0 },
+    ];
+    const { fit, draft } = drafted(plan({ waypoints }));
+    const pos = (p: Vec3): [number, number] => {
+      const [x, y] = project(p, fit);
+      return [Math.round(x / 2), Math.round(y / 2)];
+    };
+    const byId = new Map(draft.layout.waypoints.map((w) => [w.id, w.pos]));
+    expect(byId.get('kebun')).toEqual(pos({ x: 5, y: 1, z: -0.2 }));
+    expect(byId.get('luar')).toEqual(pos({ x: 20, y: 20, z: 0 }));
+  });
+
+  it('never rounds a sliver to 0 % or a near miss to 100 %', () => {
+    expect([0, 0.001, 0.5, 0.999, 1].map(percent)).toEqual(['0%', '<1%', '50%', '>99%', '100%']);
   });
 });
 
-describe('svg', () => {
-  it('draws the clean blockout without text, one group per storey and layer', () => {
-    const { faces, fit } = drafted();
-    const svg = blockoutSvg(faces, fit, CANVAS);
+describe('US-REF-02 svg', () => {
+  it('draws the clean blockout without text, one group per solid in draw order', () => {
+    const { solids, fit } = drafted();
+    const svg = blockoutSvg(solids, fit, CANVAS);
     expect(svg).toContain('width="3840" height="2400"');
     expect(svg).not.toContain('<text');
-    for (const id of [
-      'lt-dasar',
-      'lt-dasar-floors',
-      'lt-dasar-walls',
-      'lt-dasar-doors',
-      'lt-atas',
-    ]) {
-      expect(svg).toContain(`<g id="${id}">`);
-    }
+    expect(svg).toContain('<g id="structure"');
+    expect(svg).toMatch(
+      /<g data-owner="ruang-keluarga" data-solid="wall-x0" data-storey="lt-dasar">\n\s*<polygon data-kind="wall-x0"[^>]*>\n\s*<polygon data-kind="door"/,
+    );
+    expect(svg).toContain('data-storey="lt-atas"');
     expect(svg).not.toContain('mezzanine-1');
+    expect(svg.match(/<g data-owner=/g)).toHaveLength(solids.length);
   });
 
   it('adds the layout, labels and scale to the guide', () => {
-    const { faces, fit, draft } = drafted();
+    const { solids, fit, draft } = drafted();
     const svg = guideSvg({
-      faces,
+      solids,
       fit,
       size: CANVAS,
       layout: draft.layout,
@@ -443,7 +533,7 @@ describe('svg', () => {
   });
 });
 
-describe('runBlockout', () => {
+describe('US-REF-02 runBlockout', () => {
   let root: string;
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'rct-blockout-'));
