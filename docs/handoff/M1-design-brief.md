@@ -138,10 +138,12 @@ review them in GitHub.
   area.
 
 ### `SCR-COLOR-PICK` and `SCR-COLOR`: coloring (living room)
-- **Pick**: 2–3 big thumbnails of unlocked pages (≥ 320 dp). Locked pages are shown sleepy.
+- **Pick**: big thumbnails of the unlocked pages (≥ 160 dp, so all 5 still fit in two rows on the
+  phone). Locked pages are shown sleepy.
 - **Color**:
   - the page (line art per `ASSETS.md` §6)
-  - a palette of 8–10 big swatches, ≥ 96 dp each
+  - a palette of 6 big swatches, ≥ 96 dp each (10 don't fit beside the page on the phone; the
+    contract change is #12)
   - the selected-swatch indicator
   - the "oops" undo button (≥ 96 dp)
   - a "done" moment when ≥ 80% of the page is filled
@@ -350,11 +352,22 @@ checks every tap area in dp on the phone. What changes for design:
   The corridor gets a floor in millimetres from the spike; specify the guide and the corridor
   look so they still read when the corridor is at that floor.
 
-Questions for Antigravity (answer in the PR):
+Questions for Antigravity (answered in PR #11):
 1. With the phone as the main device, is the recommendation in §7 Q2 (the tablet composition
-   extended at the sides) still right? It's mine too, unless you see a problem.
+   extended at the sides) still right?
+   - **Answer: yes.** One 16:10 geometry for every device. On the phone the zoomed room view
+     shows the neighbouring doorways and rooms at the edges, which is what tap-to-pan needs,
+     and the 2688 × 1200 `house.bg` and `house.sky` cover the 20:9 width.
 2. Does any M1 screen need a phone-specific arrangement beyond what the `phone` layouts in
    `design/layouts/` already allow?
+   - **Answer: no.** `devices.phone` sets its own bounds and `hit` per element, and the
+     validator enforces 210 / 280 frame px (72 / 96 dp) on the phone. `SCR-TRACE` gets a
+     trace area of about 900 × 900 frame px, with the companion and HUD at the sides.
+
+Sizes fixed on the way (Claude): two sizes in §3 were set for the tablet and don't fit a phone
+that is 412 dp tall. The `SCR-COLOR-PICK` thumbnails drop from ≥ 320 dp to ≥ 160 dp, and
+`SCR-COLOR` gets 6 swatches instead of 8–10, as Antigravity already planned (`color.swatches`
+goes from 10 to 6 in #12).
 
 ## 8. Sign-off
 
