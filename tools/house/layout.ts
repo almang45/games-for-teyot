@@ -74,8 +74,37 @@ function spotFace(spot: PlanSpot, a: PlanArea): Vec3[] {
   const z = floorZ(a) + spot.bottom;
   const [x, y] = a.rect;
   return spot.wall === 'x0'
-    ? quadX(x, y + spot.at, y + spot.at + spot.width, z, z + spot.height)
-    : quadY(y, x + spot.at, x + spot.at + spot.width, z, z + spot.height);
+    ? quadX(x + spot.offset, y + spot.at, y + spot.at + spot.width, z, z + spot.height)
+    : quadY(y + spot.offset, x + spot.at, x + spot.at + spot.width, z, z + spot.height);
+}
+
+/** Share of a wall-parallel quad (bottom edge first) hidden, sampled on a grid of cell centres. */
+function hiddenFace(
+  face: readonly Vec3[],
+  occluders: readonly Occluder[],
+  cells = 6,
+): { fraction: number; by: string[] } {
+  const [p0, p1, , p3] = face;
+  if (!p0 || !p1 || !p3) throw new Error('a spot face needs four corners');
+  const by = new Set<string>();
+  let hidden = 0;
+  for (let i = 0; i < cells; i++) {
+    for (let j = 0; j < cells; j++) {
+      const u = (i + 0.5) / cells;
+      const v = (j + 0.5) / cells;
+      const p = {
+        x: p0.x + u * (p1.x - p0.x) + v * (p3.x - p0.x),
+        y: p0.y + u * (p1.y - p0.y) + v * (p3.y - p0.y),
+        z: p0.z + u * (p1.z - p0.z) + v * (p3.z - p0.z),
+      };
+      const o = hiddenBy(p, occluders);
+      if (o) {
+        hidden++;
+        by.add(o.owner);
+      }
+    }
+  }
+  return { fraction: hidden / cells ** 2, by: [...by].sort((x, y) => x.localeCompare(y)) };
 }
 
 const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
@@ -154,16 +183,15 @@ export function draftLayout(
     const a = areas.get(plan.rooms.find((r) => r.id === s.room)?.area ?? '');
     if (!a) throw new Error(`spots.${name}: ${s.room} has no area; run checkPlan first`);
     const face = spotFace(s, a);
-    const centre = face.reduce(
-      (c, p) => ({ x: c.x + p.x / 4, y: c.y + p.y / 4, z: c.z + p.z / 4 }),
-      {
-        x: 0,
-        y: 0,
-        z: 0,
-      },
-    );
-    const o = [...face, centre].map((p) => hiddenBy(p, occluders)).find((x) => x !== undefined);
-    if (o) issues.push(warning(`spots.${name}`, `partly hidden behind ${o.owner}`));
+    const covered = hiddenFace(face, occluders);
+    if (covered.fraction > 0) {
+      issues.push(
+        warning(
+          `spots.${name}`,
+          `${percent(covered.fraction)} hidden behind ${covered.by.join(', ')}`,
+        ),
+      );
+    }
     return { room: s.room, rect: bounds(face.map((p) => toLayout(p, fit))) };
   };
 

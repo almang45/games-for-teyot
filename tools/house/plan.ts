@@ -81,6 +81,8 @@ export const planSpot = z.strictObject({
   /** Height of the bottom edge above the floor. */
   bottom: metres.nonnegative(),
   height: length,
+  /** Distance in front of the wall, for furniture against it: the fridge door, not the wall. */
+  offset: metres.nonnegative().default(0),
 });
 export type PlanSpot = z.infer<typeof planSpot>;
 
@@ -218,6 +220,10 @@ export function checkPlan(plan: FloorPlan): Issue[] {
       continue;
     }
     issues.push(...checkOnWall(a, spot.wall, spot, `spots.${name}`, wallHeightOf(plan, a)));
+    const depth = spot.wall === 'x0' ? a.rect[2] : a.rect[3];
+    if (spot.offset >= depth) {
+      issues.push(error(`spots.${name}.offset`, `stands outside area ${a.id}`));
+    }
   }
   return issues;
 }

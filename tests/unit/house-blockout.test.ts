@@ -162,7 +162,9 @@ describe('floor plan', () => {
 
   it('reports what the schema cannot', () => {
     const input = planInput();
+    const spots = input.spots as Record<string, object>;
     const p = plan({
+      spots: { ...spots, fridge: { ...spots.fridge, offset: 3 } },
       areas: [...(input.areas as object[]), { id: 'kebun', storey: 0, rect: [0, 0, 1, 1] }],
       doors: [
         { area: 'garasi', wall: 'x0', at: 0, width: 1 },
@@ -203,6 +205,7 @@ describe('floor plan', () => {
         'doors[2]: is taller than the x0 wall of kebun',
         'stairs[0]: a flight must climb: from equals to',
         'spots.sticker-wall.room: kamar-tidur is not in rooms',
+        'spots.fridge.offset: stands outside area ruang-keluarga',
       ]),
     );
   });
@@ -326,6 +329,19 @@ describe('draft layout', () => {
     expect(draft.layout.occluders).toEqual([]);
   });
 
+  it('moves a spot in front of its wall by its offset', () => {
+    const spots = planInput().spots as Record<string, object>;
+    const atWall = drafted().draft.layout.spots.fridge.rect;
+    const inFront = drafted(plan({ spots: { ...spots, fridge: { ...spots.fridge, offset: 0.6 } } }))
+      .draft.layout.spots.fridge.rect;
+    // Away from a y0 wall is toward the viewer's lower left: smaller x, larger y on screen.
+    expect(inFront[0]).toBeLessThan(atWall[0]);
+    expect(inFront[1]).toBeGreaterThan(atWall[1]);
+    // Same size, to the whole-pixel rounding of the layout.
+    expect(Math.abs(inFront[2] - atWall[2])).toBeLessThanOrEqual(1);
+    expect(Math.abs(inFront[3] - atWall[3])).toBeLessThanOrEqual(1);
+  });
+
   it('puts the stand where the projection puts it, in half-size space', () => {
     const { fit, draft } = drafted();
     const [x, y] = project({ x: 2, y: 1.5, z: 0 }, fit);
@@ -346,6 +362,16 @@ describe('draft layout', () => {
     const covered = drafted(
       plan({ areas: [...areas, { id: 'atap', storey: 3, z: 6, rect: [7, 7, 2, 2] }] }),
     );
+    const shaded = drafted(
+      plan({ areas: [...areas, { id: 'atap-kulkas', storey: 3, z: 6, rect: [5, 4, 2, 2] }] }),
+    );
+    expect(shaded.draft.issues).toContainEqual(
+      expect.objectContaining({
+        path: 'spots.fridge',
+        message: expect.stringMatching(/^\d+% hidden behind atap-kulkas$/) as unknown,
+      }),
+    );
+
     const paths = covered.draft.issues.map((i) => i.path);
     expect(paths).toEqual(expect.arrayContaining(['rooms[0].stand', 'rooms[0].parking.bubu']));
   });
