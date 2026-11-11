@@ -22,6 +22,7 @@
     "validate:design": "node tools/validate/validate-design.ts",
     "validate:assets": "node tools/validate/validate-assets.ts",
     "contracts:schema": "node tools/validate/write-schemas.ts",
+    "house:blockout": "node tools/house/blockout.ts",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
