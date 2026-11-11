@@ -65,8 +65,8 @@ handoffs are defined in [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 - Conventional Commits. Antigravity uses scopes such as `feat(assets): …`, `feat(ui): …`,
   `fix(design): …`.
 - One concern per PR, linked to its milestone tracking issue, with the phase label.
-- Visual PRs include screenshots on both the tablet (1920 × 1200) and phone (2400 × 1080)
-  viewports.
+- Visual PRs include screenshots on both the phone (2400 × 1080, Theia's main device) and tablet
+  (1920 × 1200) viewports.
 - CI must be green: lint → test → build → validate (design + assets) → SAST → quality gate.
 
 ## Definition of done (for each PR)

@@ -17,7 +17,7 @@ Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`AS
 | Storage | IndexedDB via `idb` | Structured progress and stroke replays. Larger quota than localStorage. |
 | Validation | `zod` | Asset manifest, content files, and imported progress JSON are validated at load time |
 | Unit tests | Vitest | Tracing scorer, scheduler, nav graph, schema |
-| E2E | Playwright, Android tablet and phone viewport emulation, touch enabled | Smoke tests per room |
+| E2E | Playwright, Android phone and tablet viewport emulation, touch enabled | Smoke tests per room |
 | Lint/format | ESLint (`typescript-eslint` strict), Prettier | |
 | Hosting | Cloudflare Workers, static assets | Free tier, global edge, preview versions per PR |
 | Auth | Cloudflare Access (family Google accounts) | Her likeness and our voices are not public |
@@ -122,7 +122,7 @@ Glyphs are **centerline strokes**, not font outlines. Each one is hand-authored 
 
 | Mode | Used for | Behaviour |
 |---|---|---|
-| **Follow** | T0, and step 2 of new glyphs | A "lead ball" sits at the stroke head. It advances only when her finger is within the corridor *ahead* of it, so she cannot go wrong, only stall. Best fit for age 3. |
+| **Follow** | T0, and step 2 of new glyphs | A "lead ball" sits at the stroke head. It advances only when her finger is within the corridor *ahead* of it, so she cannot go wrong, only stall. Best fit for age 3. The corridor is set in glyph heights, but never narrower on screen than a floor in millimetres (set by the spike), because glyphs on the phone are about 2.5× smaller than on the tablet. |
 | **Score** | Steps 3–4 | She draws freely, and the finished stroke is scored as in §4.3 |
 
 Input handling:
@@ -197,12 +197,13 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 - Tapping a room while walking **retargets** the path from the current position.
 - Arriving at the room plays the room greeting voice clip, then starts the activity scene.
 - **Camera**:
-  - **Overview**: the whole diorama. Default on the tablet.
+  - **Overview**: the whole diorama. Default on the tablet and the laptops.
   - **On arrival**: a smooth zoom (about 600 ms) into the room's `focus` rect. The room fills the
     screen like one of the sticker-book scenes, then the activity starts.
   - **Leaving**: zooms back out.
-  - **Phone**: the overview opens zoomed to the current room. Drag to pan with inertia,
-    pinch-out shows the whole house.
+  - **Phone** (the main device): the overview opens zoomed to the current room. Drag to pan with
+    inertia. Tapping a room that is partly on screen pans to it, so she never needs to pinch.
+    Pinch-out shows the whole house.
 
 ## 7. Audio engine
 
@@ -316,7 +317,7 @@ Secrets:
 | Each room bundle (atlas + audio sprite, all files under its `rooms/<id>` and `audio/rooms/<id>`) | ≤ 4 MB |
 | Total offline cache, M3 | ≤ 60 MB |
 | Texture atlas | ≤ 2048 × 2048 (low-end Android GPUs) |
-| Frame rate | 60 fps on a mid-range Android tablet. Tracing input latency < 30 ms. |
+| Frame rate | 60 fps on Mama's Galaxy A52s (mid-range phone, the main device). Tracing input latency < 30 ms. |
 
 ## 11. Observability (on-device only)
 

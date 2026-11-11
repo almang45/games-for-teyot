@@ -5,7 +5,7 @@
 | From → To | Claude → Antigravity |
 | Gate | 1 (end of Phase 1). Starts Phase 2 for M1. |
 | Inputs | [`../PRD.md`](../PRD.md) §6–§9, [`../ASSETS.md`](../ASSETS.md), [`../WORKFLOW.md`](../WORKFLOW.md) §3–§4, `reference/` (local symlink to the family's Google Drive folder) |
-| Devices | **Design frame 1920 × 1200 (16:10)**, matching Theia's **Samsung Galaxy Tab S10+** (primary, 2800 × 1752) and both laptops (MacBook M4, Lenovo 14", mouse/trackpad, no touch). **Phones** (Pixel 6, Galaxy A52s, 2400 × 1080, 20:9): the whole frame is scaled to the screen height, and the extra width on each side is decoration only. The house view opens zoomed to a room. Landscape only. |
+| Devices | **Main device: Mama's Galaxy A52s** (2400 × 1080, 20:9); Papa's Pixel 6 is the same size. Occasional: the **Galaxy Tab S10+** (2800 × 1752) and both laptops (MacBook M4, Lenovo 14", mouse/trackpad, no touch). **Design frame 1920 × 1200 (16:10)**: on the phones the whole frame is scaled to the screen height, and the extra width on each side is decoration only. The house view opens zoomed to a room on the phone. Landscape only. See §7a. |
 
 This brief says **what** each screen must achieve and what it contains. **How it looks** is
 Antigravity's call, within the art direction in `ASSETS.md` §2 and the design rules in `PLAN.md` §2.
@@ -59,10 +59,10 @@ review them in GitHub.
 | 2 | Family sheet: Theia, Mama, Papa, Bubu, Ocica at relative scale, front / three-quarter / side | `design/concepts/M1/02-family-sheet.png` → final `assets/style/` | Papa and Mama |
 | 3 | Isometric house concept painted over Claude's blockout (`npm run house:blockout`), with the 3 M1 rooms marked | `design/concepts/M1/03-house.png` | Papa and Mama |
 | 4 | Design tokens + `ui/` components (§5) | `design/tokens.json`, `ui/` | Claude checks contracts |
-| 5 | Mockups for every screen in §3, every state, tablet and phone | `design/mockups/<screen-id>/` | Papa |
+| 5 | Mockups for every screen in §3, every state, phone and tablet | `design/mockups/<screen-id>/` | Papa, on Mama's phone |
 | 6 | Layout JSON per game screen | `design/layouts/<screen-id>.json` | Claude checks contracts |
 | 7 | Motion spec + reference GIFs for the key moments (§4) | `design/motion.json`, `design/motion/` | Papa |
-| 8 | Clickable prototype of the M1 main flow on mock data | `prototype/` (`npm run proto`) | Papa, on the tablet |
+| 8 | Clickable prototype of the M1 main flow on mock data | `prototype/` (`npm run proto`) | Papa, on Mama's phone |
 | 9 | Production assets (§6) | `assets/` + `manifest.json` | Validators + checklist |
 
 ## 3. Screens
@@ -138,10 +138,12 @@ review them in GitHub.
   area.
 
 ### `SCR-COLOR-PICK` and `SCR-COLOR`: coloring (living room)
-- **Pick**: 2–3 big thumbnails of unlocked pages (≥ 320 dp). Locked pages are shown sleepy.
+- **Pick**: big thumbnails of the unlocked pages (≥ 160 dp, so all 5 still fit in two rows on the
+  phone). Locked pages are shown sleepy.
 - **Color**:
   - the page (line art per `ASSETS.md` §6)
-  - a palette of 8–10 big swatches, ≥ 96 dp each
+  - a palette of 6 big swatches, ≥ 96 dp each (10 don't fit beside the page on the phone; the
+    contract change is #12)
   - the selected-swatch indicator
   - the "oops" undo button (≥ 96 dp)
   - a "done" moment when ≥ 80% of the page is filled
@@ -333,6 +335,39 @@ Answer inline at the Phase 2 kickoff. The numbers stay stable.
    - *Status: Resolved.* Confirmed by Claude: ink fades out (~400 ms), Ocica `comfort` animation and narrator hint ("Hampir! Coba lagi ya.") play simultaneously. Bubu's demo step replays only after the spoken clip ends, respecting US-AUD-01 (no overlapping voice clips).
 4. **Asset validation tooling during Phase 2**:
    - *Status: Resolved.* Confirmed by Claude: `npm run validate:design` and `npm run validate:assets` ship in the contracts v1 PR (M0), available for local verification before Phase 2 begins.
+
+## 7a. Update 2026-11-11: the phone is the main device
+
+Papa: Theia plays mostly on **Mama's Galaxy A52s**. The tablet is an occasional backup. The
+contracts don't change: the 1920 × 1200 frame stays, and `contracts/screenLayout.ts` already
+checks every tap area in dp on the phone. What changes for design:
+
+- **Phone first.** Design and review every mockup at 2400 × 1080 first. Papa reviews on Mama's
+  phone. The frame shows about 6.8 cm tall there, about 2.5× smaller than on the tablet, so
+  check that details, faces and the follow ball still read at that size.
+- **House view on the phone** opens zoomed to her room (US-HOUSE-05). A 3-year-old can't
+  pinch reliably, so tapping a room that is partly on screen pans to it. Show enough of the
+  neighbouring rooms at the edges that she sees where she can go.
+- **Tracing on the phone** uses the full height, with the decoration at the sides (as before).
+  The corridor gets a floor in millimetres from the spike; specify the guide and the corridor
+  look so they still read when the corridor is at that floor.
+
+Questions for Antigravity (answered in PR #11):
+1. With the phone as the main device, is the recommendation in §7 Q2 (the tablet composition
+   extended at the sides) still right?
+   - **Answer: yes.** One 16:10 geometry for every device. On the phone the zoomed room view
+     shows the neighbouring doorways and rooms at the edges, which is what tap-to-pan needs,
+     and the 2688 × 1200 `house.bg` and `house.sky` cover the 20:9 width.
+2. Does any M1 screen need a phone-specific arrangement beyond what the `phone` layouts in
+   `design/layouts/` already allow?
+   - **Answer: no.** `devices.phone` sets its own bounds and `hit` per element, and the
+     validator enforces 210 / 280 frame px (72 / 96 dp) on the phone. `SCR-TRACE` gets a
+     trace area of about 900 × 900 frame px, with the companion and HUD at the sides.
+
+Sizes fixed on the way (Claude): two sizes in §3 were set for the tablet and don't fit a phone
+that is 412 dp tall. The `SCR-COLOR-PICK` thumbnails drop from ≥ 320 dp to ≥ 160 dp, and
+`SCR-COLOR` gets 6 swatches instead of 8–10, as Antigravity already planned (`color.swatches`
+goes from 10 to 6 in #12).
 
 ## 8. Sign-off
 

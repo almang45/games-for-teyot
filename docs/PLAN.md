@@ -13,7 +13,7 @@ Status: **planning**. No code yet.
 | Item | Decision |
 |---|---|
 | Player | Our daughter, 3 years old. Already knows numbers and some letters. Cannot read instructions. |
-| Devices | Android tablet (**main device**) and Android phone, landscape, touch only, no stylus. **Secondary**: MacBook and Windows laptop, **no touchscreen** (mouse or trackpad). Tracing practice only counts on touch devices. |
+| Devices | Mama's Android phone (**main device**), plus Papa's phone and an Android tablet now and then. Landscape, touch only, no stylus. **Secondary**: MacBook and Windows laptop, **no touchscreen** (mouse or trackpad). Tracing practice only counts on touch devices. |
 | Language | Bahasa Indonesia for everything she sees and hears. The parent area may mix in English. |
 | Voice | Recorded by Papa and Mama. No text-to-speech in the kid-facing game. |
 | World | Our real house layout, drawn as an **isometric cutaway diorama** in the style of the sticker-book dollhouses she loves. The character is a stylized version of her. |
@@ -217,7 +217,7 @@ a playtest with her. Her reaction decides what changes next, not this document.
 - Repo scaffold, CI/CD to Cloudflare, installable offline app shell
 - Placeholder art generated in code
 - Asset manifest contract with Antigravity, and the audio recording script for Papa and Mama
-- **Done when**: the app installs on the tablet, opens offline, and plays a test voice clip on the
+- **Done when**: the app installs on Mama's phone, opens offline, and plays a test voice clip on the
   first tap.
 
 ### M1: First playable version (about 3 rooms)
@@ -269,7 +269,7 @@ The game uses her likeness, our house layout, and our voices.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Tracing too strict or too loose | Frustration, or no learning | Tolerance adapts to her success rate. Parent override. Snap-to-path. Real playtests from M1. |
-| Small phone screen | Tracing area cramped | Tablet is the main device. On the phone, tracing fills the full height, house view zooms and pans. |
+| Small phone screen | Tracing area cramped, and the phone is the main device | Tracing fills the full height, with a corridor floor in millimetres set by the spike. The house view zooms and pans without needing a pinch. Touch targets are checked in dp on the phone (`contracts/`). |
 | Chrome clears stored data | Progress lost | Ask the browser for persistent storage. JSON export. Optional D1 sync. |
 | AI-generated art inconsistent across rooms | World looks patchy | Style guide plus a locked character reference sheet. Every asset reviewed against the reference sheet before merge. See `ASSETS.md`. |
 | AI line art has gaps | Tap-to-fill leaks color | Gap-closing pass when the page loads, plus validation in CI (`ASSETS.md` §6) |
@@ -291,7 +291,8 @@ Decided (2026-11-07):
 - The parents are **Mama** and **Papa**, and Mama is the default narrator.
 - The game's name is **Rumah Cici Theia**.
 - (2026-11-09, PR #2 review) The voice lines call her **"Theia"**.
-  - Devices: Galaxy Tab S10+ (primary), Pixel 6, Galaxy A52s, MacBook M4, Lenovo 14".
+  - Devices: Galaxy Tab S10+, Pixel 6, Galaxy A52s, MacBook M4, Lenovo 14". (2026-11-11: Mama's
+    Galaxy A52s is the main device; the tablet is occasional.)
   - Domain: `rct.amns.my.id`.
   - Sound effects: CC0, curated by Claude.
   - Cooldown can be turned off by a parent.

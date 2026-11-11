@@ -200,7 +200,9 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   small JSON) into an isometric **SVG blockout**: floors, walls, stairs, and door openings at the
   exact projection. Antigravity paints over it (structure guide or img2img), so every room shares
   one geometry and `layout.json` lines up with the art.
-- Design canvas **3840 × 2400 px** (16:10, matching Theia's Galaxy Tab S10+ and the laptops).
+- Design canvas **3840 × 2400 px** (16:10, the 1920 × 1200 frame at 2×). It fits the tablet and
+  the laptops; on the phones, Theia's main devices, it fills the height and `house.bg` fills the
+  sides.
   `layout.json` uses the 1920 × 1200 half-size space; the game draws the full-size layers at 50%,
   so the camera can zoom into a room on arrival (§4.3) without blur.
 - Layers, each a separate PNG. Layers of one size share the same canvas, so they stack without
@@ -395,7 +397,7 @@ motion, `ui/` props). Changes follow `WORKFLOW.md` §7.
 - [ ] Sizes and frame grid exactly as specified
 - [ ] Registered in `manifest.json`
 - [ ] `npm run validate:assets` passes
-- [ ] Looked at on the actual Android tablet **and** phone
+- [ ] Looked at on Mama's phone **and** the tablet
 
 ## 9. Delivery order
 
