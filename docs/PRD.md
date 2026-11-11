@@ -232,6 +232,9 @@ every room shares one perspective.
 - A tap on another room while walking re-routes from her current position.
 - On arrival, the camera zooms smoothly into the room (≤ 600 ms) before the activity starts.
   Leaving zooms back out.
+- While the camera is zoomed into a room, the storeys above it fade out during the same zoom, so
+  the room's back walls and its spots (the fridge in dapur) are in full view. They fade back in
+  as the camera zooms out.
 - She walks *behind* front furniture and railings: depth order is always correct.
 - A tap outside every room does nothing, and Bubu tilts its head.
 - Tap areas are ≥ 72 dp everywhere.
@@ -329,7 +332,9 @@ Tapping one opens it.
 
 **US-COLOR-03: Save and show.**
 - Pages are saved automatically.
-- A finished page (≥ 80% of its areas filled) appears on the fridge in the house.
+- A finished page (≥ 80% of its areas filled) appears on the fridge in the house. The fridge
+  stands where it really is in dapur, so it shows in full when the camera zooms into dapur
+  (US-HOUSE-01).
 - Reopening a page shows her colors.
 - One-step undo with an "oops" button that is ≥ 96 dp.
 
@@ -525,6 +530,7 @@ Music ducks while a voice clip plays.
 | 7 | Coloring subjects | Dolls, dinosaurs, flowers, animals. M1: `bubu`, `ocica`, `dinosaurus`, `bunga`, `kucing`. |
 | 8 | Progress per device | OK to keep it per device. JSON export/import stays the way to move progress. Sync stays an optional M4 item. |
 | 9 | Main device (2026-11-11) | **Mama's Galaxy A52s** is Theia's main device, and her progress lives there. The Pixel 6 and the tablet are occasional, with their own progress. Replaces the device priority in #2; the 1920 × 1200 frame stays. |
+| 10 | Where the fridge stands (2026-11-12) | Where it really is in dapur, even though the upper storeys cover it in the whole-house view. Zoomed into a room, the storeys above it fade out (US-HOUSE-01), so the fridge shows in the dapur zoom. |
 | — | New request: tidy-up "refreshment" activities | Added as tidy-up breaks ("Beberes"): tidy the toys in M1, the rest in M2 (US-TIDY-01..04) |
 
 ### Still open
