@@ -1,0 +1,30 @@
+{
+  "$schema": "../contracts/schema/manifest.schema.json",
+  "version": 1,
+  "assets": [
+    {
+      "key": "house.structure.lt-dasar",
+      "type": "image",
+      "path": "house/structure/lt-dasar.png",
+      "room": "global"
+    },
+    {
+      "key": "house.props.dapur.kulkas",
+      "type": "image",
+      "path": "house/props/dapur/kulkas.png",
+      "room": "dapur"
+    },
+    {
+      "key": "house.props.ruang-keluarga.sofa",
+      "type": "image",
+      "path": "house/props/ruang-keluarga/sofa.png",
+      "room": "ruang-keluarga"
+    },
+    {
+      "key": "house.props.kamar-tidur.kasur",
+      "type": "image",
+      "path": "house/props/kamar-tidur/kasur.png",
+      "room": "kamar-tidur"
+    }
+  ]
+}
