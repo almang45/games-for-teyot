@@ -26,7 +26,11 @@ const num = (v: number): string => String(Math.round(v * 10) / 10);
 const pts = (points: readonly Point[]): string =>
   points.map(([x, y]) => `${num(x)},${num(y)}`).join(' ');
 const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 
 function faceElement(f: Face, fit: Fit): string {
   const fill = FILL[f.kind][f.outdoor ? 1 : 0];

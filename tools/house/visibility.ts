@@ -59,5 +59,9 @@ export function hiddenFloor(
       }
     }
   }
-  return { fraction: points.length / (nx * ny), points, by: [...by].sort() };
+  return {
+    fraction: points.length / (nx * ny),
+    points,
+    by: [...by].sort((a, b) => a.localeCompare(b)),
+  };
 }
