@@ -108,6 +108,27 @@ export const planFurniture = z.strictObject({
 });
 export type PlanFurniture = z.infer<typeof planFurniture>;
 
+const viewPx = z.number().int().min(16).max(4096);
+
+/**
+ * A review camera: a person's eye in an area, looking at a point. The blockout renders it as
+ * `house-eye-<id>.svg` to hold up against a photo from the same spot; the game never uses it.
+ */
+export const planView = z.strictObject({
+  id: kebabId,
+  /** The area the eye is in; both heights are above its floor. */
+  area: kebabId,
+  /** [x, y, eye height]: about 1.1 m seated on a sofa, 1.6 m standing. */
+  eye: z.tuple([metres, metres, length]),
+  /** [x, y, height] of what the eye looks at. */
+  look: z.tuple([metres, metres, metres]),
+  /** Horizontal field of view in degrees; a phone's main camera is about 70. */
+  fov: z.number().min(20).max(120).default(70),
+  /** Image [width, height] in px. */
+  size: z.tuple([viewPx, viewPx]).default([1600, 1000]),
+});
+export type PlanView = z.infer<typeof planView>;
+
 export const planWaypoint = z.strictObject({
   id: kebabId,
   at: planPoint,
@@ -138,6 +159,7 @@ export const floorPlan = z.strictObject({
   rooms: z.array(planRoom).min(1),
   spots: z.strictObject({ fridge: planSpot, 'sticker-wall': planSpot }),
   furniture: z.array(planFurniture).default([]),
+  views: z.array(planView).default([]),
   waypoints: z.array(planWaypoint).default([]),
   edges: z.array(z.tuple([kebabId, kebabId])).default([]),
   start: roomId,
@@ -287,6 +309,37 @@ function checkFurniture(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): 
   return issues;
 }
 
+function checkViews(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): Issue[] {
+  const issues: Issue[] = [];
+  for (const dupe of duplicates(plan.views.map((v) => v.id))) {
+    issues.push(error('views', `duplicate view ${dupe}`));
+  }
+  plan.views.forEach((v, i) => {
+    const path = `views[${i}]`;
+    const a = areas.get(v.area);
+    if (!a) {
+      issues.push(error(`${path}.area`, `unknown area ${v.area}`));
+      return;
+    }
+    const [x, y, h] = v.eye;
+    if (!inPlanRect([x, y], a.rect))
+      issues.push(error(`${path}.eye`, `stands outside area ${a.id}`));
+    if (Math.hypot(v.look[0] - x, v.look[1] - y) < EPS) {
+      issues.push(error(`${path}.look`, 'looks straight up or down: move it away from the eye'));
+    }
+    const inside = plan.furniture.find((f) => {
+      const [fx, fy, fw, fd] = f.rect;
+      const within = (p: number, start: number, size: number): boolean =>
+        p > start + EPS && p < start + size - EPS;
+      return (
+        f.area === a.id && within(x, fx, fw) && within(y, fy, fd) && within(h, f.lift, f.height)
+      );
+    });
+    if (inside) issues.push(error(`${path}.eye`, `is inside ${furnitureName(inside)}`));
+  });
+  return issues;
+}
+
 function checkRoom(plan: FloorPlan, room: PlanRoom, i: number, a: PlanArea | undefined): Issue[] {
   const path = `rooms[${i}]`;
   if (!a) return [error(`${path}.area`, `unknown area ${room.area}`)];
@@ -340,6 +393,7 @@ export function checkPlan(plan: FloorPlan): Issue[] {
     issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a)));
   });
   issues.push(...checkFurniture(plan, areas));
+  issues.push(...checkViews(plan, areas));
   plan.stairs.forEach((s, i) => {
     if (s.from >= s.to) {
       issues.push(error(`stairs[${i}]`, 'a flight climbs along rise: from must be below to'));

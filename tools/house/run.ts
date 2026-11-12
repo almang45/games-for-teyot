@@ -4,6 +4,7 @@ import { zodIssues } from '../../contracts/common.ts';
 import { STOREYS } from '../../contracts/rooms.ts';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout.ts';
 import { inFile, parseJsonFile, type FileIssue, type Report } from '../validate/lane.ts';
+import { eyeFile, eyeSvg } from './eye.ts';
 import { fitToCanvas, gridStep } from './iso.ts';
 import { CANVAS, draftLayout } from './layout.ts';
 import { checkPlan, floorPlan } from './plan.ts';
@@ -105,6 +106,8 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
       }),
     ],
     [OUTPUT_FILES.layout, `${JSON.stringify(draft.layout, null, 2)}\n`],
+    // Review renders only: the eye sees every storey, so the solids go in unfiltered.
+    ...plan.views.map((v): [string, string] => [eyeFile(v.id), eyeSvg(solids, plan, v)]),
   ];
   mkdirSync(join(root, outDir), { recursive: true });
   for (const [name, content] of outputs) writeFileSync(join(root, outDir, name), content);
