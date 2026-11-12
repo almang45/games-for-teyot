@@ -21,7 +21,7 @@ import {
 import { checkPlan, floorPlan, type FloorPlan, type PlanView } from '../../tools/house/plan';
 import { encodePng } from '../../tools/house/png';
 import { runBlockout } from '../../tools/house/run';
-import { buildSolids, type Solid } from '../../tools/house/scene';
+import { buildSolids, eyeWallSolids, type Solid } from '../../tools/house/scene';
 
 /** One made-up room with a door, a TV rack and a TV on the wall above it. */
 function planInput(): Record<string, unknown> {
@@ -281,5 +281,135 @@ describe('US-REF-02 eye views: runBlockout', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('US-REF-02 eye views: eye walls', () => {
+  // A partition between the room and the garden, with a door in it.
+  const walled = (patch: Record<string, unknown> = {}): FloorPlan => {
+    const input = planInput();
+    const [ruang, kebun] = input.areas as Record<string, unknown>[];
+    return plan({
+      areas: [ruang, { ...kebun, eyeWalls: ['x0'] }],
+      doors: [...(input.doors as object[]), { area: 'kebun', wall: 'x0', at: 1, width: 0.8 }],
+      ...patch,
+    });
+  };
+
+  it('builds them only for eye views, with their doors', () => {
+    const p = walled();
+    expect(checkPlan(p)).toEqual([]);
+    expect(buildSolids(p).some((s) => s.owner === 'kebun' && s.kind === 'wall-x0')).toBe(false);
+    const [wall] = eyeWallSolids(p);
+    expect(wall).toMatchObject({ kind: 'wall-x0', owner: 'kebun', outdoor: true });
+    expect(wall?.openings).toMatchObject([{ from: 1, to: 1.8, bottom: -0.2 }]);
+    expect(wall?.openings[0]?.top).toBeCloseTo(1.9);
+    const solids = [...buildSolids(p), ...eyeWallSolids(p)];
+    const at = (o: V3): string | undefined => {
+      const h = castRay(solids, o, [1, 0, 0]);
+      return h && `${h.solid.owner}:${faceKindOf(h)}`;
+    };
+    expect(at([3.9, 0.5, 1])).toBe('kebun:wall-x0');
+    expect(at([3.9, 1.4, 1])).toBe('kebun:door');
+  });
+
+  it('refuses an eye wall that is already a wall, and a spot on an eye wall', () => {
+    const input = planInput();
+    const [ruang, kebun] = input.areas as Record<string, unknown>[];
+    const spots = input.spots as Record<string, unknown>;
+    const messages = checkPlan(
+      plan({
+        areas: [{ ...ruang, walls: ['x0'], eyeWalls: ['x0', 'y0'] }, kebun],
+        spots: { ...spots, fridge: { ...(spots.fridge as object), wall: 'y0' } },
+      }),
+    ).map((i) => `${i.path}: ${i.message}`);
+    expect(messages).toEqual([
+      'areas[0].eyeWalls: x0 is already one of the walls',
+      'spots.fridge.wall: ruang has no y0 wall',
+    ]);
+  });
+
+  it('draws them in the eye view and nowhere else', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rct-eye-wall-'));
+    try {
+      const input = planInput();
+      const [ruang, kebun] = input.areas as Record<string, unknown>[];
+      const view = { ...SOFA, eye: [3, 1.5, 1.1], look: [4, 1.5, 1.1] };
+      const render = (eyeWalls: string[]): [string, string] => {
+        const areas = [ruang, { ...kebun, eyeWalls }];
+        writeFileSync(join(root, 'plan.json'), JSON.stringify({ ...input, areas, views: [view] }));
+        expect(runBlockout(root, 'plan.json', 'out').report.issues).toEqual([]);
+        const svg = (name: string): string => readFileSync(join(root, 'out', name), 'utf8');
+        return [svg('house-blockout.svg'), svg('house-eye-sofa.svg')];
+      };
+      const [open, openEye] = render([]);
+      const [walled, walledEye] = render(['x0']);
+      expect(walled).toBe(open);
+      expect(walled).not.toContain('data-owner="kebun" data-solid="wall');
+      expect(walledEye).not.toBe(openEye);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('US-REF-02 eye views: passages, ties and labels', () => {
+  it('sees through an open passage but not through a door', () => {
+    const input = planInput();
+    const [ruang, kebun] = input.areas as Record<string, unknown>[];
+    const p = (open: boolean): FloorPlan =>
+      plan({
+        areas: [ruang, { ...kebun, eyeWalls: ['x0'] }],
+        doors: [
+          ...(input.doors as object[]),
+          { area: 'kebun', wall: 'x0', at: 1, width: 0.8, open },
+        ],
+        furniture: [
+          ...(input.furniture as object[]),
+          { id: 'pot', area: 'kebun', rect: [5, 1, 0.4, 0.4], height: 1.2 },
+        ],
+      });
+    const seen = (q: FloorPlan): string | undefined =>
+      castRay([...buildSolids(q), ...eyeWallSolids(q)], [3.9, 1.2, 1], [1, 0, 0])?.solid.owner;
+    expect(seen(p(false))).toBe('kebun');
+    expect(seen(p(true))).toBe('kebun.pot');
+    expect(floorPlan.parse(planInput()).doors[0]?.open).toBe(false);
+  });
+
+  it('lets a wall win over furniture built flush behind it', () => {
+    const wall: Solid = {
+      kind: 'wall-y0',
+      owner: 'sekat',
+      storey: 0,
+      outdoor: false,
+      box: { x0: 0, x1: 4, y0: 2, y1: 2, z0: 0, z1: 2.4 },
+      openings: [],
+    };
+    const shelf = prop('sekat.rak', [1, 2, 0], [2, 2.4, 1.6]);
+    for (const solids of [
+      [shelf, wall],
+      [wall, shelf],
+    ]) {
+      expect(castRay(solids, [1.5, 1, 1], [0, 1, 0])?.solid.owner).toBe('sekat');
+    }
+    expect(castRay([shelf, wall], [1.5, 1, 2], [0, 1, 0])?.solid.owner).toBe('sekat');
+    expect(castRay([shelf], [1.5, 1, 1], [0, 1, 0])?.solid.owner).toBe('sekat.rak');
+  });
+
+  it('keeps every label inside the image', () => {
+    const p = plan({
+      furniture: [
+        { id: 'bangku-jendela-panjang', area: 'ruang', rect: [0.2, 0, 2.4, 0.4], height: 0.6 },
+      ],
+    });
+    const view: PlanView = { ...SOFA, eye: [0.3, 2.6, 1.1], look: [0.3, 0, 1.1], size: [200, 120] };
+    const svg = eyeSvg(buildSolids(p), p, view);
+    const xs = [...svg.matchAll(/<text x="([\d.]+)"/g)].map((m) => Number(m[1]));
+    expect(xs.length).toBeGreaterThan(0);
+    const half = ('bangku-jendela-panjang'.length * 12 * 0.55) / 2;
+    xs.forEach((x) => {
+      expect(x).toBeGreaterThanOrEqual(half - 0.01);
+      expect(x).toBeLessThanOrEqual(200 - half + 0.01);
+    });
   });
 });

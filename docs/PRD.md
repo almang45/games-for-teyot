@@ -237,6 +237,9 @@ every room shares one perspective.
   point. The blockout renders each one in perspective as `house-eye-<id>.svg`, with the visible
   furniture labelled, so Papa can compare it with a photo taken from the same spot. These are
   review renders only; the game keeps its one dollhouse angle.
+- An area can name eye walls: back walls the dollhouse leaves out so the rooms behind stay in view,
+  such as the partition behind the TV. Only review views draw them, with their doors; a door with
+  no leaf, such as the mouth of a flight, is marked open and the view sees through it.
 
 ### 8.2 M1: First playable
 

@@ -72,34 +72,39 @@ export interface Hit {
   readonly point: V3;
 }
 
-/** The first solid a unit ray enters, ahead of its origin. */
+const isWall = (s: Solid): boolean => s.kind === 'wall-x0' || s.kind === 'wall-y0';
+
+/** The door at a point of a wall, its bounds grown by `margin`. */
+function openingAt(wall: Solid, p: V3, margin: number): Opening | undefined {
+  const along = wall.kind === 'wall-x0' ? p[1] : p[0];
+  return wall.openings.find(
+    (o) =>
+      along >= o.from - margin &&
+      along <= o.to + margin &&
+      p[2] >= o.bottom - margin &&
+      p[2] <= o.top + margin,
+  );
+}
+
+/**
+ * The first solid a unit ray enters, ahead of its origin. Rays pass through open doors, and
+ * where faces meet in one plane the wall wins: it stands in front of what is built behind it.
+ */
 export function castRay(solids: readonly Solid[], o: V3, d: V3): Hit | undefined {
   let best: Solid | undefined;
   let bestT = Infinity;
   for (const s of solids) {
     const t = enterAt(s.box, o, d);
-    if (t < bestT) {
-      bestT = t;
-      best = s;
-    }
+    const tie = t <= bestT + EPS && best !== undefined && isWall(s) && !isWall(best);
+    if (!(t < bestT - EPS || tie)) continue;
+    if (isWall(s) && openingAt(s, add(o, mul(d, t)), 0)?.open) continue;
+    bestT = t;
+    best = s;
   }
   if (!best) return undefined;
   const n = nears(best.box, o, d);
   const axis: Axis = n[0] === bestT ? 0 : n[1] === bestT ? 1 : 2;
   return { solid: best, t: bestT, axis, side: d[axis] > 0 ? -1 : 1, point: add(o, mul(d, bestT)) };
-}
-
-/** The door a wall hit falls in, its bounds grown by `margin`. */
-function openingAt(h: Hit, margin: number): Opening | undefined {
-  const along = h.solid.kind === 'wall-x0' ? h.point[1] : h.point[0];
-  const z = h.point[2];
-  return h.solid.openings.find(
-    (o) =>
-      along >= o.from - margin &&
-      along <= o.to + margin &&
-      z >= o.bottom - margin &&
-      z <= o.top + margin,
-  );
 }
 
 /** The blockout face colour a hit shows, matching the dollhouse SVGs. */
@@ -114,7 +119,7 @@ export function faceKindOf(h: Hit): FaceKind {
       return axis === 0 ? 'slab-x' : 'slab-y';
     case 'wall-x0':
     case 'wall-y0':
-      return openingAt(h, 0) ? 'door' : solid.kind;
+      return openingAt(solid, h.point, 0) ? 'door' : solid.kind;
     case 'step':
     case 'prop':
       if (top) return solid.kind;
@@ -135,7 +140,7 @@ export function lineAt(h: Hit, kind: FaceKind, width: number, grid: number): Lin
     if (Math.abs(c - lo(b, a)) < width || Math.abs(c - hi(b, a)) < width) return 'edge';
   }
   if (h.solid.kind === 'wall-x0' || h.solid.kind === 'wall-y0') {
-    const door = openingAt(h, width);
+    const door = openingAt(h.solid, h.point, width);
     if (door) {
       const along = h.solid.kind === 'wall-x0' ? h.point[1] : h.point[0];
       const jamb = [door.from, door.to].some((e) => Math.abs(along - e) < width);
@@ -292,7 +297,12 @@ export function eyeSvg(solids: readonly Solid[], plan: FloorPlan, view: PlanView
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`,
     `<image width="${w}" height="${h}" href="data:image/png;base64,${png.toString('base64')}"/>`,
     `<g id="eye-labels" font-family="sans-serif" fill="#1b1b1b">`,
-    ...eyeLabels(solids, cam).map((l) => `  ${label(l.text, l.at, size)}`),
+    ...eyeLabels(solids, cam).map((l) => {
+      // Keep the text inside the image; sans-serif runs about 0.55 em a character.
+      const half = (l.text.length * size * 0.55) / 2;
+      const x = Math.min(Math.max(l.at[0], half), w - half);
+      return `  ${label(l.text, [x, Math.max(l.at[1], size)], size)}`;
+    }),
     '</g>',
     '</svg>',
     '',

@@ -31,6 +31,11 @@ export const planArea = z.strictObject({
   rect: planRect,
   /** Back walls to draw. Front walls are always cut away. */
   walls: z.array(wallSide).default([]),
+  /**
+   * Back walls the dollhouse leaves out so the rooms behind them stay in view, such as the
+   * partition behind the TV. Only eye views draw them; doors can sit on them.
+   */
+  eyeWalls: z.array(wallSide).default([]),
   /** Defaults to the plan's `wallHeight`. */
   wallHeight: length.optional(),
   /** Slab thickness; defaults to the plan's. A landing can reach down to the floor under it. */
@@ -46,6 +51,8 @@ export const planDoor = z.strictObject({
   at: metres.nonnegative(),
   width: length,
   height: length.default(2.1),
+  /** A passage with no door leaf, such as the mouth of a flight: eye views see through it. */
+  open: z.boolean().default(false),
 });
 export type PlanDoor = z.infer<typeof planDoor>;
 
@@ -203,9 +210,10 @@ function checkOnWall(
   span: { at: number; width: number; bottom: number; height: number },
   path: string,
   wallHeight: number,
+  sides: readonly WallSide[] = a.walls,
 ): Issue[] {
   const issues: Issue[] = [];
-  if (!a.walls.includes(side)) issues.push(error(`${path}.wall`, `${a.id} has no ${side} wall`));
+  if (!sides.includes(side)) issues.push(error(`${path}.wall`, `${a.id} has no ${side} wall`));
   if (span.at + span.width > wallLength(a, side) + EPS) {
     issues.push(error(path, `runs past the end of the ${side} wall of ${a.id}`));
   }
@@ -372,6 +380,11 @@ export function checkPlan(plan: FloorPlan): Issue[] {
   for (const dupe of duplicates(plan.areas.map((a) => a.id))) {
     issues.push(error('areas', `duplicate area ${dupe}`));
   }
+  plan.areas.forEach((a, i) => {
+    for (const side of a.eyeWalls.filter((s) => a.walls.includes(s))) {
+      issues.push(error(`areas[${i}].eyeWalls`, `${side} is already one of the walls`));
+    }
+  });
   for (const dupe of duplicates(plan.stairs.map((s) => s.id))) {
     issues.push(error('stairs', `duplicate stair ${dupe}`));
   }
@@ -390,7 +403,9 @@ export function checkPlan(plan: FloorPlan): Issue[] {
       return;
     }
     const span = { at: door.at, width: door.width, bottom: 0, height: door.height };
-    issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a)));
+    // A door may sit on an eye wall; a spot may not, since the game never shows one.
+    const sides = [...a.walls, ...a.eyeWalls];
+    issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a), sides));
   });
   issues.push(...checkFurniture(plan, areas));
   issues.push(...checkViews(plan, areas));
