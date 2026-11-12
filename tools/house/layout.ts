@@ -5,21 +5,28 @@ import {
   type Point,
   type Rect,
 } from '../../contracts/common.ts';
-import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
+import {
+  HOUSE_SIZE,
+  type HouseLayout,
+  type HouseProp,
+  type HouseRoom,
+} from '../../contracts/houseLayout.ts';
 import { convexHull, project, type Fit, type Vec3 } from './iso.ts';
 import {
   ffl,
   floorZ,
+  furnitureName,
   inPlanRect,
   walkOf,
   wallHeightOf,
   type FloorPlan,
   type PlanArea,
+  type PlanFurniture,
   type PlanPoint,
   type PlanSpot,
   type PlanWaypoint,
 } from './plan.ts';
-import { quadX, quadY, quadZ, type Solid } from './scene.ts';
+import { isProp, quadX, quadY, quadZ, type Solid } from './scene.ts';
 import { hiddenBy, hiddenQuad } from './visibility.ts';
 
 /** The blockout canvas: the 1920 × 1200 layout space at 2× (ASSETS.md §4.1). */
@@ -81,6 +88,44 @@ function spotFace(spot: PlanSpot, a: PlanArea): Vec3[] {
     : quadY(y + spot.offset, x + spot.at, x + spot.at + spot.width, z, z + spot.height);
 }
 
+/** The manifest's largest image side (house.props), in source px at 2×. */
+const PROP_MAX_SOURCE_PX = 1024;
+
+/**
+ * A piece's sprite rect and footprint. The footprint is the box's underside: on the floor for
+ * what stands, at its lift for what hangs on a wall, so the sprite stays trimmed.
+ */
+function propOf(
+  f: PlanFurniture,
+  a: PlanArea,
+  fit: Fit,
+  room: HouseProp['room'],
+): { prop: HouseProp; issues: Issue[] } {
+  const z0 = floorZ(a) + f.lift;
+  const base = quadZ(z0, f.rect);
+  const top = quadZ(z0 + f.height, f.rect);
+  const rect = bounds([...base, ...top].map((p) => toLayout(p, fit)));
+  const issues: Issue[] = [];
+  const [w, h] = [rect[2] * 2, rect[3] * 2];
+  const [b0, b1, b2, b3] = base;
+  if (Math.max(w, h) > PROP_MAX_SOURCE_PX) {
+    issues.push(
+      warning(
+        `furniture.${furnitureName(f)}`,
+        `the sprite would be ${w} × ${h} px, over the ${PROP_MAX_SOURCE_PX} px limit: split it`,
+      ),
+    );
+  }
+  const prop: HouseProp = {
+    key: `house.props.${furnitureName(f)}`,
+    storey: a.storey,
+    ...(room === undefined ? {} : { room }),
+    rect,
+    base: [toLayout(b0, fit), toLayout(b1, fit), toLayout(b2, fit), toLayout(b3, fit)],
+  };
+  return { prop, issues };
+}
+
 /** Never rounds a sliver to 0 % or a near miss to 100 %. */
 export function percent(fraction: number): string {
   const p = Math.round(fraction * 100);
@@ -119,13 +164,15 @@ export function draftLayout(plan: FloorPlan, fit: Fit, solids: readonly Solid[])
   const issues: Issue[] = [];
   const hidden: HiddenFloor[] = [];
   const stands: Vec3[] = [];
+  // Characters are depth-sorted with props, so only the house itself can hide a walk.
+  const house = solids.filter((s) => !isProp(s));
   const rooms = plan.rooms.map((room, i): HouseRoom => {
     const a = areas.get(room.area);
     if (!a) throw new Error(`rooms[${i}]: unknown area ${room.area}; run checkPlan first`);
     const z = floorZ(a);
     const walk = walkOf(plan, room, a);
     stands.push(at(room.stand, z));
-    const covered = hiddenQuad(quadZ(z, walk), solids);
+    const covered = hiddenQuad(quadZ(z, walk), house);
     if (covered.points.length > 0) {
       hidden.push({ room: room.id, points: covered.points });
       issues.push(
@@ -180,13 +227,22 @@ export function draftLayout(plan: FloorPlan, fit: Fit, solids: readonly Solid[])
     return { room: s.room, rect: bounds(face.map((p) => toLayout(p, fit))) };
   };
 
+  const props = plan.furniture.map((f, i): HouseProp => {
+    const a = areas.get(f.area);
+    if (!a) throw new Error(`furniture[${i}]: unknown area ${f.area}; run checkPlan first`);
+    const room = plan.rooms.find((r) => r.area === f.area)?.id;
+    const drafted = propOf(f, a, fit, room);
+    issues.push(...drafted.issues);
+    return drafted.prop;
+  });
+
   const layout: HouseLayout = {
     version: CONTRACT_VERSION,
     size: [HOUSE_SIZE[0], HOUSE_SIZE[1]],
     rooms,
     spots: { fridge: spot('fridge'), 'sticker-wall': spot('sticker-wall') },
     occluders: [],
-    props: [],
+    props,
     waypoints: plan.waypoints.map((w) => ({
       id: w.id,
       pos: toLayout(at(w.at, waypointZ(plan, w)), fit),

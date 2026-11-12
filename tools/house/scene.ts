@@ -3,6 +3,7 @@ import { depthKey } from '../../src/engine/iso/projection.ts';
 import type { Vec3 } from './iso.ts';
 import {
   floorZ,
+  furnitureName,
   wallHeightOf,
   type FloorPlan,
   type PlanArea,
@@ -31,12 +32,12 @@ export interface Opening {
   readonly top: number;
 }
 
-export type SolidKind = 'slab' | 'wall-x0' | 'wall-y0' | 'step';
+export type SolidKind = 'slab' | 'wall-x0' | 'wall-y0' | 'step' | 'prop';
 
-/** One piece of the house: a floor slab, a back wall with its doors, or a stair step. */
+/** One piece of the house: a floor slab, a back wall with its doors, a stair step or furniture. */
 export interface Solid {
   readonly kind: SolidKind;
-  /** The area or flight it belongs to. */
+  /** The area or flight it belongs to; for furniture, `<area>.<id>`. */
   readonly owner: string;
   readonly storey: Storey;
   readonly outdoor: boolean;
@@ -46,7 +47,21 @@ export interface Solid {
 }
 
 export type FaceKind =
-  'floor' | 'slab-x' | 'slab-y' | 'wall-x0' | 'wall-y0' | 'door' | 'step' | 'step-x' | 'step-y';
+  | 'floor'
+  | 'slab-x'
+  | 'slab-y'
+  | 'wall-x0'
+  | 'wall-y0'
+  | 'door'
+  | 'step'
+  | 'step-x'
+  | 'step-y'
+  | 'prop'
+  | 'prop-x'
+  | 'prop-y';
+
+/** Furniture is drawn with the house but painted as separate sprites. */
+export const isProp = (s: Solid): boolean => s.kind === 'prop';
 
 /** One flat polygon of the blockout, in plan metres. */
 export interface Face {
@@ -54,8 +69,11 @@ export interface Face {
   readonly points: readonly Vec3[];
 }
 
+/** Four corners, each next to the one before. */
+export type Quad = [Vec3, Vec3, Vec3, Vec3];
+
 /** The plane x = `x`, from y0 to y1 and z0 to z1. */
-export const quadX = (x: number, y0: number, y1: number, z0: number, z1: number): Vec3[] => [
+export const quadX = (x: number, y0: number, y1: number, z0: number, z1: number): Quad => [
   { x, y: y0, z: z0 },
   { x, y: y1, z: z0 },
   { x, y: y1, z: z1 },
@@ -63,7 +81,7 @@ export const quadX = (x: number, y0: number, y1: number, z0: number, z1: number)
 ];
 
 /** The plane y = `y`, from x0 to x1 and z0 to z1. */
-export const quadY = (y: number, x0: number, x1: number, z0: number, z1: number): Vec3[] => [
+export const quadY = (y: number, x0: number, x1: number, z0: number, z1: number): Quad => [
   { x: x0, y, z: z0 },
   { x: x1, y, z: z0 },
   { x: x1, y, z: z1 },
@@ -71,7 +89,7 @@ export const quadY = (y: number, x0: number, x1: number, z0: number, z1: number)
 ];
 
 /** A horizontal rect at height z. */
-export const quadZ = (z: number, [x, y, w, d]: PlanRect): Vec3[] => [
+export const quadZ = (z: number, [x, y, w, d]: PlanRect): Quad => [
   { x, y, z },
   { x: x + w, y, z },
   { x: x + w, y: y + d, z },
@@ -122,7 +140,7 @@ function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
         return { from: start, to: start + door.width, bottom: z, top: z + door.height };
       });
   const solids: Solid[] = [
-    { ...base, kind: 'slab', box: boxOf(a.rect, z - plan.slab, z), openings: [] },
+    { ...base, kind: 'slab', box: boxOf(a.rect, z - (a.slab ?? plan.slab), z), openings: [] },
   ];
   if (a.walls.includes('x0')) {
     const box = { x0: x, x1: x, y0: y, y1: y + d, z0: z, z1: top };
@@ -135,13 +153,29 @@ function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
   return solids;
 }
 
-/** Every solid of the house. Throws on a door whose area is missing: run checkPlan first. */
+/**
+ * Every solid of the house, furniture included. Throws on a door or piece whose area is missing:
+ * run checkPlan first.
+ */
 export function buildSolids(plan: FloorPlan): Solid[] {
-  const areas = new Set(plan.areas.map((a) => a.id));
+  const areas = new Map(plan.areas.map((a) => [a.id, a]));
   plan.doors.forEach((door, i) => {
     if (!areas.has(door.area)) {
       throw new Error(`doors[${i}]: unknown area ${door.area}; run checkPlan first`);
     }
+  });
+  const furniture = plan.furniture.map((f, i): Solid => {
+    const a = areas.get(f.area);
+    if (!a) throw new Error(`furniture[${i}]: unknown area ${f.area}; run checkPlan first`);
+    const z = floorZ(a) + f.lift;
+    return {
+      kind: 'prop',
+      owner: furnitureName(f),
+      storey: a.storey,
+      outdoor: a.outdoor,
+      box: boxOf(f.rect, z, z + f.height),
+      openings: [],
+    };
   });
   const steps = plan.stairs.flatMap((s) =>
     stepsOf(s).map((step): Solid => ({
@@ -149,11 +183,11 @@ export function buildSolids(plan: FloorPlan): Solid[] {
       owner: s.id,
       storey: s.storey,
       outdoor: false,
-      box: boxOf(step.rect, Math.min(s.from, s.to), step.top),
+      box: boxOf(step.rect, s.base ?? Math.min(s.from, s.to), step.top),
       openings: [],
     })),
   );
-  return [...plan.areas.flatMap((a) => areaSolids(plan, a)), ...steps];
+  return [...plan.areas.flatMap((a) => areaSolids(plan, a)), ...steps, ...furniture];
 }
 
 /** The faces the camera can see, in the order to draw them: the box's own faces never overlap. */
@@ -168,10 +202,11 @@ export function facesOf(s: Solid): Face[] {
         { kind: 'slab-y', points: quadY(y1, x0, x1, z0, z1) },
       ];
     case 'step':
+    case 'prop':
       return [
-        { kind: 'step', points: quadZ(z1, top) },
-        { kind: 'step-x', points: quadX(x1, y0, y1, z0, z1) },
-        { kind: 'step-y', points: quadY(y1, x0, x1, z0, z1) },
+        { kind: s.kind, points: quadZ(z1, top) },
+        { kind: `${s.kind}-x`, points: quadX(x1, y0, y1, z0, z1) },
+        { kind: `${s.kind}-y`, points: quadY(y1, x0, x1, z0, z1) },
       ];
     case 'wall-x0':
       return [
@@ -320,6 +355,7 @@ export function gridLinesOf(s: Solid, grid: number): GridLine[] {
         ...heights(),
       ];
     case 'step':
+    case 'prop':
       return [];
   }
 }

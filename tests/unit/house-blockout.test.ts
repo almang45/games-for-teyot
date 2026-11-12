@@ -18,6 +18,7 @@ import {
   type Solid,
 } from '../../tools/house/scene';
 import { blockoutSvg, guideSvg } from '../../tools/house/svg';
+import type { HouseProp } from '../../contracts/houseLayout';
 import { hiddenBy, hiddenQuad } from '../../tools/house/visibility';
 
 /** A made-up two-storey house; the real plan stays in reference/ (AGENTS.md privacy rules). */
@@ -621,21 +622,43 @@ describe('US-REF-02 runBlockout', () => {
   };
 
   it('writes the blockout, the guide and a contract-valid draft layout', () => {
-    write(planInput());
+    write({ ...planInput(), furniture: FURNITURE });
     const { report, summary } = runBlockout(root, 'plan.json', 'out');
     expect(report.issues).toEqual([]);
     expect(summary?.files).toEqual([
       'out/house-blockout.svg',
       'out/house-blockout-grid.svg',
+      'out/house-blockout-props-lt-dasar.svg',
       'out/house-blockout-guide.svg',
       'out/layout.json',
     ]);
+    expect(summary?.props).toBe(FURNITURE.length);
+    const svg = (name: string): string => readFileSync(join(root, 'out', name), 'utf8');
+    // The structure is painted without furniture; the props file adds it.
+    expect(svg('house-blockout.svg')).not.toContain('data-solid="prop"');
+    expect(svg('house-blockout-grid.svg')).not.toContain('data-solid="prop"');
+    const props = svg('house-blockout-props-lt-dasar.svg');
+    expect(props.match(/data-solid="prop"/g)).toHaveLength(3);
+    expect(props).not.toContain('<text');
+    // Zoomed into the ground floor, the bedroom above is faded out.
+    expect(props).not.toContain('data-storey="lt-atas"');
     const scale = summary?.pxPerMetre ?? 0;
     expect(scale % 10).toBe(0);
     expect(summary?.cellTilePx).toEqual([0.4 * scale, 0.2 * scale]);
     expect(summary?.theiaLayoutPx).toBe(Math.round((0.95 * (summary?.pxPerMetre ?? 0)) / 2));
     const layout: unknown = JSON.parse(readFileSync(join(root, 'out', 'layout.json'), 'utf8'));
     expect(checkHouseLayout(houseLayout.parse(layout))).toEqual([]);
+  });
+
+  it('writes a props file per furnished storey, with the storeys below it', () => {
+    const kasur = { id: 'kasur', area: 'kamar-tidur', rect: [-2.4, -3.4, 1.6, 2], height: 0.4 };
+    write({ ...planInput(), furniture: [kasur] });
+    const { summary } = runBlockout(root, 'plan.json', 'out');
+    expect(summary?.files).toContain('out/house-blockout-props-lt-atas.svg');
+    expect(summary?.files).not.toContain('out/house-blockout-props-lt-dasar.svg');
+    const svg = readFileSync(join(root, 'out', 'house-blockout-props-lt-atas.svg'), 'utf8');
+    expect(svg).toContain('data-owner="kamar-tidur.kasur"');
+    expect(svg).toContain('data-storey="lt-dasar"');
   });
 
   it('accepts absolute paths and reports them relative to root', () => {
@@ -669,5 +692,186 @@ describe('US-REF-02 runBlockout', () => {
         message: 'kamar-tidur is not reachable from ruang-keluarga',
       }),
     );
+  });
+});
+
+/** A TV rack against the living room's y0 wall, the TV hung above it, and a pot in the garden. */
+const FURNITURE = [
+  { id: 'rak-tv', area: 'ruang-keluarga', rect: [2.4, 0, 1.2, 0.4], height: 0.8 },
+  { id: 'tv', area: 'ruang-keluarga', rect: [2.6, 0, 0.8, 0.2], height: 0.6, lift: 1 },
+  { id: 'pot', area: 'kebun', rect: [4.4, 0.4, 0.4, 0.4], height: 0.6 },
+];
+
+describe('US-REF-02 furniture', () => {
+  const furnished = (): FloorPlan => plan({ furniture: FURNITURE });
+
+  it('passes a consistent plan and defaults to no furniture', () => {
+    expect(plan().furniture).toEqual([]);
+    expect(furnished().furniture[0]?.lift).toBe(0);
+    expect(checkPlan(furnished())).toEqual([]);
+  });
+
+  it('reports pieces off the grid, outside their area, too tall, overlapping or doubled', () => {
+    const [rak, tv, pot] = FURNITURE;
+    const messages = checkPlan(
+      plan({
+        furniture: [
+          rak,
+          tv,
+          pot,
+          { ...rak, id: 'rak-2', rect: [3, 0.2, 0.4, 0.4] },
+          { ...pot, rect: [5.8, 0, 0.4, 0.4] },
+          { ...tv, id: 'lampu', lift: 2, height: 0.6 },
+          { ...pot, id: 'meja', rect: [4.45, 1, 0.4, 0.4] },
+          { ...pot, area: 'garasi' },
+        ],
+      }),
+    ).map((i) => `${i.path}: ${i.message}`);
+    expect(messages).toEqual([
+      'furniture[6].rect: x 4.45 is off the 20 cm grid; nearest 4.4',
+      'furniture[6].rect: x + width 4.85 is off the 20 cm grid; nearest 4.8',
+      'furniture: duplicate piece kebun.pot',
+      'furniture[3]: overlaps ruang-keluarga.rak-tv',
+      'furniture[4].rect: leaves area kebun',
+      'furniture[5]: is taller than the walls of ruang-keluarga',
+      'furniture[7].area: unknown area garasi',
+    ]);
+  });
+
+  it('builds a box per piece that stands on its floor or hangs at its lift', () => {
+    const props = buildSolids(furnished()).filter((s) => s.kind === 'prop');
+    expect(props.map((s) => [s.owner, s.storey, s.outdoor])).toEqual([
+      ['ruang-keluarga.rak-tv', 0, false],
+      ['ruang-keluarga.tv', 0, false],
+      ['kebun.pot', 0, true],
+    ]);
+    expect(props[1]?.box).toMatchObject({ z0: 1, z1: 1.6 });
+    // The garden sits 0.2 m low, and its pot with it.
+    expect(props[2]?.box.z0).toBeCloseTo(-0.2);
+    expect(props[2]?.box.z1).toBeCloseTo(0.4);
+    const [piece] = props;
+    if (!piece) throw new Error('no props');
+    expect(facesOf(piece).map((f) => f.kind)).toEqual(['prop', 'prop-x', 'prop-y']);
+    expect(gridLinesOf(piece, 0.2)).toEqual([]);
+  });
+
+  it('draws furniture after the floor and wall it stands against', () => {
+    const order = drawOrder(buildSolids(furnished()));
+    const rak = rank(order, 'ruang-keluarga.rak-tv', 'prop');
+    expect(rank(order, 'ruang-keluarga', 'slab')).toBeLessThan(rak);
+    expect(rank(order, 'ruang-keluarga', 'wall-y0')).toBeLessThan(rak);
+  });
+
+  it('refuses a piece whose area is missing', () => {
+    const p = furnished();
+    p.furniture.push({ id: 'meja', area: 'garasi', rect: [0, 0, 1, 1], height: 1, lift: 0 });
+    expect(() => buildSolids(p)).toThrow('furniture[3]: unknown area garasi');
+    const solids = buildSolids(furnished());
+    const fit = { scale: 100, origin: [1900, 800] as [number, number] };
+    expect(() => draftLayout(p, fit, solids)).toThrow('furniture[3]: unknown area garasi');
+  });
+
+  it('drafts a prop per piece: key, storey, room, sprite rect and footprint', () => {
+    const { fit, draft } = drafted(furnished());
+    expect(checkHouseLayout(houseLayout.parse(draft.layout))).toEqual([]);
+    const [rak, tv, pot] = draft.layout.props as [HouseProp, HouseProp, HouseProp];
+    expect(rak).toMatchObject({ key: 'house.props.ruang-keluarga.rak-tv', storey: 0 });
+    expect(rak.room).toBe('ruang-keluarga');
+    // Outside every room: nothing to dim while a room is locked.
+    expect(pot.key).toBe('house.props.kebun.pot');
+    expect(pot).not.toHaveProperty('room');
+    const half = (p: Vec3): [number, number] => {
+      const [x, y] = project(p, fit);
+      return [Math.round(x / 2), Math.round(y / 2)];
+    };
+    // Back corner first, then clockwise on screen: right, front, left.
+    expect(rak.base).toEqual([
+      half({ x: 2.4, y: 0, z: 0 }),
+      half({ x: 3.6, y: 0, z: 0 }),
+      half({ x: 3.6, y: 0.4, z: 0 }),
+      half({ x: 2.4, y: 0.4, z: 0 }),
+    ]);
+    // The top's back corner is the sprite's top edge; the floor's front corner its bottom.
+    expect(rak.rect[1]).toBe(half({ x: 2.4, y: 0, z: 0.8 })[1]);
+    expect(rak.rect[1] + rak.rect[3]).toBe(half({ x: 3.6, y: 0.4, z: 0 })[1]);
+    // A hung piece's footprint is its underside, so its sprite stays trimmed to the box.
+    expect(tv.base[0]).toEqual(half({ x: 2.6, y: 0, z: 1 }));
+    expect(tv.rect[1] + tv.rect[3]).toBe(half({ x: 3.4, y: 0.2, z: 1 })[1]);
+  });
+
+  it('lets characters stand behind furniture, but not behind the house', () => {
+    // A sofa across the walk, between the stand and the camera.
+    const sofa = { id: 'sofa', area: 'ruang-keluarga', rect: [0.4, 1.8, 3.6, 1], height: 0.8 };
+    const { draft } = drafted(plan({ furniture: [sofa] }));
+    const paths = draft.issues.map((i) => i.path);
+    expect(paths).not.toContain('rooms[0].walk');
+    expect(draft.issues).toContainEqual(
+      expect.objectContaining({
+        path: 'rooms[0].stand',
+        message: 'hidden behind ruang-keluarga.sofa',
+      }),
+    );
+  });
+
+  it('warns when a sprite would pass the manifest size limit', () => {
+    const lemari = { id: 'lemari', area: 'ruang-keluarga', rect: [0, 0, 2.4, 0.6], height: 1.2 };
+    const p = plan({ furniture: [lemari] });
+    const solids = buildSolids(p);
+    const sized = (scale: number) =>
+      draftLayout(p, { scale, origin: [1900, 800] }, solids).issues.filter(
+        (i) => i.path === 'furniture.ruang-keluarga.lemari',
+      );
+    // 3 m of x + y across, 1.5 m of floor diagonal plus 1.2 m tall: 1200 × 1080 px at 400 px/m.
+    expect(sized(400)).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        message: 'the sprite would be 1200 × 1080 px, over the 1024 px limit: split it',
+      }),
+    ]);
+    expect(sized(300)).toEqual([]);
+  });
+
+  it('outlines each footprint and names each piece in the guide', () => {
+    const { solids, fit, draft } = drafted(furnished());
+    const svg = guideSvg({
+      solids,
+      fit,
+      grid: 0.2,
+      size: CANVAS,
+      layout: draft.layout,
+      hidden: [],
+      stands: draft.stands,
+    });
+    expect(svg).toContain('<g id="guide-props"');
+    expect(svg.match(/stroke="#6d4c2f"/g)).toHaveLength(3);
+    for (const name of ['ruang-keluarga.rak-tv', 'ruang-keluarga.tv', 'kebun.pot']) {
+      expect(svg).toContain(`>${name}</text>`);
+    }
+    expect(blockoutSvg(solids, fit, CANVAS)).toContain('data-kind="prop-x"');
+  });
+});
+
+describe('US-REF-02 closed understairs', () => {
+  it('lets a flight reach down to the floor and a landing slab fill the space under it', () => {
+    const input = planInput();
+    const landing = { id: 'bordes', storey: 0, z: 0.6, slab: 0.6, rect: [6, 0, 1, 1] };
+    const p = plan({
+      areas: [...(input.areas as object[]), landing],
+      stairs: [flight({ from: 0.6, to: 1.2, base: 0 })],
+    });
+    expect(checkPlan(p)).toEqual([]);
+    const solids = buildSolids(p);
+    expect(solids.filter((s) => s.kind === 'step').map((s) => s.box.z0)).toEqual([0, 0]);
+    expect(solids.find((s) => s.owner === 'bordes')?.box).toMatchObject({ z0: 0, z1: 0.6 });
+    // Without a base, the flight's mass starts at its lower end.
+    const floating = buildSolids(plan({ stairs: [flight({ from: 0.6, to: 1.2 })] }));
+    expect(floating.filter((s) => s.kind === 'step').map((s) => s.box.z0)).toEqual([0.6, 0.6]);
+  });
+
+  it('refuses a base above the flight', () => {
+    const messages = checkPlan(plan({ stairs: [flight({ base: 0.4 })] })).map(
+      (i) => `${i.path}: ${i.message}`,
+    );
+    expect(messages).toEqual(['stairs[0].base: the mass under a flight starts at or below from']);
   });
 });

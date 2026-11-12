@@ -225,6 +225,14 @@ every room shares one perspective.
 - The plan sits on a 20 cm grid: walls, doors, stairs and spots land on its lines, so furniture
   and art are measured in whole cells. A grid version of the blockout draws the cells on every
   floor and back wall, and each cell's corners fall on whole pixels.
+- The plan lists the furniture of each area as boxes in whole cells, with a height and, for what
+  hangs on a wall, a lift. The blockout draws them in one file per storey (with the storeys below
+  it), and the draft `layout.json` gets a prop per piece: key `house.props.<area>.<id>`, sprite
+  rect and footprint. Furniture that overlaps, leaves its area or rises above its walls stops the
+  run; a stand or parking spot hidden behind furniture, or a sprite past the 1024 px limit, is a
+  warning.
+- A flight can reach down to the floor and a landing's slab can fill the space under it, so a
+  closed understair (the storeroom under the stairs) reads as solid, not as a gap.
 
 ### 8.2 M1: First playable
 

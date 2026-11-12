@@ -24,6 +24,10 @@ const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
   step: ['#efe9df', '#efe9df'],
   'step-x': ['#c7bfb2', '#c7bfb2'],
   'step-y': ['#b3ab9e', '#b3ab9e'],
+  // Furniture in warm tan, so it reads apart from the house at a glance.
+  prop: ['#d9b48a', '#d9b48a'],
+  'prop-x': ['#bf9a70', '#bf9a70'],
+  'prop-y': ['#a9875f', '#a9875f'],
 };
 const STROKE = '#4b463e';
 const GRID_STROKE = '#8a8275';
@@ -181,12 +185,19 @@ export function guideSvg(g: GuideInput): string {
       `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c2185b" stroke-width="4"/>`,
     ];
   });
+  const props = layout.props.map(
+    (p) =>
+      `<polygon points="${pts(p.base.map(canvas))}" fill="none" stroke="#6d4c2f" stroke-width="3" stroke-dasharray="10 6"/>`,
+  );
   const spots = Object.values(layout.spots).map(
     ({ rect: [x, y, w, h] }) =>
       `<rect x="${x * 2}" y="${y * 2}" width="${w * 2}" height="${h * 2}" fill="#8e44ad" fill-opacity="0.3" stroke="#8e44ad" stroke-width="4"/>`,
   );
   const labels = [
     ...layout.rooms.map((r) => label(r.id, canvas([r.stand[0], r.stand[1] + 30]), 40)),
+    ...layout.props.map(({ key, rect: [x, y, w] }) =>
+      label(key.split('.').slice(2).join('.'), canvas([x + w / 2, y + 12]), 22),
+    ),
     ...layout.waypoints.map((w) => {
       const [x, y] = canvas(w.pos);
       return `<circle cx="${x}" cy="${y}" r="9" fill="#c2185b"/>\n${label(w.id, [x, y - 18], 24)}`;
@@ -205,6 +216,7 @@ export function guideSvg(g: GuideInput): string {
     '</g>',
     ...group('guide-rooms', rooms),
     ...group('guide-hidden', hidden),
+    ...group('guide-props', props),
     ...group('guide-spots', spots),
     ...group('guide-edges', edges),
     ...group('guide-theia', theia),
