@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { error, warning } from '../../contracts/common.ts';
 import { checkHouseLayout, houseLayout, type HouseLayout } from '../../contracts/houseLayout.ts';
+import { STOREYS } from '../../contracts/rooms.ts';
 import {
   checkImageSize,
   checkManifest,
@@ -71,9 +72,14 @@ function checkLayout(root: string, file: string, m: Manifest): FileIssue[] {
     if (!keys.has(o.key))
       issues.push({ ...error(`occluders[${i}].key`, `${o.key} is not in the manifest`), file });
   });
-  for (const room of layout.rooms) {
-    if (!keys.has(`house.rooms.${room.id}`)) {
-      issues.push({ ...warning('rooms', `house.rooms.${room.id} is not delivered yet`), file });
+  layout.props.forEach((p, i) => {
+    if (!keys.has(p.key))
+      issues.push({ ...error(`props[${i}].key`, `${p.key} is not in the manifest`), file });
+  });
+  const storeys = new Set([...layout.rooms, ...layout.props].map((x) => x.storey));
+  for (const s of STOREYS.filter((st) => storeys.has(st.id))) {
+    if (!keys.has(`house.structure.${s.name}`)) {
+      issues.push({ ...warning('rooms', `house.structure.${s.name} is not delivered yet`), file });
     }
   }
   return issues;

@@ -31,10 +31,13 @@ describe('key families', () => {
     ['house.layout', 'house.layout'],
     ['house.sky.dusk', 'house.backdrop'],
     ['house.lights', 'house.layer'],
-    ['house.rooms.kamar-anak.dim', 'house.layer'],
+    ['house.structure.lt-dasar', 'house.layer'],
+    ['house.structure.mezzanine-2', 'house.layer'],
+    ['house.props.dapur.kulkas', 'house.props'],
+    ['house.props.ruang-tangga.rak-sepatu', 'house.props'],
     ['house.mess.ruang-keluarga', 'house.layer'],
     ['house.occluders.railing-tangga', 'house.layer'],
-    ['house.fridge', 'house.prop'],
+    ['house.fridge', 'house.spot'],
     ['tracing.theme.zigzag', 'tracing'],
     ['counting.dots.10', 'counting.dots'],
     ['coloring.ayam', 'coloring'],
@@ -52,12 +55,17 @@ describe('key families', () => {
     expect(familyOf(key)?.id).toBe(family);
   });
 
-  it.each(['house.rooms.ruang-tamu', 'counting.dots.11', 'companion.kiki.default', 'misc.thing'])(
-    '%s matches no family',
-    (key) => {
-      expect(familyOf(key)).toBeUndefined();
-    },
-  );
+  it.each([
+    'house.structure',
+    'house.structure.lt-bawah',
+    'house.rooms.dapur',
+    'house.props.kulkas',
+    'counting.dots.11',
+    'companion.kiki.default',
+    'misc.thing',
+  ])('%s matches no family', (key) => {
+    expect(familyOf(key)).toBeUndefined();
+  });
 
   it('gives every image family a size rule and every sheet a frame', () => {
     for (const f of KEY_FAMILIES) {

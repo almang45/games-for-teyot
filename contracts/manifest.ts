@@ -13,7 +13,7 @@ import {
   type Point,
   type Size,
 } from './common.ts';
-import { ROOM_IDS, roomId } from './rooms.ts';
+import { ROOM_IDS, roomId, STOREYS } from './rooms.ts';
 
 /** Relative to `assets/`: kebab-case folders and names (ASSETS.md §7), no `..`, no leading `/`. */
 const pathFor = (ext: string) =>
@@ -195,7 +195,8 @@ export interface KeyFamily {
 
 const ID = '[a-z0-9]+(?:-[a-z0-9]+)*';
 const ROOM = `(?:${ROOM_IDS.join('|')})`;
-// Sources are the literals in KEY_FAMILIES below, built from ID and ROOM_IDS; never input.
+const STOREY_NAME = `(?:${STOREYS.map((s) => s.name).join('|')})`;
+// Sources are the literals in KEY_FAMILIES below, built from ID, ROOM_IDS and STOREYS; never input.
 // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
 const key = (source: string) => new RegExp(`^${source}$`);
 
@@ -261,14 +262,19 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
   },
   {
     id: 'house.layer',
-    pattern: key(
-      `house\\.(?:structure|lights|rooms\\.${ROOM}(?:\\.dim)?|mess\\.${ROOM}|occluders\\.${ID})`,
-    ),
+    pattern: key(`house\\.(?:structure\\.${STOREY_NAME}|lights|mess\\.${ROOM}|occluders\\.${ID})`),
     type: 'image',
     size: { exact: HOUSE_SOURCE },
   },
   {
-    id: 'house.prop',
+    // The first id is the plan area the prop stands in, so the sheet groups by room.
+    id: 'house.props',
+    pattern: key(`house\\.props\\.${ID}\\.${ID}`),
+    type: 'image',
+    size: { min: [16, 16], max: [1024, 1024] },
+  },
+  {
+    id: 'house.spot',
     pattern: key('house\\.(?:fridge|sticker-wall)'),
     type: 'image',
     size: { min: [64, 64], max: [1024, 1024] },

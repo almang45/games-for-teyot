@@ -200,6 +200,14 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   small JSON) into an isometric **SVG blockout**: floors, walls, stairs, and door openings at the
   exact projection. Antigravity paints over it (structure guide or img2img), so every room shares
   one geometry and `layout.json` lines up with the art.
+- **The 20 cm grid.** The plan sits on a 20 cm grid, and `house-blockout-grid.svg` draws its cells
+  on every floor and back wall (whole metres are thicker). Each cell's corners land on whole
+  pixels; the guide's scale bar gives the cell size in px. Furniture is measured in whole cells,
+  so a prop's footprint and height follow the grid lines.
+- **One sprite per piece of furniture.** The structure layers hold no furniture. Each piece is
+  its own `house.props.*` sprite, so one can be redrawn without touching the rest, and the game
+  sorts it with the characters by its footprint. Lock the style first: paint 3–4 props and one
+  storey, get Papa's approval, then do the rest.
 - Design canvas **3840 × 2400 px** (16:10, the 1920 × 1200 frame at 2×). It fits the tablet and
   the laptops; on the phones, Theia's main devices, it fills the height and `house.bg` fills the
   sides.
@@ -212,14 +220,15 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   |---|---|---|---|
   | `house.bg` | `house/bg.png` | 2688 × 1200 | Outside around the house: garden, fence, trees. The middle 1920 px lines up with the 1920 × 1200 export space; 384 px of extra garden on each side fills a 20:9 phone. |
   | `house.sky.<look>` | `house/sky/<look>.png` | 2688 × 1200 | One per look: `morning`, `noon`, `afternoon`, `dusk`. The game blends them with the `color.sky` tints. Same side extension as `house.bg`. |
-  | `house.structure` | `house/structure.png` | 3840 × 2400 | Walls, floors, stairs, everything *behind* the characters |
+  | `house.structure.<storey>` | `house/structure/<storey>.png` | 3840 × 2400 | One per storey (`lt-dasar`, `mezzanine-1`, `lt-atas`, `mezzanine-2`): its floor, back walls, door openings and stairs, with no furniture. Zoomed into a room, the game fades the storeys above it (PRD US-HOUSE-01). |
   | `house.lights` | `house/lights.png` | 3840 × 2400 | Warm lamp and window glow. The game fades it in at dusk and dims it at bedtime. |
-  | `house.rooms.<room-id>` | `house/rooms/<room-id>.png` | 3840 × 2400 | Furniture in each room that stands behind the characters |
-  | `house.rooms.<room-id>.dim` | `house/rooms/<room-id>-dim.png` | 3840 × 2400 | The locked look for each room |
-  | `house.occluders.<id>` | `house/occluders/<id>.png` | 3840 × 2400 | Anything drawn **in front of** a character walking behind it (railings, a sofa back, a front table edge). Each has a sort line in `layout.json`. |
+  | `house.props.<area>.<id>` | `house/props/<area>/<id>.png` | 16–1024 px per side | One piece of furniture or decor, trimmed to its own bounds and drawn at 2× its `rect` in `layout.json`. `<area>` is the plan area it stands in (a room id, or `ruang-tangga`, …). |
+  | `house.occluders.<id>` | `house/occluders/<id>.png` | 3840 × 2400 | Fixed parts of the building drawn **in front of** a character walking behind them (a stair railing, a half wall). Each has a sort line in `layout.json`. Furniture is a prop instead. |
   | `house.mess.<room-id>` | `house/mess/<room-id>.png` | 3840 × 2400 | Drawn on top of the room while it's messy (tidy-up) |
   | `house.fridge`, `house.sticker-wall` | `house/fridge.png`, … | 64–1024 px per side | The fridge display and her sticker wall, placed at `spots` in `layout.json` |
 - Walkable areas are **floor polygons** on each storey. Stairs run along one isometric axis.
+- **Locked rooms** (PRD US-HOUSE-03) need no extra art: the game dims the room's floor area and its
+  props.
 
 ### 4.2 `assets/house/layout.json`
 
@@ -248,6 +257,15 @@ the top left. Schema: `contracts/houseLayout.ts`.
   },
   "occluders": [
     { "key": "house.occluders.railing-tangga", "sortY": 488 }   // in front of characters with feet y < sortY
+  ],
+  "props": [
+    {
+      "key": "house.props.dapur.kulkas",     // in the manifest, with its 2× PNG
+      "storey": 0,                            // fades with this storey
+      "room": "dapur",                        // dims with this room while it's locked; omit outside rooms
+      "rect": [480, 600, 160, 240],           // where the sprite is drawn (x, y, w, h)
+      "base": [[560, 780], [630, 815], [560, 835], [490, 815]]   // footprint: back corner, then clockwise
+    }
   ],
   "waypoints": [
     { "id": "pintu-dapur", "pos": [1100, 900], "storey": 0 },
@@ -280,7 +298,11 @@ Rules (`npm run validate:assets` checks all of them):
   two `stair` waypoints.
 - Every room's `stand` and both `parking` spots lie inside its `walk` polygon.
 - Polygons have an area, don't cross themselves, and stay on the canvas. So do `focus` and `spots`.
-- Every occluder key is registered in the manifest.
+- Every occluder and prop key is registered in the manifest. Prop keys are unique.
+- A prop stays on the canvas, its footprint is a real polygon inside its `rect`, and its `room`
+  is on the prop's `storey`.
+- The game draws a character in front of a prop when the character's feet are in front of the
+  prop's footprint, and behind it otherwise.
 
 ## 5. Activity art
 

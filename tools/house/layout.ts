@@ -186,6 +186,7 @@ export function draftLayout(plan: FloorPlan, fit: Fit, solids: readonly Solid[])
     rooms,
     spots: { fridge: spot('fridge'), 'sticker-wall': spot('sticker-wall') },
     occluders: [],
+    props: [],
     waypoints: plan.waypoints.map((w) => ({
       id: w.id,
       pos: toLayout(at(w.at, waypointZ(plan, w)), fit),
