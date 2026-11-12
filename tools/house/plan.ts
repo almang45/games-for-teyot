@@ -33,6 +33,8 @@ export const planArea = z.strictObject({
   walls: z.array(wallSide).default([]),
   /** Defaults to the plan's `wallHeight`. */
   wallHeight: length.optional(),
+  /** Slab thickness; defaults to the plan's. A landing can reach down to the floor under it. */
+  slab: length.optional(),
   outdoor: z.boolean().default(false),
 });
 export type PlanArea = z.infer<typeof planArea>;
@@ -57,6 +59,11 @@ export const planStair = z.strictObject({
   from: metres,
   to: metres,
   steps: z.number().int().positive(),
+  /**
+   * Where the steps' mass starts; defaults to `from`. Set it to the floor below for a closed
+   * understair, such as a storeroom, so the flight doesn't float.
+   */
+  base: metres.optional(),
 });
 export type PlanStair = z.infer<typeof planStair>;
 
@@ -336,6 +343,9 @@ export function checkPlan(plan: FloorPlan): Issue[] {
   plan.stairs.forEach((s, i) => {
     if (s.from >= s.to) {
       issues.push(error(`stairs[${i}]`, 'a flight climbs along rise: from must be below to'));
+    }
+    if (s.base !== undefined && s.base > s.from) {
+      issues.push(error(`stairs[${i}].base`, 'the mass under a flight starts at or below from'));
     }
   });
   for (const [name, spot] of Object.entries(plan.spots)) {

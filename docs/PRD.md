@@ -231,6 +231,8 @@ every room shares one perspective.
   rect and footprint. Furniture that overlaps, leaves its area or rises above its walls stops the
   run; a stand or parking spot hidden behind furniture, or a sprite past the 1024 px limit, is a
   warning.
+- A flight can reach down to the floor and a landing's slab can fill the space under it, so a
+  closed understair (the storeroom under the stairs) reads as solid, not as a gap.
 
 ### 8.2 M1: First playable
 

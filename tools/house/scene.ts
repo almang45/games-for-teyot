@@ -140,7 +140,7 @@ function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
         return { from: start, to: start + door.width, bottom: z, top: z + door.height };
       });
   const solids: Solid[] = [
-    { ...base, kind: 'slab', box: boxOf(a.rect, z - plan.slab, z), openings: [] },
+    { ...base, kind: 'slab', box: boxOf(a.rect, z - (a.slab ?? plan.slab), z), openings: [] },
   ];
   if (a.walls.includes('x0')) {
     const box = { x0: x, x1: x, y0: y, y1: y + d, z0: z, z1: top };
@@ -183,7 +183,7 @@ export function buildSolids(plan: FloorPlan): Solid[] {
       owner: s.id,
       storey: s.storey,
       outdoor: false,
-      box: boxOf(step.rect, Math.min(s.from, s.to), step.top),
+      box: boxOf(step.rect, s.base ?? Math.min(s.from, s.to), step.top),
       openings: [],
     })),
   );

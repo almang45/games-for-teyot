@@ -850,3 +850,28 @@ describe('US-REF-02 furniture', () => {
     expect(blockoutSvg(solids, fit, CANVAS)).toContain('data-kind="prop-x"');
   });
 });
+
+describe('US-REF-02 closed understairs', () => {
+  it('lets a flight reach down to the floor and a landing slab fill the space under it', () => {
+    const input = planInput();
+    const landing = { id: 'bordes', storey: 0, z: 0.6, slab: 0.6, rect: [6, 0, 1, 1] };
+    const p = plan({
+      areas: [...(input.areas as object[]), landing],
+      stairs: [flight({ from: 0.6, to: 1.2, base: 0 })],
+    });
+    expect(checkPlan(p)).toEqual([]);
+    const solids = buildSolids(p);
+    expect(solids.filter((s) => s.kind === 'step').map((s) => s.box.z0)).toEqual([0, 0]);
+    expect(solids.find((s) => s.owner === 'bordes')?.box).toMatchObject({ z0: 0, z1: 0.6 });
+    // Without a base, the flight's mass starts at its lower end.
+    const floating = buildSolids(plan({ stairs: [flight({ from: 0.6, to: 1.2 })] }));
+    expect(floating.filter((s) => s.kind === 'step').map((s) => s.box.z0)).toEqual([0.6, 0.6]);
+  });
+
+  it('refuses a base above the flight', () => {
+    const messages = checkPlan(plan({ stairs: [flight({ base: 0.4 })] })).map(
+      (i) => `${i.path}: ${i.message}`,
+    );
+    expect(messages).toEqual(['stairs[0].base: the mass under a flight starts at or below from']);
+  });
+});
