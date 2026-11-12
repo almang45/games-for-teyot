@@ -82,6 +82,20 @@ const HOUSE: HouseLayout = {
     'sticker-wall': { room: 'kamar-tidur', rect: [1200, 250, 100, 60] },
   },
   occluders: [{ key: 'house.occluders.railing', sortY: 480 }],
+  props: [
+    {
+      key: 'house.props.dapur.kulkas',
+      storey: 0,
+      room: 'dapur',
+      rect: [480, 600, 160, 240],
+      base: [
+        [560, 780],
+        [630, 815],
+        [560, 835],
+        [490, 815],
+      ],
+    },
+  ],
   waypoints: [
     { id: 'pintu-dapur', pos: [1100, 900], storey: 0 },
     { id: 'tangga-bawah', pos: [1550, 850], storey: 0, stair: true },

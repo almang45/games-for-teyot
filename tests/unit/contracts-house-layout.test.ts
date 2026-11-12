@@ -110,6 +110,34 @@ describe('house layout', () => {
     );
   });
 
+  it('defaults props to none and checks each prop against its sprite, room and storey', () => {
+    const withoutProps: Partial<HouseLayout> = houseFixture();
+    delete withoutProps.props;
+    expect(houseLayout.parse(withoutProps).props).toEqual([]);
+
+    const l = houseFixture();
+    const kulkas = l.props[0];
+    if (!kulkas) throw new Error('fixture has a prop');
+    l.props.push(
+      { ...kulkas },
+      { ...kulkas, key: 'house.props.dapur.meja', rect: [1900, 600, 160, 240] },
+      { ...kulkas, key: 'house.props.dapur.kursi', rect: [480, 600, 40, 40] },
+      { ...kulkas, key: 'house.props.dapur.rak', room: 'kamar-anak' },
+      { ...kulkas, key: 'house.props.dapur.lemari', storey: 2 },
+    );
+    expect(messages(l)).toEqual([
+      'props: duplicate prop house.props.dapur.kulkas',
+      'props[2].rect: prop leaves the canvas',
+      'props[2].base: the footprint must lie inside the sprite rect',
+      'props[3].base: the footprint must lie inside the sprite rect',
+      'props[4].room: kamar-anak is not in rooms',
+      'props[5].storey: dapur is on storey 0',
+    ]);
+    expect(
+      houseLayout.safeParse({ ...l, props: [{ ...kulkas, key: 'house.kulkas' }] }).success,
+    ).toBe(false);
+  });
+
   it('flags degenerate, crossing and off-canvas polygons', () => {
     const l = houseFixture();
     const room = l.rooms[0];

@@ -50,8 +50,8 @@ function deliverAssets(): void {
   put('assets/character/theia/default.png', blank(1024, 256));
   put('assets/counting/objects/apel.png', blank(192, 192));
   put('assets/counting/containers/mangkuk.png', blank(512, 384));
-  // Occluder art is a 3840 × 2400 layer; keep the fixture light and test occluder keys separately.
-  putJson('assets/house/layout.json', { ...houseFixture(), occluders: [] });
+  // Occluder and prop art isn't delivered here; their keys are tested separately.
+  putJson('assets/house/layout.json', { ...houseFixture(), occluders: [], props: [] });
   put('assets/fonts/andika-regular.woff2', Buffer.from('wOF2 not really a font'));
   put('assets/ui/home.png', blank(144, 144));
 }
@@ -106,9 +106,8 @@ describe('validateAssets', () => {
       expect.stringMatching(
         /^assets\/manifest\.json assets\[0\]\.animations: not delivered yet/,
       ) as string,
-      'assets/house/layout.json rooms: house.rooms.ruang-keluarga is not delivered yet',
-      'assets/house/layout.json rooms: house.rooms.dapur is not delivered yet',
-      'assets/house/layout.json rooms: house.rooms.kamar-tidur is not delivered yet',
+      'assets/house/layout.json rooms: house.structure.lt-dasar is not delivered yet',
+      'assets/house/layout.json rooms: house.structure.lt-atas is not delivered yet',
     ]);
     expect(report.files).toBe(8);
   });
@@ -136,7 +135,7 @@ describe('validateAssets', () => {
     ]);
   });
 
-  it('checks the house layout and its occluder keys', () => {
+  it('checks the house layout and its occluder and prop keys', () => {
     deliverAssets();
     const layout = houseFixture();
     first(layout.rooms).stand = [5, 5];
@@ -145,6 +144,7 @@ describe('validateAssets', () => {
       expect.arrayContaining([
         'assets/house/layout.json rooms[0].stand: stand must lie inside the walk polygon',
         'assets/house/layout.json occluders[0].key: house.occluders.railing is not in the manifest',
+        'assets/house/layout.json props[0].key: house.props.dapur.kulkas is not in the manifest',
       ]),
     );
     putJson('assets/house/layout.json', { version: 1 });

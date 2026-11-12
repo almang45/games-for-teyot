@@ -48,6 +48,26 @@ export const houseSpot = z.strictObject({
   rect,
 });
 
+/**
+ * One piece of furniture or decor, drawn as its own sprite and depth-sorted with the characters
+ * (ASSETS.md §4.1). Sized in whole 20 cm cells of the blockout grid.
+ */
+export const houseProp = z.strictObject({
+  key: assetKey.regex(/^house\.props\./, 'prop keys start with house.props.'),
+  /** Fades with its storey when the camera zooms into a room below (PRD US-HOUSE-01). */
+  storey,
+  /** Dims with this room while it's locked; absent for props outside every room. */
+  room: roomId.optional(),
+  /** Where the sprite is drawn. The source art is this size at 2×. */
+  rect,
+  /**
+   * The footprint on the floor: its four corners, back corner first, then clockwise on screen.
+   * A character whose feet are in front of it is drawn in front of the prop.
+   */
+  base: z.tuple([point, point, point, point]),
+});
+export type HouseProp = z.infer<typeof houseProp>;
+
 export const houseLayout = z.strictObject({
   $schema: schemaRef,
   version,
@@ -66,6 +86,8 @@ export const houseLayout = z.strictObject({
       sortY: z.number(),
     }),
   ),
+  /** Furniture and decor sprites; empty until the art for them is planned. */
+  props: z.array(houseProp).default([]),
   waypoints: z.array(
     z.strictObject({
       id: kebabId,
@@ -177,6 +199,25 @@ function checkGraph(layout: HouseLayout): Issue[] {
   return issues;
 }
 
+function checkProp(prop: HouseProp, i: number, layout: HouseLayout): Issue[] {
+  const path = `props[${i}]`;
+  const issues = checkPolygon(prop.base, `${path}.base`);
+  if (!rectContains(FRAME_RECT, prop.rect)) {
+    issues.push(error(`${path}.rect`, 'prop leaves the canvas'));
+  }
+  if (!prop.base.every((p) => rectContainsPoint(prop.rect, p))) {
+    issues.push(error(`${path}.base`, 'the footprint must lie inside the sprite rect'));
+  }
+  if (prop.room !== undefined) {
+    const room = layout.rooms.find((r) => r.id === prop.room);
+    if (!room) issues.push(error(`${path}.room`, `${prop.room} is not in rooms`));
+    else if (room.storey !== prop.storey) {
+      issues.push(error(`${path}.storey`, `${prop.room} is on storey ${room.storey}`));
+    }
+  }
+  return issues;
+}
+
 /** ASSETS.md §4.2 rules the schema can't express. */
 export function checkHouseLayout(layout: HouseLayout): Issue[] {
   const issues: Issue[] = [];
@@ -190,6 +231,10 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
   for (const dupe of duplicates(layout.occluders.map((o) => o.key))) {
     issues.push(error('occluders', `duplicate occluder ${dupe}`));
   }
+  for (const dupe of duplicates(layout.props.map((p) => p.key))) {
+    issues.push(error('props', `duplicate prop ${dupe}`));
+  }
+  layout.props.forEach((p, i) => issues.push(...checkProp(p, i, layout)));
   const hasStart = layout.rooms.some((r) => r.id === layout.start);
   if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
   layout.rooms.forEach((r, i) => issues.push(...checkRoom(r, i)));
