@@ -3,7 +3,15 @@ import type { HouseLayout } from '../../contracts/houseLayout.ts';
 import { STOREYS } from '../../contracts/rooms.ts';
 import { project, type Fit, type Vec3 } from './iso.ts';
 import type { HiddenFloor } from './layout.ts';
-import { drawOrder, facesOf, type Face, type FaceKind, type Solid } from './scene.ts';
+import {
+  drawOrder,
+  facesOf,
+  gridLinesOf,
+  type Face,
+  type FaceKind,
+  type GridLine,
+  type Solid,
+} from './scene.ts';
 
 /** Neutral greys, lighter facing up and toward +x: Antigravity paints over them (ASSETS.md §4.1). */
 const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
@@ -18,6 +26,7 @@ const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
   'step-y': ['#b3ab9e', '#b3ab9e'],
 };
 const STROKE = '#4b463e';
+const GRID_STROKE = '#8a8275';
 
 /** A 3-year-old is about this tall; the guide draws her at each stand to judge sprite scale. */
 export const THEIA_HEIGHT_M = 0.95;
@@ -34,16 +43,42 @@ function faceElement(f: Face, outdoor: boolean, fit: Fit): string {
   return `<polygon data-kind="${f.kind}" points="${points}" fill="${fill}"/>`;
 }
 
+/** Minor and major (whole-metre) lines as one path each. */
+function gridElements(lines: readonly GridLine[], fit: Fit): string[] {
+  const path = (major: boolean): string[] => {
+    const d = lines
+      .filter((l) => l.major === major)
+      .map((l) => {
+        const [x1, y1] = project(l.from, fit);
+        const [x2, y2] = project(l.to, fit);
+        return `M${num(x1)} ${num(y1)}L${num(x2)} ${num(y2)}`;
+      })
+      .join('');
+    if (d === '') return [];
+    const width = major ? 2 : 1;
+    return [
+      `<path data-kind="grid${major ? '-major' : ''}" d="${d}" fill="none" stroke="${GRID_STROKE}" stroke-width="${width}"/>`,
+    ];
+  };
+  return [...path(false), ...path(true)];
+}
+
 /**
  * One group per solid in painter's order for the whole house. Storeys interleave (a lower
  * storey's front can cover an upper one's back), so the storey is an attribute, not a group.
+ * With a `grid`, its lines go right after the solid's first face (floor or wall), so doors and
+ * whatever stands in front still cover them.
  */
-function structure(solids: readonly Solid[], fit: Fit): string[] {
-  return drawOrder(solids).flatMap((s) => [
-    `<g data-owner="${esc(s.owner)}" data-solid="${s.kind}" data-storey="${STOREYS[s.storey].name}">`,
-    ...facesOf(s).map((f) => `  ${faceElement(f, s.outdoor, fit)}`),
-    '</g>',
-  ]);
+function structure(solids: readonly Solid[], fit: Fit, grid?: number): string[] {
+  return drawOrder(solids).flatMap((s) => {
+    const [first, ...rest] = facesOf(s).map((f) => faceElement(f, s.outdoor, fit));
+    const lines = grid === undefined ? [] : gridElements(gridLinesOf(s, grid), fit);
+    return [
+      `<g data-owner="${esc(s.owner)}" data-solid="${s.kind}" data-storey="${STOREYS[s.storey].name}">`,
+      ...[first ?? '', ...lines, ...rest].filter((e) => e !== '').map((e) => `  ${e}`),
+      '</g>',
+    ];
+  });
 }
 
 const open = (size: readonly [number, number]): string =>
@@ -53,17 +88,21 @@ const open = (size: readonly [number, number]): string =>
 const groupAttrs =
   `stroke="${STROKE}" stroke-width="2" stroke-linejoin="round" ` + 'fill-rule="nonzero"';
 
-/** The clean blockout: geometry only, no text (AGENTS.md: no text in images). */
+/**
+ * The clean blockout: geometry only, no text (AGENTS.md: no text in images). With `grid`, the
+ * floors and back walls carry its cells.
+ */
 export function blockoutSvg(
   solids: readonly Solid[],
   fit: Fit,
   size: readonly [number, number],
+  grid?: number,
 ): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     open(size),
     `<g id="structure" ${groupAttrs}>`,
-    ...structure(solids, fit).map((l) => `  ${l}`),
+    ...structure(solids, fit, grid).map((l) => `  ${l}`),
     '</g>',
     '</svg>',
     '',
@@ -80,18 +119,22 @@ function label(text: string, [x, y]: Point, size: number, anchor = 'middle'): st
 }
 
 /** A 1 m bar along the screen x axis: one plan metre along x or y spans `scale` px across. */
-function scaleBar(fit: Fit): string[] {
+function scaleBar(fit: Fit, grid: number): string[] {
   const [x, y] = [80, 80];
-  const text = `1 m = ${fit.scale} px (layout ${fit.scale / 2} px)`;
+  const cell = grid * fit.scale;
+  const cm = Math.round(grid * 1000) / 10;
   return [
     `<line x1="${x}" y1="${y}" x2="${x + fit.scale}" y2="${y}" stroke="#1b1b1b" stroke-width="6"/>`,
-    label(text, [x, y + 50], 36, 'start'),
+    label(`1 m = ${fit.scale} px (layout ${fit.scale / 2} px)`, [x, y + 50], 36, 'start'),
+    label(`${cm} cm cell = ${num(2 * cell)} × ${num(cell)} px tile`, [x, y + 100], 36, 'start'),
   ];
 }
 
 export interface GuideInput {
   readonly solids: readonly Solid[];
   readonly fit: Fit;
+  /** Cell size in metres, drawn on floors and back walls. */
+  readonly grid: number;
   readonly size: readonly [number, number];
   readonly layout: HouseLayout;
   readonly hidden: readonly HiddenFloor[];
@@ -158,7 +201,7 @@ export function guideSvg(g: GuideInput): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     open(g.size),
     `<g id="structure" ${groupAttrs}>`,
-    ...structure(g.solids, fit).map((l) => `  ${l}`),
+    ...structure(g.solids, fit, g.grid).map((l) => `  ${l}`),
     '</g>',
     ...group('guide-rooms', rooms),
     ...group('guide-hidden', hidden),
@@ -166,7 +209,7 @@ export function guideSvg(g: GuideInput): string {
     ...group('guide-edges', edges),
     ...group('guide-theia', theia),
     `<g id="guide-labels" font-family="sans-serif" fill="#1b1b1b">`,
-    ...[...labels, ...scaleBar(fit)].map((l) => `  ${l}`),
+    ...[...labels, ...scaleBar(fit, g.grid)].map((l) => `  ${l}`),
     '</g>',
     '</svg>',
     '',

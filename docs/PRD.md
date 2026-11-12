@@ -222,6 +222,9 @@ every room shares one perspective.
   storeys, doors, stairs).
 - It writes a 2:1 isometric SVG blockout at 3840 × 2400, plus a draft `layout.json` (walkable
   polygons, stands, waypoints, focus rects) that matches the SVG exactly.
+- The plan sits on a 20 cm grid: walls, doors, stairs and spots land on its lines, so furniture
+  and art are measured in whole cells. A grid version of the blockout draws the cells on every
+  floor and back wall, and each cell's corners fall on whole pixels.
 
 ### 8.2 M1: First playable
 

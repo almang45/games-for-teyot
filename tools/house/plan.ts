@@ -103,6 +103,11 @@ export const floorPlan = z.strictObject({
   slab: length.default(0.2),
   /** How far the default walk polygon keeps from a back wall. */
   walkInset: metres.nonnegative().default(0.3),
+  /**
+   * Cell size in metres. Walls, doors, stairs and spots sit on it, so art and furniture can be
+   * measured in whole cells; 20 cm fits standard furniture (60, 80, 120, 160, 200 cm).
+   */
+  grid: length.default(0.2),
   /** Empty border kept around the house on the 3840 × 2400 canvas, in px. */
   marginPx: z.number().int().nonnegative().default(160),
   areas: z.array(planArea).min(1),
@@ -165,6 +170,55 @@ function checkOnWall(
   return issues;
 }
 
+/** True when `v` is a whole number of `grid` cells, to the plan's slack. */
+export const onGrid = (v: number, grid: number): boolean =>
+  Math.abs(v / grid - Math.round(v / grid)) * grid < EPS;
+
+/** Everything that has to land on a grid line; heights and room points stay free. */
+function gridIssues(plan: FloorPlan): Issue[] {
+  const g = plan.grid;
+  const edges = ([x, y, w, d]: PlanRect): [string, number][] => [
+    ['x', x],
+    ['y', y],
+    ['x + width', x + w],
+    ['y + depth', y + d],
+  ];
+  const checks: [string, [string, number][]][] = [
+    ...plan.areas.map((a, i): [string, [string, number][]] => [`areas[${i}].rect`, edges(a.rect)]),
+    ...plan.stairs.map((s, i): [string, [string, number][]] => [
+      `stairs[${i}].rect`,
+      edges(s.rect),
+    ]),
+    ...plan.doors.map((door, i): [string, [string, number][]] => [
+      `doors[${i}]`,
+      [
+        ['at', door.at],
+        ['width', door.width],
+      ],
+    ]),
+    ...Object.entries(plan.spots).map(([name, spot]): [string, [string, number][]] => [
+      `spots.${name}`,
+      [
+        ['at', spot.at],
+        ['width', spot.width],
+        ['offset', spot.offset],
+      ],
+    ]),
+  ];
+  const mm = (v: number): number => Math.round(v * 1000) / 1000;
+  return checks.flatMap(([path, values]) =>
+    values
+      .filter(([, v]) => !onGrid(v, g))
+      .map(([name, v]) => {
+        const nearest = mm(Math.round(v / g) * g);
+        return error(
+          path,
+          `${name} ${mm(v)} is off the ${mm(g * 100)} cm grid; nearest ${nearest}`,
+        );
+      }),
+  );
+}
+
 function checkRoom(plan: FloorPlan, room: PlanRoom, i: number, a: PlanArea | undefined): Issue[] {
   const path = `rooms[${i}]`;
   if (!a) return [error(`${path}.area`, `unknown area ${room.area}`)];
@@ -206,6 +260,7 @@ export function checkPlan(plan: FloorPlan): Issue[] {
   for (const dupe of duplicates(plan.rooms.map((r) => r.area))) {
     issues.push(error('rooms', `area ${dupe} is the floor of more than one room`));
   }
+  issues.push(...gridIssues(plan));
   plan.rooms.forEach((r, i) => issues.push(...checkRoom(plan, r, i, areas.get(r.area))));
   plan.doors.forEach((door, i) => {
     const a = areas.get(door.area);
