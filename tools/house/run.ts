@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { zodIssues } from '../../contracts/common.ts';
 import { STOREYS } from '../../contracts/rooms.ts';
@@ -111,6 +111,11 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
     ...plan.views.map((v): [string, string] => [eyeFile(v.id), eyeSvg(seen, plan, v)]),
   ];
   mkdirSync(join(root, outDir), { recursive: true });
+  // A renamed or dropped view must not leave its old render behind to be compared with a photo.
+  const written = new Set(outputs.map(([name]) => name));
+  for (const name of readdirSync(join(root, outDir))) {
+    if (/^house-eye-.+\.svg$/.test(name) && !written.has(name)) rmSync(join(root, outDir, name));
+  }
   for (const [name, content] of outputs) writeFileSync(join(root, outDir, name), content);
 
   const layoutPxPerMetre = fit.scale / 2;

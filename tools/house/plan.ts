@@ -335,15 +335,24 @@ function checkViews(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): Issu
     if (Math.hypot(v.look[0] - x, v.look[1] - y) < EPS) {
       issues.push(error(`${path}.look`, 'looks straight up or down: move it away from the eye'));
     }
-    const inside = plan.furniture.find((f) => {
-      const [fx, fy, fw, fd] = f.rect;
-      const within = (p: number, start: number, size: number): boolean =>
-        p > start + EPS && p < start + size - EPS;
-      return (
-        f.area === a.id && within(x, fx, fw) && within(y, fy, fd) && within(h, f.lift, f.height)
-      );
-    });
+    const within = (p: number, start: number, size: number): boolean =>
+      p > start + EPS && p < start + size - EPS;
+    const inRect = ([rx, ry, rw, rd]: readonly number[]): boolean =>
+      within(x, rx ?? 0, rw ?? 0) && within(y, ry ?? 0, rd ?? 0);
+    const inside = plan.furniture.find(
+      (f) => f.area === a.id && inRect(f.rect) && within(h, f.lift, f.height),
+    );
     if (inside) issues.push(error(`${path}.eye`, `is inside ${furnitureName(inside)}`));
+    if (h >= wallHeightOf(plan, a) - EPS) {
+      issues.push(error(`${path}.eye`, `is at or above the ceiling of ${a.id}`));
+    }
+    // Stair heights are absolute; the mass runs from base (or from) up to the top step.
+    const z = floorZ(a) + h;
+    const stair = plan.stairs.find((s) => {
+      const bottom = s.base ?? s.from;
+      return inRect(s.rect) && within(z, bottom, s.to - bottom);
+    });
+    if (stair) issues.push(error(`${path}.eye`, `is inside stair ${stair.id}`));
   });
   return issues;
 }

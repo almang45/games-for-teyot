@@ -66,6 +66,9 @@ export type FaceKind =
 /** Furniture is drawn with the house but painted as separate sprites. */
 export const isProp = (s: Solid): boolean => s.kind === 'prop';
 
+/** A back wall: a box with no thickness, with doors cut in. */
+export const isWall = (s: Solid): boolean => s.kind === 'wall-x0' || s.kind === 'wall-y0';
+
 /** One flat polygon of the blockout, in plan metres. */
 export interface Face {
   readonly kind: FaceKind;

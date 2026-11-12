@@ -1,5 +1,5 @@
 import type { Vec3 } from './iso.ts';
-import { EPS, type Solid } from './scene.ts';
+import { EPS, isWall, type Solid } from './scene.ts';
 
 /** Ignores contact: a solid touching the point, or grazed along an edge, does not hide it. */
 const GRAZE = 1e-3;
@@ -13,7 +13,7 @@ const inside = (v: number, lo: number, hi: number): boolean => v > lo + GRAZE &&
  */
 function hides(s: Solid, p: Vec3): boolean {
   const { box } = s;
-  if (s.kind === 'wall-x0' || s.kind === 'wall-y0') {
+  if (isWall(s)) {
     const t = s.kind === 'wall-x0' ? box.x0 - p.x : box.y0 - p.y;
     if (t <= GRAZE) return false;
     const along = (s.kind === 'wall-x0' ? p.y : p.x) + t;

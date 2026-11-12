@@ -1,7 +1,7 @@
 import type { Point } from '../../contracts/common.ts';
 import { floorZ, type FloorPlan, type PlanView } from './plan.ts';
 import { encodePng } from './png.ts';
-import { EPS, type Box, type FaceKind, type Opening, type Solid } from './scene.ts';
+import { EPS, isWall, type Box, type FaceKind, type Opening, type Solid } from './scene.ts';
 import { FILL, GRID_STROKE, label, STROKE } from './svg.ts';
 
 /*
@@ -70,9 +70,9 @@ export interface Hit {
   /** +1 when that face points along +axis. */
   readonly side: 1 | -1;
   readonly point: V3;
+  /** The unit ray that made the hit. */
+  readonly dir: V3;
 }
-
-const isWall = (s: Solid): boolean => s.kind === 'wall-x0' || s.kind === 'wall-y0';
 
 /** The door at a point of a wall, its bounds grown by `margin`. */
 function openingAt(wall: Solid, p: V3, margin: number): Opening | undefined {
@@ -102,9 +102,18 @@ export function castRay(solids: readonly Solid[], o: V3, d: V3): Hit | undefined
     best = s;
   }
   if (!best) return undefined;
-  const n = nears(best.box, o, d);
-  const axis: Axis = n[0] === bestT ? 0 : n[1] === bestT ? 1 : 2;
-  return { solid: best, t: bestT, axis, side: d[axis] > 0 ? -1 : 1, point: add(o, mul(d, bestT)) };
+  // The entry face is the slab entered last; argmax rather than equality with bestT, so this
+  // never depends on enterAt and nears rounding alike.
+  const [nx, ny, nz] = nears(best.box, o, d);
+  const axis: Axis = nx >= ny && nx >= nz ? 0 : ny >= nz ? 1 : 2;
+  return {
+    solid: best,
+    t: bestT,
+    axis,
+    side: d[axis] > 0 ? -1 : 1,
+    point: add(o, mul(d, bestT)),
+    dir: d,
+  };
 }
 
 /** The blockout face colour a hit shows, matching the dollhouse SVGs. */
@@ -131,27 +140,40 @@ type Line = 'edge' | 'major' | 'minor';
 
 const GRID_FACES: ReadonlySet<FaceKind> = new Set(['floor', 'wall-x0', 'wall-y0']);
 
-/** A box edge, a door jamb or a grid line within `width` metres of the hit. */
+/** How far a line may widen where the ray grazes a face, so far floors keep their grid. */
+const GRAZE_CAP = 4;
+
+/**
+ * A box edge, a door jamb or a grid line within `width` metres of the hit. Where the ray grazes
+ * the face a pixel covers more of it along the ray's run, so the width grows that way.
+ */
 export function lineAt(h: Hit, kind: FaceKind, width: number, grid: number): Line | undefined {
   const axes = ([0, 1, 2] as const).filter((a) => a !== h.axis);
   const b = h.solid.box;
+  const facing = Math.max(Math.abs(h.dir[h.axis]), 1e-6);
+  const across = (a: Axis): number =>
+    width * Math.min(GRAZE_CAP, Math.hypot(facing, h.dir[a]) / facing);
   for (const a of axes) {
     const c = h.point[a];
-    if (Math.abs(c - lo(b, a)) < width || Math.abs(c - hi(b, a)) < width) return 'edge';
+    if (Math.abs(c - lo(b, a)) < across(a) || Math.abs(c - hi(b, a)) < across(a)) return 'edge';
   }
-  if (h.solid.kind === 'wall-x0' || h.solid.kind === 'wall-y0') {
-    const door = openingAt(h.solid, h.point, width);
+  if (isWall(h.solid)) {
+    const alongAxis = h.solid.kind === 'wall-x0' ? 1 : 0;
+    const door = openingAt(h.solid, h.point, Math.max(...axes.map(across)));
     if (door) {
-      const along = h.solid.kind === 'wall-x0' ? h.point[1] : h.point[0];
-      const jamb = [door.from, door.to].some((e) => Math.abs(along - e) < width);
-      if (jamb || Math.abs(h.point[2] - door.top) < width) return 'edge';
+      const along = h.point[alongAxis];
+      const jamb = [door.from, door.to].some((e) => Math.abs(along - e) < across(alongAxis));
+      if (jamb || Math.abs(h.point[2] - door.top) < across(2)) return 'edge';
     }
   }
-  if (!GRID_FACES.has(kind)) return undefined;
+  // Ceilings (a slab seen from below) carry no grid, as in the dollhouse.
+  if (!GRID_FACES.has(kind) || (h.solid.kind === 'slab' && kind !== 'floor')) return undefined;
   for (const a of axes) {
-    const c = h.point[a];
-    if (Math.abs(c - Math.round(c / grid) * grid) < width / 2) {
-      return Math.abs(c - Math.round(c)) < width / 2 ? 'major' : 'minor';
+    // Wall heights count up from the wall's own floor, as gridLinesOf draws them.
+    const c = a === 2 ? h.point[2] - b.z0 : h.point[a];
+    const half = across(a) / 2;
+    if (Math.abs(c - Math.round(c / grid) * grid) < half) {
+      return Math.abs(c - Math.round(c)) < half ? 'major' : 'minor';
     }
   }
   return undefined;
@@ -217,6 +239,18 @@ const rgbOf = (hex: string): V3 => [
 ];
 const mix = (a: V3, b: V3, k: number): V3 => add(mul(a, 1 - k), mul(b, k));
 
+// Each colour is parsed once: shade runs for every pixel.
+const parsed = new Map<string, V3>();
+function fillOf(kind: FaceKind, outdoor: boolean): V3 {
+  const hex = FILL[kind][outdoor ? 1 : 0];
+  let rgb = parsed.get(hex);
+  if (!rgb) {
+    rgb = rgbOf(hex);
+    parsed.set(hex, rgb);
+  }
+  return rgb;
+}
+
 const BACKGROUND: V3 = [255, 255, 255];
 const EDGE_RGB = rgbOf(STROKE);
 const GRID_RGB = rgbOf(GRID_STROKE);
@@ -232,7 +266,7 @@ export function shade(
   const h = castRay(solids, cam.eye, rayAt(cam, px, py));
   if (!h) return BACKGROUND;
   const kind = faceKindOf(h);
-  const base = rgbOf(FILL[kind][h.solid.outdoor ? 1 : 0]);
+  const base = fillOf(kind, h.solid.outdoor);
   // One pixel's width at the hit, so lines stay about a pixel wide near and far.
   const pixel = (h.t * 2 * cam.tanX) / cam.width;
   const line = lineAt(h, kind, pixel * 0.9, grid);
@@ -298,10 +332,12 @@ export function eyeSvg(solids: readonly Solid[], plan: FloorPlan, view: PlanView
     `<image width="${w}" height="${h}" href="data:image/png;base64,${png.toString('base64')}"/>`,
     `<g id="eye-labels" font-family="sans-serif" fill="#1b1b1b">`,
     ...eyeLabels(solids, cam).map((l) => {
-      // Keep the text inside the image; sans-serif runs about 0.55 em a character.
-      const half = (l.text.length * size * 0.55) / 2;
+      // Keep the text inside the image; sans-serif runs about 0.55 em a character. Text wider
+      // than the image is centred on it. Below the baseline leave room for descenders.
+      const half = Math.min((l.text.length * size * 0.55) / 2, w / 2);
       const x = Math.min(Math.max(l.at[0], half), w - half);
-      return `  ${label(l.text, [x, Math.max(l.at[1], size)], size)}`;
+      const y = Math.min(Math.max(l.at[1], size), h - size * 0.3);
+      return `  ${label(l.text, [x, y], size)}`;
     }),
     '</g>',
     '</svg>',

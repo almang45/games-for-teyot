@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
@@ -282,6 +282,24 @@ describe('US-REF-02 eye views: runBlockout', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('removes the render of a view that is gone, and nothing else', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rct-eye-stale-'));
+    try {
+      writeFileSync(join(root, 'plan.json'), JSON.stringify({ ...planInput(), views: [SOFA] }));
+      runBlockout(root, 'plan.json', 'out');
+      writeFileSync(join(root, 'out', 'notes.svg'), '<svg/>');
+      const renamed = { ...SOFA, id: 'sofa-kiri' };
+      writeFileSync(join(root, 'plan.json'), JSON.stringify({ ...planInput(), views: [renamed] }));
+      runBlockout(root, 'plan.json', 'out');
+      const files = readdirSync(join(root, 'out'));
+      expect(files).toContain('house-eye-sofa-kiri.svg');
+      expect(files).toContain('notes.svg');
+      expect(files).not.toContain('house-eye-sofa.svg');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('US-REF-02 eye views: eye walls', () => {
@@ -404,8 +422,12 @@ describe('US-REF-02 eye views: passages, ties and labels', () => {
     });
     const view: PlanView = { ...SOFA, eye: [0.3, 2.6, 1.1], look: [0.3, 0, 1.1], size: [200, 120] };
     const svg = eyeSvg(buildSolids(p), p, view);
-    const xs = [...svg.matchAll(/<text x="([\d.]+)"/g)].map((m) => Number(m[1]));
+    const at = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"/g)];
+    const xs = at.map((m) => Number(m[1]));
     expect(xs.length).toBeGreaterThan(0);
+    at.forEach((m) => {
+      expect(Number(m[2])).toBeLessThanOrEqual(120 - 12 * 0.3 + 0.01);
+    });
     const half = ('bangku-jendela-panjang'.length * 12 * 0.55) / 2;
     xs.forEach((x) => {
       expect(x).toBeGreaterThanOrEqual(half - 0.01);
@@ -413,3 +435,72 @@ describe('US-REF-02 eye views: passages, ties and labels', () => {
     });
   });
 });
+
+describe('US-REF-02 eye views: grid lines and eye placement', () => {
+  const w = 0.02;
+  const lineOf = (solids: readonly Solid[], o: V3, d: V3): string | undefined => {
+    const h = castRay(solids, o, d);
+    if (!h) throw new Error('expected a hit');
+    return lineAt(h, faceKindOf(h), w, 0.2);
+  };
+
+  it("counts wall grid heights up from the wall's own floor, as the dollhouse does", () => {
+    const [ruang, kebun] = planInput().areas as Record<string, unknown>[];
+    const raised = buildSolids(plan({ areas: [{ ...ruang, z: 0.3 }, kebun] }));
+    expect(lineOf(raised, [1, 2.5, 1.3], [-1, 0, 0])).toBe('major');
+    expect(lineOf(raised, [1, 2.5, 1.0], [-1, 0, 0])).toBeUndefined();
+  });
+
+  it('draws no grid on a ceiling', () => {
+    const ceiling: Solid = {
+      kind: 'slab',
+      owner: 'atas',
+      storey: 1,
+      outdoor: false,
+      box: { x0: 0, x1: 4, y0: 0, y1: 3, z0: 2.4, z1: 2.6 },
+      openings: [],
+    };
+    expect(lineOf([ceiling], [1, 1, 1], [0, 0, 1])).toBeUndefined();
+    expect(lineOf([ceiling], [1, 1, 3], [0, 0, -1])).toBe('major');
+  });
+
+  it('widens lines where the ray grazes a face, so far grid lines stay drawn', () => {
+    const solids = buildSolids(plan());
+    // Grazing at about 6 degrees, the floor hit lands 3 cm past the 2.4 m line.
+    const grazing = lineOf(solids, [0.5, 1.5, 0.193], unitOf([1, 0, -0.1]));
+    expect(grazing).toBe('minor');
+    expect(lineOf(solids, [2.43, 1.5, 1], [0, 0, -1])).toBeUndefined();
+  });
+
+  it('refuses an eye above the ceiling or inside a stair', () => {
+    const tangga = {
+      id: 'tangga',
+      storey: 0,
+      rect: [0.2, 2.0, 0.8, 0.8],
+      rise: '+y',
+      from: 0,
+      to: 0.6,
+      steps: 3,
+    };
+    const messages = checkPlan(
+      plan({
+        stairs: [tangga],
+        views: [
+          { ...SOFA, id: 'loteng', eye: [3, 2.6, 2.4] },
+          { ...SOFA, id: 'tangga', eye: [0.6, 2.4, 0.3] },
+        ],
+      }),
+    )
+      .filter((i) => i.path.startsWith('views'))
+      .map((i) => `${i.path}: ${i.message}`);
+    expect(messages).toEqual([
+      'views[0].eye: is at or above the ceiling of ruang',
+      'views[1].eye: is inside stair tangga',
+    ]);
+  });
+});
+
+function unitOf(v: V3): V3 {
+  const n = Math.hypot(...v);
+  return [v[0] / n, v[1] / n, v[2] / n];
+}
