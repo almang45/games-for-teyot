@@ -195,6 +195,22 @@ describe('US-REF-02 eye views: camera and image', () => {
     expect(() => cameraOf(p, { ...SOFA, area: 'loteng' })).toThrow(/run checkPlan first/);
   });
 
+  it('keeps the dollhouse handedness, so the room is never mirrored', () => {
+    // From the dollhouse corner, as the iso view sees it: +x is drawn right of +y.
+    const corner = cameraOf(p, { ...SOFA, eye: [3.9, 2.9, 1.5], look: [0, 0, 0.5] });
+    const along = (q: V3): number => projectTo(corner, q)?.[0] ?? NaN;
+    const dollhouseX = (q: V3): number => q[0] - q[1];
+    const onX: V3 = [3, 0, 0.5];
+    const onY: V3 = [0, 2, 0.5];
+    expect(Math.sign(along(onX) - along(onY))).toBe(Math.sign(dollhouseX(onX) - dollhouseX(onY)));
+    // Facing -y, +x is on the right; facing +y it is on the left.
+    expect(projectTo(cam, [3.5, 0, 1.1])?.[0]).toBeGreaterThan(32);
+    const back = cameraOf(p, { ...SOFA, eye: [3, 0.6, 1.1], look: [3, 3, 1.1] });
+    expect(projectTo(back, [3.5, 3, 1.1])?.[0]).toBeLessThan(32);
+    const height = (q: V3): number => projectTo(corner, q)?.[1] ?? NaN;
+    expect(height([1, 1, 2])).toBeLessThan(height([1, 1, 0]));
+  });
+
   it('shades a wall in its blockout colour and empty space white', () => {
     const solids = buildSolids(plan({ furniture: [] }));
     expect(

@@ -171,14 +171,16 @@ export function cameraOf(plan: FloorPlan, view: PlanView): Camera {
   const z = floorZ(a);
   const eye: V3 = [view.eye[0], view.eye[1], z + view.eye[2]];
   const forward = unit(sub([view.look[0], view.look[1], z + view.look[2]], eye));
-  const right = unit(cross(forward, [0, 0, 1]));
+  // The plan is left-handed with z up (the dollhouse draws +x to the right of +y), so right is
+  // up × forward, not forward × up; the other way round mirrors the room.
+  const right = unit(cross([0, 0, 1], forward));
   const [width, height] = view.size;
   const tanX = Math.tan((view.fov * Math.PI) / 360);
   return {
     eye,
     forward,
     right,
-    up: cross(right, forward),
+    up: cross(forward, right),
     tanX,
     tanY: (tanX * height) / width,
     width,
