@@ -202,12 +202,16 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
   one geometry and `layout.json` lines up with the art.
 - **The 20 cm grid.** The plan sits on a 20 cm grid, and `house-blockout-grid.svg` draws its cells
   on every floor and back wall (whole metres are thicker). Each cell's corners land on whole
-  pixels; the guide's scale bar gives the cell size in px. Furniture is measured in whole cells,
-  so a prop's footprint and height follow the grid lines.
+  pixels; the guide's scale bar gives the cell size in px. A prop's footprint is measured in whole
+  cells, so it follows the grid lines; its height is free.
 - **One sprite per piece of furniture.** The structure layers hold no furniture. Each piece is
   its own `house.props.*` sprite, so one can be redrawn without touching the rest, and the game
   sorts it with the characters by its footprint. Lock the style first: paint 3–4 props and one
   storey, get Papa's approval, then do the rest.
+  `house-blockout-props-<storey>.svg` draws every piece of furniture as a box, with that storey
+  and the ones below it (the storeys above fade, as in the zoom). The guide names each piece by
+  its key, and the draft `layout.json` carries its `rect` and `base`. A piece that hangs on a wall
+  (a TV, wall cabinets) has its underside as its footprint, so its sprite stays trimmed.
 - Design canvas **3840 × 2400 px** (16:10, the 1920 × 1200 frame at 2×). It fits the tablet and
   the laptops; on the phones, Theia's main devices, it fills the height and `house.bg` fills the
   sides.

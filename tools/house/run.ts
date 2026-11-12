@@ -1,12 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { zodIssues } from '../../contracts/common.ts';
+import { STOREYS } from '../../contracts/rooms.ts';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout.ts';
 import { inFile, parseJsonFile, type FileIssue, type Report } from '../validate/lane.ts';
 import { fitToCanvas, gridStep } from './iso.ts';
 import { CANVAS, draftLayout } from './layout.ts';
 import { checkPlan, floorPlan } from './plan.ts';
-import { buildSolids, facesOf } from './scene.ts';
+import { buildSolids, facesOf, isProp } from './scene.ts';
 import { blockoutSvg, guideSvg, THEIA_HEIGHT_M } from './svg.ts';
 
 export const OUTPUT_FILES = {
@@ -26,6 +27,8 @@ export interface BlockoutSummary {
   readonly cellTilePx: readonly [number, number];
   readonly theiaLayoutPx: number;
   readonly doorLayoutPx: number;
+  /** Furniture pieces drawn and written to layout.json as props. */
+  readonly props: number;
   /** Repo-relative paths written. */
   readonly files: readonly string[];
 }
@@ -37,6 +40,9 @@ export interface BlockoutResult {
 }
 
 const LANE = 'house-blockout';
+
+/** One file per storey with furniture, as the zoom shows it: that storey and those below. */
+export const propsFile = (storeyName: string): string => `house-blockout-props-${storeyName}.svg`;
 
 /**
  * Reads the plan at `planArg`, writes the blockout SVGs and the draft layout.json into `outArg`
@@ -60,6 +66,7 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
     plan.marginPx,
     gridStep(plan.grid),
   );
+  const house = solids.filter((s) => !isProp(s));
   const draft = draftLayout(plan, fit, solids);
   const layoutFile = `${outDir}/${OUTPUT_FILES.layout}`;
   const schema = houseLayout.safeParse(draft.layout);
@@ -71,8 +78,20 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
   ];
 
   const outputs: [string, string][] = [
-    [OUTPUT_FILES.blockout, blockoutSvg(solids, fit, CANVAS)],
-    [OUTPUT_FILES.grid, blockoutSvg(solids, fit, CANVAS, plan.grid)],
+    // The structure layers are painted without furniture; props get their own file.
+    [OUTPUT_FILES.blockout, blockoutSvg(house, fit, CANVAS)],
+    [OUTPUT_FILES.grid, blockoutSvg(house, fit, CANVAS, plan.grid)],
+    ...STOREYS.filter((st) => solids.some((s) => isProp(s) && s.storey === st.id)).map(
+      (st): [string, string] => [
+        propsFile(st.name),
+        blockoutSvg(
+          solids.filter((s) => s.storey <= st.id),
+          fit,
+          CANVAS,
+          plan.grid,
+        ),
+      ],
+    ),
     [
       OUTPUT_FILES.guide,
       guideSvg({
@@ -100,6 +119,7 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
       cellTilePx: [2 * cellPx, cellPx],
       theiaLayoutPx: Math.round(THEIA_HEIGHT_M * layoutPxPerMetre),
       doorLayoutPx: Math.round(DOOR_HEIGHT_M * layoutPxPerMetre),
+      props: draft.layout.props.length,
       files: outputs.map(([name]) => `${outDir}/${name}`),
     },
   };

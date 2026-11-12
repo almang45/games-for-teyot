@@ -86,6 +86,21 @@ export const planSpot = z.strictObject({
 });
 export type PlanSpot = z.infer<typeof planSpot>;
 
+/**
+ * One piece of furniture or decor: a box in an area, drawn as its own sprite,
+ * `house.props.<area>.<id>` (ASSETS.md §4.1).
+ */
+export const planFurniture = z.strictObject({
+  id: kebabId,
+  area: kebabId,
+  /** Footprint on the plan, on the grid and inside its area. */
+  rect: planRect,
+  height: length,
+  /** Gap under it, for what hangs on a wall: a TV, wall cabinets. */
+  lift: metres.nonnegative().default(0),
+});
+export type PlanFurniture = z.infer<typeof planFurniture>;
+
 export const planWaypoint = z.strictObject({
   id: kebabId,
   at: planPoint,
@@ -115,6 +130,7 @@ export const floorPlan = z.strictObject({
   stairs: z.array(planStair).default([]),
   rooms: z.array(planRoom).min(1),
   spots: z.strictObject({ fridge: planSpot, 'sticker-wall': planSpot }),
+  furniture: z.array(planFurniture).default([]),
   waypoints: z.array(planWaypoint).default([]),
   edges: z.array(z.tuple([kebabId, kebabId])).default([]),
   start: roomId,
@@ -189,6 +205,10 @@ function gridIssues(plan: FloorPlan): Issue[] {
       `stairs[${i}].rect`,
       edges(s.rect),
     ]),
+    ...plan.furniture.map((f, i): [string, [string, number][]] => [
+      `furniture[${i}].rect`,
+      edges(f.rect),
+    ]),
     ...plan.doors.map((door, i): [string, [string, number][]] => [
       `doors[${i}]`,
       [
@@ -217,6 +237,47 @@ function gridIssues(plan: FloorPlan): Issue[] {
         );
       }),
   );
+}
+
+/** The manifest key segment of a piece: `<area>.<id>`. */
+export const furnitureName = (f: PlanFurniture): string => `${f.area}.${f.id}`;
+
+type Span = readonly [number, number];
+
+const spansOverlap = ([a0, a1]: Span, [b0, b1]: Span): boolean =>
+  Math.min(a1, b1) - Math.max(a0, b0) > EPS;
+
+function checkFurniture(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): Issue[] {
+  const issues: Issue[] = [];
+  for (const dupe of duplicates(plan.furniture.map(furnitureName))) {
+    issues.push(error('furniture', `duplicate piece ${dupe}`));
+  }
+  const placed: { name: string; spans: [Span, Span, Span] }[] = [];
+  plan.furniture.forEach((f, i) => {
+    const path = `furniture[${i}]`;
+    const a = areas.get(f.area);
+    if (!a) {
+      issues.push(error(`${path}.area`, `unknown area ${f.area}`));
+      return;
+    }
+    const [x, y, w, d] = f.rect;
+    if (!inPlanRect([x, y], a.rect) || !inPlanRect([x + w, y + d], a.rect)) {
+      issues.push(error(`${path}.rect`, `leaves area ${a.id}`));
+    }
+    if (f.lift + f.height > wallHeightOf(plan, a) + EPS) {
+      issues.push(error(path, `is taller than the walls of ${a.id}`));
+    }
+    const z = floorZ(a) + f.lift;
+    const spans: [Span, Span, Span] = [
+      [x, x + w],
+      [y, y + d],
+      [z, z + f.height],
+    ];
+    const hit = placed.find((p) => p.spans.every((s, k) => spansOverlap(s, spans[k] ?? s)));
+    if (hit) issues.push(error(path, `overlaps ${hit.name}`));
+    placed.push({ name: furnitureName(f), spans });
+  });
+  return issues;
 }
 
 function checkRoom(plan: FloorPlan, room: PlanRoom, i: number, a: PlanArea | undefined): Issue[] {
@@ -271,6 +332,7 @@ export function checkPlan(plan: FloorPlan): Issue[] {
     const span = { at: door.at, width: door.width, bottom: 0, height: door.height };
     issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a)));
   });
+  issues.push(...checkFurniture(plan, areas));
   plan.stairs.forEach((s, i) => {
     if (s.from >= s.to) {
       issues.push(error(`stairs[${i}]`, 'a flight climbs along rise: from must be below to'));
