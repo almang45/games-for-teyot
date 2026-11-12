@@ -3,7 +3,7 @@ import { join, relative, resolve } from 'node:path';
 import { zodIssues } from '../../contracts/common.ts';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout.ts';
 import { inFile, parseJsonFile, type FileIssue, type Report } from '../validate/lane.ts';
-import { fitToCanvas } from './iso.ts';
+import { fitToCanvas, gridStep } from './iso.ts';
 import { CANVAS, draftLayout } from './layout.ts';
 import { checkPlan, floorPlan } from './plan.ts';
 import { buildSolids, facesOf } from './scene.ts';
@@ -11,6 +11,7 @@ import { blockoutSvg, guideSvg, THEIA_HEIGHT_M } from './svg.ts';
 
 export const OUTPUT_FILES = {
   blockout: 'house-blockout.svg',
+  grid: 'house-blockout-grid.svg',
   guide: 'house-blockout-guide.svg',
   layout: 'layout.json',
 } as const;
@@ -21,6 +22,8 @@ const DOOR_HEIGHT_M = 2.1;
 export interface BlockoutSummary {
   /** Canvas px per plan metre; the layout space uses half. */
   readonly pxPerMetre: number;
+  /** One grid cell's floor tile on the canvas, [width, height] in px. */
+  readonly cellTilePx: readonly [number, number];
   readonly theiaLayoutPx: number;
   readonly doorLayoutPx: number;
   /** Repo-relative paths written. */
@@ -55,6 +58,7 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
     solids.flatMap((s) => facesOf(s).flatMap((f) => f.points)),
     CANVAS,
     plan.marginPx,
+    gridStep(plan.grid),
   );
   const draft = draftLayout(plan, fit, solids);
   const layoutFile = `${outDir}/${OUTPUT_FILES.layout}`;
@@ -68,11 +72,13 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
 
   const outputs: [string, string][] = [
     [OUTPUT_FILES.blockout, blockoutSvg(solids, fit, CANVAS)],
+    [OUTPUT_FILES.grid, blockoutSvg(solids, fit, CANVAS, plan.grid)],
     [
       OUTPUT_FILES.guide,
       guideSvg({
         solids,
         fit,
+        grid: plan.grid,
         size: CANVAS,
         layout: draft.layout,
         hidden: draft.hidden,
@@ -85,10 +91,13 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
   for (const [name, content] of outputs) writeFileSync(join(root, outDir, name), content);
 
   const layoutPxPerMetre = fit.scale / 2;
+  // gridStep makes this whole; the rounding only drops float noise.
+  const cellPx = Math.round(plan.grid * fit.scale * 1000) / 1000;
   return {
     report: { lane: LANE, files: 1, issues: layoutIssues },
     summary: {
       pxPerMetre: fit.scale,
+      cellTilePx: [2 * cellPx, cellPx],
       theiaLayoutPx: Math.round(THEIA_HEIGHT_M * layoutPxPerMetre),
       doorLayoutPx: Math.round(DOOR_HEIGHT_M * layoutPxPerMetre),
       files: outputs.map(([name]) => `${outDir}/${name}`),

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout';
 import { toScreen } from '../../src/engine/iso/projection';
-import { convexHull, fitToCanvas, project, type Vec3 } from '../../tools/house/iso';
+import { convexHull, fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
 import { CANVAS, draftLayout, focusRect, percent } from '../../tools/house/layout';
 import { checkPlan, defaultWalk, floorPlan, type FloorPlan } from '../../tools/house/plan';
 import { runBlockout } from '../../tools/house/run';
@@ -12,6 +12,7 @@ import {
   buildSolids,
   drawOrder,
   facesOf,
+  gridLinesOf,
   quadZ,
   stepsOf,
   type Solid,
@@ -27,7 +28,7 @@ function planInput(): Record<string, unknown> {
       { id: 'kamar-tidur', storey: 2, rect: [-3.4, -3.4, 3, 3], walls: ['x0', 'y0'] },
       { id: 'kebun', storey: 0, z: -0.2, rect: [4, 0, 2, 3], outdoor: true },
     ],
-    doors: [{ area: 'ruang-keluarga', wall: 'x0', at: 1, width: 0.9 }],
+    doors: [{ area: 'ruang-keluarga', wall: 'x0', at: 1, width: 0.8 }],
     stairs: [],
     rooms: [
       {
@@ -50,7 +51,7 @@ function planInput(): Record<string, unknown> {
       'sticker-wall': {
         room: 'kamar-tidur',
         wall: 'y0',
-        at: 0.5,
+        at: 0.4,
         width: 1,
         bottom: 0.5,
         height: 0.5,
@@ -78,6 +79,7 @@ function drafted(p: FloorPlan = plan()) {
     solids.flatMap((s) => facesOf(s).flatMap((f) => f.points)),
     CANVAS,
     p.marginPx,
+    gridStep(p.grid),
   );
   return { solids, fit, draft: draftLayout(p, fit, solids) };
 }
@@ -134,6 +136,20 @@ describe('US-REF-02 projection', () => {
     expect(Math.max(...ys)).toBeLessThanOrEqual(2400 - 159);
     // Centred: equal slack on both sides, to the rounding of the origin.
     expect(Math.abs(Math.min(...xs) - (3840 - Math.max(...xs)))).toBeLessThanOrEqual(1);
+  });
+
+  it('fits at a scale that puts every grid corner on a whole pixel', () => {
+    expect([0.2, 0.25, 0.5, 1].map(gridStep)).toEqual([10, 8, 4, 2]);
+    expect(() => gridStep(0.1234567)).toThrow(RangeError);
+    const points: Vec3[] = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 5, z: 4 },
+    ];
+    const free = fitToCanvas(points, [3840, 2400], 160);
+    const stepped = fitToCanvas(points, [3840, 2400], 160, 10);
+    expect(stepped.scale % 10).toBe(0);
+    expect(stepped.scale).toBeLessThanOrEqual(free.scale);
+    expect(free.scale - stepped.scale).toBeLessThan(10);
   });
 
   it('refuses to fit nothing, or into no room', () => {
@@ -243,6 +259,28 @@ describe('US-REF-02 floor plan', () => {
     expect(paths).toEqual(['rooms[0].stand']);
   });
 
+  it('keeps walls, doors, stairs and spots on the grid', () => {
+    const input = planInput();
+    const spots = input.spots as Record<string, object>;
+    const issues = checkPlan(
+      plan({
+        areas: [...(input.areas as object[]), { id: 'teras', storey: 0, rect: [6, 0, 1.1, 3] }],
+        doors: [{ area: 'ruang-keluarga', wall: 'x0', at: 1, width: 0.9 }],
+        stairs: [flight({ rect: [4, 0.05, 1, 1] })],
+        spots: { ...spots, fridge: { ...spots.fridge, offset: 0.65 } },
+      }),
+    ).map((i) => `${i.path}: ${i.message}`);
+    expect(issues).toEqual([
+      'areas[3].rect: x + width 7.1 is off the 20 cm grid; nearest 7',
+      'stairs[0].rect: y 0.05 is off the 20 cm grid; nearest 0',
+      'stairs[0].rect: y + depth 1.05 is off the 20 cm grid; nearest 1',
+      'doors[0]: width 0.9 is off the 20 cm grid; nearest 1',
+      'spots.fridge: offset 0.65 is off the 20 cm grid; nearest 0.6',
+    ]);
+    // A coarser grid only needs a different plan.
+    expect(checkPlan(plan({ grid: 0.5 })).map((i) => i.path)).toContain('doors[0]');
+  });
+
   it('reports a room without its area once, not again for its spot', () => {
     const [living, bedroom] = planInput().rooms as Record<string, unknown>[];
     const issues = checkPlan(plan({ rooms: [living, { ...bedroom, area: 'loteng' }] }));
@@ -318,6 +356,27 @@ describe('US-REF-02 scene', () => {
     );
     // By centre depth the small slab (x + y = 2) would come before the wide one (5.5).
     expect(rank(order, 'teras', 'slab')).toBeLessThan(rank(order, 'ruang-keluarga', 'slab'));
+  });
+
+  it('draws grid lines on floors and back walls, whole metres as major lines', () => {
+    const solids = buildSolids(plan());
+    const lines = (owner: string, kind: Solid['kind']) => {
+      const solid = solids.find((x) => x.owner === owner && x.kind === kind);
+      if (!solid) throw new Error(`no ${kind} of ${owner}`);
+      return gridLinesOf(solid, 0.2);
+    };
+    // The living room floor is 4 × 3 m: 19 lines across x, 14 across y; 3 + 2 on whole metres.
+    const floor = lines('ruang-keluarga', 'slab');
+    expect(floor).toHaveLength(19 + 14);
+    expect(floor.filter((l) => l.major)).toHaveLength(3 + 2);
+    expect(floor.every((l) => l.from.z === 0 && l.to.z === 0)).toBe(true);
+    // Its x0 wall is 3 m long and 2.4 m tall: 14 uprights, 11 courses.
+    const wall = lines('ruang-keluarga', 'wall-x0');
+    expect(wall).toHaveLength(14 + 11);
+    expect(wall.every((l) => l.from.x === 0 && l.to.x === 0)).toBe(true);
+    expect(lines('kamar-tidur', 'wall-y0').some((l) => l.from.z === 3.4 + 1)).toBe(true);
+    const step = buildSolids(plan({ stairs: [flight()] })).find((x) => x.kind === 'step');
+    expect(step && gridLinesOf(step, 0.2)).toEqual([]);
   });
 
   it('still draws everything when boxes interpenetrate', () => {
@@ -510,11 +569,23 @@ describe('US-REF-02 svg', () => {
     expect(svg.match(/<g data-owner=/g)).toHaveLength(solids.length);
   });
 
+  it('draws the grid under doors, only when asked', () => {
+    const { solids, fit } = drafted();
+    expect(blockoutSvg(solids, fit, CANVAS)).not.toContain('data-kind="grid');
+    const svg = blockoutSvg(solids, fit, CANVAS, 0.2);
+    expect(svg).toContain('data-kind="grid-major"');
+    expect(svg).toMatch(
+      /<polygon data-kind="wall-x0"[^>]*>\n\s*<path data-kind="grid"[^>]*>\n\s*<path data-kind="grid-major"[^>]*>\n\s*<polygon data-kind="door"/,
+    );
+    expect(svg).not.toContain('<text');
+  });
+
   it('adds the layout, labels and scale to the guide', () => {
     const { solids, fit, draft } = drafted();
     const svg = guideSvg({
       solids,
       fit,
+      grid: 0.2,
       size: CANVAS,
       layout: draft.layout,
       hidden: [{ room: 'ruang-keluarga', points: [{ x: 1, y: 1, z: 0 }] }],
@@ -531,6 +602,8 @@ describe('US-REF-02 svg', () => {
     }
     expect(svg).toContain('>ruang-keluarga</text>');
     expect(svg).toContain(`1 m = ${fit.scale} px`);
+    expect(svg).toContain(`20 cm cell = ${0.4 * fit.scale} × ${0.2 * fit.scale} px tile`);
+    expect(svg).toContain('data-kind="grid"');
   });
 });
 
@@ -553,9 +626,13 @@ describe('US-REF-02 runBlockout', () => {
     expect(report.issues).toEqual([]);
     expect(summary?.files).toEqual([
       'out/house-blockout.svg',
+      'out/house-blockout-grid.svg',
       'out/house-blockout-guide.svg',
       'out/layout.json',
     ]);
+    const scale = summary?.pxPerMetre ?? 0;
+    expect(scale % 10).toBe(0);
+    expect(summary?.cellTilePx).toEqual([0.4 * scale, 0.2 * scale]);
     expect(summary?.theiaLayoutPx).toBe(Math.round((0.95 * (summary?.pxPerMetre ?? 0)) / 2));
     const layout: unknown = JSON.parse(readFileSync(join(root, 'out', 'layout.json'), 'utf8'));
     expect(checkHouseLayout(houseLayout.parse(layout))).toEqual([]);

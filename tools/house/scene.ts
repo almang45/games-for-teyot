@@ -275,3 +275,51 @@ export function drawOrder(solids: readonly Solid[]): Solid[] {
   }
   return out;
 }
+
+/** A straight line in plan metres; `major` marks whole metres. */
+export interface GridLine {
+  readonly from: Vec3;
+  readonly to: Vec3;
+  readonly major: boolean;
+}
+
+/** Multiples of `grid` strictly between `lo` and `hi`. */
+function cuts(lo: number, hi: number, grid: number): number[] {
+  const out: number[] = [];
+  for (let k = Math.floor(lo / grid + EPS) + 1; k * grid < hi - EPS; k++) out.push(k * grid);
+  return out;
+}
+
+const isMajor = (v: number): boolean => Math.abs(v - Math.round(v)) < EPS;
+
+/**
+ * The grid drawn on a floor or a back wall, so art can be measured in cells. Lines on a floor
+ * follow the plan grid; heights on a wall count up from that wall's own floor.
+ */
+export function gridLinesOf(s: Solid, grid: number): GridLine[] {
+  const { x0, x1, y0, y1, z0, z1 } = s.box;
+  const line = (from: Vec3, to: Vec3, at: number): GridLine => ({ from, to, major: isMajor(at) });
+  const heights = (): GridLine[] =>
+    cuts(0, z1 - z0, grid).map((h) =>
+      line({ x: x0, y: y0, z: z0 + h }, { x: x1, y: y1, z: z0 + h }, h),
+    );
+  switch (s.kind) {
+    case 'slab':
+      return [
+        ...cuts(x0, x1, grid).map((x) => line({ x, y: y0, z: z1 }, { x, y: y1, z: z1 }, x)),
+        ...cuts(y0, y1, grid).map((y) => line({ x: x0, y, z: z1 }, { x: x1, y, z: z1 }, y)),
+      ];
+    case 'wall-x0':
+      return [
+        ...cuts(y0, y1, grid).map((y) => line({ x: x0, y, z: z0 }, { x: x0, y, z: z1 }, y)),
+        ...heights(),
+      ];
+    case 'wall-y0':
+      return [
+        ...cuts(x0, x1, grid).map((x) => line({ x, y: y0, z: z0 }, { x, y: y0, z: z1 }, x)),
+        ...heights(),
+      ];
+    case 'step':
+      return [];
+  }
+}
