@@ -22,4 +22,6 @@ export const COVERAGE_EXCLUDE = [
   'tools/validate/write-schemas.ts',
   'tools/dev/**',
   'tools/house/blockout.ts',
+  'tools/inputs/check.ts',
+  'tools/inputs/frames.ts',
 ] as const;
