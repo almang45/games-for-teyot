@@ -14,7 +14,7 @@ import {
 } from './scene.ts';
 
 /** Neutral greys, lighter facing up and toward +x: Antigravity paints over them (ASSETS.md §4.1). */
-const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
+export const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
   floor: ['#ddd6ca', '#cdd5c0'],
   'slab-x': ['#b9b1a4', '#a9b29c'],
   'slab-y': ['#a69e91', '#97a08b'],
@@ -29,8 +29,8 @@ const FILL: Record<FaceKind, readonly [indoor: string, outdoor: string]> = {
   'prop-x': ['#bf9a70', '#bf9a70'],
   'prop-y': ['#a9875f', '#a9875f'],
 };
-const STROKE = '#4b463e';
-const GRID_STROKE = '#8a8275';
+export const STROKE = '#4b463e';
+export const GRID_STROKE = '#8a8275';
 
 /** A 3-year-old is about this tall; the guide draws her at each stand to judge sprite scale. */
 export const THEIA_HEIGHT_M = 0.95;
@@ -115,7 +115,7 @@ export function blockoutSvg(
 
 const canvas = ([x, y]: Point): Point => [x * 2, y * 2];
 
-function label(text: string, [x, y]: Point, size: number, anchor = 'middle'): string {
+export function label(text: string, [x, y]: Point, size: number, anchor = 'middle'): string {
   return (
     `<text x="${num(x)}" y="${num(y)}" font-size="${size}" text-anchor="${anchor}" ` +
     `stroke="#ffffff" stroke-width="${size / 6}" paint-order="stroke">${esc(text)}</text>`

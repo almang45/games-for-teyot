@@ -9,6 +9,7 @@ import {
   type PlanArea,
   type PlanRect,
   type PlanStair,
+  type WallSide,
 } from './plan.ts';
 
 /** Contact, not overlap: solids that only touch neither hide nor order each other. */
@@ -30,6 +31,8 @@ export interface Opening {
   readonly to: number;
   readonly bottom: number;
   readonly top: number;
+  /** No door leaf: the dollhouse still draws the hole, eye views see through it. */
+  readonly open: boolean;
 }
 
 export type SolidKind = 'slab' | 'wall-x0' | 'wall-y0' | 'step' | 'prop';
@@ -62,6 +65,9 @@ export type FaceKind =
 
 /** Furniture is drawn with the house but painted as separate sprites. */
 export const isProp = (s: Solid): boolean => s.kind === 'prop';
+
+/** A back wall: a box with no thickness, with doors cut in. */
+export const isWall = (s: Solid): boolean => s.kind === 'wall-x0' || s.kind === 'wall-y0';
 
 /** One flat polygon of the blockout, in plan metres. */
 export interface Face {
@@ -127,31 +133,58 @@ const boxOf = ([x, y, w, d]: PlanRect, z0: number, z1: number): Box => ({
   z1,
 });
 
-function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
+/** A back wall with its doors cut in: a box with no thickness. */
+function wallSolid(plan: FloorPlan, a: PlanArea, side: WallSide): Solid {
   const z = floorZ(a);
   const [x, y, w, d] = a.rect;
   const top = z + wallHeightOf(plan, a);
-  const base = { owner: a.id, storey: a.storey, outdoor: a.outdoor };
-  const openings = (side: 'x0' | 'y0'): Opening[] =>
-    plan.doors
-      .filter((door) => door.area === a.id && door.wall === side)
-      .map((door) => {
-        const start = (side === 'x0' ? y : x) + door.at;
-        return { from: start, to: start + door.width, bottom: z, top: z + door.height };
-      });
-  const solids: Solid[] = [
-    { ...base, kind: 'slab', box: boxOf(a.rect, z - (a.slab ?? plan.slab), z), openings: [] },
-  ];
-  if (a.walls.includes('x0')) {
-    const box = { x0: x, x1: x, y0: y, y1: y + d, z0: z, z1: top };
-    solids.push({ ...base, kind: 'wall-x0', box, openings: openings('x0') });
-  }
-  if (a.walls.includes('y0')) {
-    const box = { x0: x, x1: x + w, y0: y, y1: y, z0: z, z1: top };
-    solids.push({ ...base, kind: 'wall-y0', box, openings: openings('y0') });
-  }
-  return solids;
+  const openings = plan.doors
+    .filter((door) => door.area === a.id && door.wall === side)
+    .map((door): Opening => {
+      const start = (side === 'x0' ? y : x) + door.at;
+      return {
+        from: start,
+        to: start + door.width,
+        bottom: z,
+        top: z + door.height,
+        open: door.open,
+      };
+    });
+  const box =
+    side === 'x0'
+      ? { x0: x, x1: x, y0: y, y1: y + d, z0: z, z1: top }
+      : { x0: x, x1: x + w, y0: y, y1: y, z0: z, z1: top };
+  return {
+    kind: side === 'x0' ? 'wall-x0' : 'wall-y0',
+    owner: a.id,
+    storey: a.storey,
+    outdoor: a.outdoor,
+    box,
+    openings,
+  };
 }
+
+const SIDES: readonly WallSide[] = ['x0', 'y0'];
+
+function areaSolids(plan: FloorPlan, a: PlanArea): Solid[] {
+  const z = floorZ(a);
+  const slab: Solid = {
+    kind: 'slab',
+    owner: a.id,
+    storey: a.storey,
+    outdoor: a.outdoor,
+    box: boxOf(a.rect, z - (a.slab ?? plan.slab), z),
+    openings: [],
+  };
+  const walls = SIDES.filter((side) => a.walls.includes(side));
+  return [slab, ...walls.map((side) => wallSolid(plan, a, side))];
+}
+
+/** The walls only eye views draw (`areas[].eyeWalls`); the dollhouse never sees them. */
+export const eyeWallSolids = (plan: FloorPlan): Solid[] =>
+  plan.areas.flatMap((a) =>
+    SIDES.filter((side) => a.eyeWalls.includes(side)).map((side) => wallSolid(plan, a, side)),
+  );
 
 /**
  * Every solid of the house, furniture included. Throws on a door or piece whose area is missing:

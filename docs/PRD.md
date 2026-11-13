@@ -233,6 +233,13 @@ every room shares one perspective.
   warning.
 - A flight can reach down to the floor and a landing's slab can fill the space under it, so a
   closed understair (the storeroom under the stairs) reads as solid, not as a gap.
+- The plan can name review views: an eye in an area (for example seated on the sofa) looking at a
+  point. The blockout renders each one in perspective as `house-eye-<id>.svg`, with the visible
+  furniture labelled, so Papa can compare it with a photo taken from the same spot. These are
+  review renders only; the game keeps its one dollhouse angle.
+- An area can name eye walls: back walls the dollhouse leaves out so the rooms behind stay in view,
+  such as the partition behind the TV. Only review views draw them, with their doors; a door with
+  no leaf, such as the mouth of a flight, is marked open and the view sees through it.
 
 ### 8.2 M1: First playable
 

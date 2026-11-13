@@ -1,13 +1,14 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { zodIssues } from '../../contracts/common.ts';
 import { STOREYS } from '../../contracts/rooms.ts';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout.ts';
 import { inFile, parseJsonFile, type FileIssue, type Report } from '../validate/lane.ts';
+import { eyeFile, eyeSvg } from './eye.ts';
 import { fitToCanvas, gridStep } from './iso.ts';
 import { CANVAS, draftLayout } from './layout.ts';
 import { checkPlan, floorPlan } from './plan.ts';
-import { buildSolids, facesOf, isProp } from './scene.ts';
+import { buildSolids, eyeWallSolids, facesOf, isProp } from './scene.ts';
 import { blockoutSvg, guideSvg, THEIA_HEIGHT_M } from './svg.ts';
 
 export const OUTPUT_FILES = {
@@ -67,6 +68,7 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
     gridStep(plan.grid),
   );
   const house = solids.filter((s) => !isProp(s));
+  const seen = plan.views.length > 0 ? [...solids, ...eyeWallSolids(plan)] : [];
   const draft = draftLayout(plan, fit, solids);
   const layoutFile = `${outDir}/${OUTPUT_FILES.layout}`;
   const schema = houseLayout.safeParse(draft.layout);
@@ -105,8 +107,15 @@ export function runBlockout(root: string, planArg: string, outArg: string): Bloc
       }),
     ],
     [OUTPUT_FILES.layout, `${JSON.stringify(draft.layout, null, 2)}\n`],
+    // Review renders only: the eye sees every storey and the walls the dollhouse leaves out.
+    ...plan.views.map((v): [string, string] => [eyeFile(v.id), eyeSvg(seen, plan, v)]),
   ];
   mkdirSync(join(root, outDir), { recursive: true });
+  // A renamed or dropped view must not leave its old render behind to be compared with a photo.
+  const written = new Set(outputs.map(([name]) => name));
+  for (const name of readdirSync(join(root, outDir))) {
+    if (/^house-eye-.+\.svg$/.test(name) && !written.has(name)) rmSync(join(root, outDir, name));
+  }
   for (const [name, content] of outputs) writeFileSync(join(root, outDir, name), content);
 
   const layoutPxPerMetre = fit.scale / 2;

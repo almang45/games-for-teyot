@@ -31,6 +31,11 @@ export const planArea = z.strictObject({
   rect: planRect,
   /** Back walls to draw. Front walls are always cut away. */
   walls: z.array(wallSide).default([]),
+  /**
+   * Back walls the dollhouse leaves out so the rooms behind them stay in view, such as the
+   * partition behind the TV. Only eye views draw them; doors can sit on them.
+   */
+  eyeWalls: z.array(wallSide).default([]),
   /** Defaults to the plan's `wallHeight`. */
   wallHeight: length.optional(),
   /** Slab thickness; defaults to the plan's. A landing can reach down to the floor under it. */
@@ -46,6 +51,8 @@ export const planDoor = z.strictObject({
   at: metres.nonnegative(),
   width: length,
   height: length.default(2.1),
+  /** A passage with no door leaf, such as the mouth of a flight: eye views see through it. */
+  open: z.boolean().default(false),
 });
 export type PlanDoor = z.infer<typeof planDoor>;
 
@@ -108,6 +115,27 @@ export const planFurniture = z.strictObject({
 });
 export type PlanFurniture = z.infer<typeof planFurniture>;
 
+const viewPx = z.number().int().min(16).max(4096);
+
+/**
+ * A review camera: a person's eye in an area, looking at a point. The blockout renders it as
+ * `house-eye-<id>.svg` to hold up against a photo from the same spot; the game never uses it.
+ */
+export const planView = z.strictObject({
+  id: kebabId,
+  /** The area the eye is in; both heights are above its floor. */
+  area: kebabId,
+  /** [x, y, eye height]: about 1.1 m seated on a sofa, 1.6 m standing. */
+  eye: z.tuple([metres, metres, length]),
+  /** [x, y, height] of what the eye looks at. */
+  look: z.tuple([metres, metres, metres]),
+  /** Horizontal field of view in degrees; a phone's main camera is about 70. */
+  fov: z.number().min(20).max(120).default(70),
+  /** Image [width, height] in px. */
+  size: z.tuple([viewPx, viewPx]).default([1600, 1000]),
+});
+export type PlanView = z.infer<typeof planView>;
+
 export const planWaypoint = z.strictObject({
   id: kebabId,
   at: planPoint,
@@ -138,6 +166,7 @@ export const floorPlan = z.strictObject({
   rooms: z.array(planRoom).min(1),
   spots: z.strictObject({ fridge: planSpot, 'sticker-wall': planSpot }),
   furniture: z.array(planFurniture).default([]),
+  views: z.array(planView).default([]),
   waypoints: z.array(planWaypoint).default([]),
   edges: z.array(z.tuple([kebabId, kebabId])).default([]),
   start: roomId,
@@ -181,9 +210,10 @@ function checkOnWall(
   span: { at: number; width: number; bottom: number; height: number },
   path: string,
   wallHeight: number,
+  sides: readonly WallSide[] = a.walls,
 ): Issue[] {
   const issues: Issue[] = [];
-  if (!a.walls.includes(side)) issues.push(error(`${path}.wall`, `${a.id} has no ${side} wall`));
+  if (!sides.includes(side)) issues.push(error(`${path}.wall`, `${a.id} has no ${side} wall`));
   if (span.at + span.width > wallLength(a, side) + EPS) {
     issues.push(error(path, `runs past the end of the ${side} wall of ${a.id}`));
   }
@@ -287,6 +317,46 @@ function checkFurniture(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): 
   return issues;
 }
 
+function checkViews(plan: FloorPlan, areas: ReadonlyMap<string, PlanArea>): Issue[] {
+  const issues: Issue[] = [];
+  for (const dupe of duplicates(plan.views.map((v) => v.id))) {
+    issues.push(error('views', `duplicate view ${dupe}`));
+  }
+  plan.views.forEach((v, i) => {
+    const path = `views[${i}]`;
+    const a = areas.get(v.area);
+    if (!a) {
+      issues.push(error(`${path}.area`, `unknown area ${v.area}`));
+      return;
+    }
+    const [x, y, h] = v.eye;
+    if (!inPlanRect([x, y], a.rect))
+      issues.push(error(`${path}.eye`, `stands outside area ${a.id}`));
+    if (Math.hypot(v.look[0] - x, v.look[1] - y) < EPS) {
+      issues.push(error(`${path}.look`, 'looks straight up or down: move it away from the eye'));
+    }
+    const within = (p: number, start: number, size: number): boolean =>
+      p > start + EPS && p < start + size - EPS;
+    const inRect = ([rx, ry, rw, rd]: readonly number[]): boolean =>
+      within(x, rx ?? 0, rw ?? 0) && within(y, ry ?? 0, rd ?? 0);
+    const inside = plan.furniture.find(
+      (f) => f.area === a.id && inRect(f.rect) && within(h, f.lift, f.height),
+    );
+    if (inside) issues.push(error(`${path}.eye`, `is inside ${furnitureName(inside)}`));
+    if (h >= wallHeightOf(plan, a) - EPS) {
+      issues.push(error(`${path}.eye`, `is at or above the ceiling of ${a.id}`));
+    }
+    // Stair heights are absolute; the mass runs from base (or from) up to the top step.
+    const z = floorZ(a) + h;
+    const stair = plan.stairs.find((s) => {
+      const bottom = s.base ?? s.from;
+      return inRect(s.rect) && within(z, bottom, s.to - bottom);
+    });
+    if (stair) issues.push(error(`${path}.eye`, `is inside stair ${stair.id}`));
+  });
+  return issues;
+}
+
 function checkRoom(plan: FloorPlan, room: PlanRoom, i: number, a: PlanArea | undefined): Issue[] {
   const path = `rooms[${i}]`;
   if (!a) return [error(`${path}.area`, `unknown area ${room.area}`)];
@@ -319,6 +389,11 @@ export function checkPlan(plan: FloorPlan): Issue[] {
   for (const dupe of duplicates(plan.areas.map((a) => a.id))) {
     issues.push(error('areas', `duplicate area ${dupe}`));
   }
+  plan.areas.forEach((a, i) => {
+    for (const side of a.eyeWalls.filter((s) => a.walls.includes(s))) {
+      issues.push(error(`areas[${i}].eyeWalls`, `${side} is already one of the walls`));
+    }
+  });
   for (const dupe of duplicates(plan.stairs.map((s) => s.id))) {
     issues.push(error('stairs', `duplicate stair ${dupe}`));
   }
@@ -337,9 +412,12 @@ export function checkPlan(plan: FloorPlan): Issue[] {
       return;
     }
     const span = { at: door.at, width: door.width, bottom: 0, height: door.height };
-    issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a)));
+    // A door may sit on an eye wall; a spot may not, since the game never shows one.
+    const sides = [...a.walls, ...a.eyeWalls];
+    issues.push(...checkOnWall(a, door.wall, span, `doors[${i}]`, wallHeightOf(plan, a), sides));
   });
   issues.push(...checkFurniture(plan, areas));
+  issues.push(...checkViews(plan, areas));
   plan.stairs.forEach((s, i) => {
     if (s.from >= s.to) {
       issues.push(error(`stairs[${i}]`, 'a flight climbs along rise: from must be below to'));

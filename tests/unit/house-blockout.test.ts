@@ -349,8 +349,15 @@ describe('US-REF-02 scene', () => {
       buildSolids({
         ...p,
         areas: [
-          { id: 'teras', storey: 0, rect: [0, 0, 10, 1], walls: [], outdoor: false },
-          { id: 'ruang-keluarga', storey: 0, rect: [0, 1, 1, 1], walls: [], outdoor: false },
+          { id: 'teras', storey: 0, rect: [0, 0, 10, 1], walls: [], eyeWalls: [], outdoor: false },
+          {
+            id: 'ruang-keluarga',
+            storey: 0,
+            rect: [0, 1, 1, 1],
+            walls: [],
+            eyeWalls: [],
+            outdoor: false,
+          },
         ],
         doors: [],
       }),
@@ -388,7 +395,10 @@ describe('US-REF-02 scene', () => {
   it('refuses a door whose area is missing', () => {
     const p = plan();
     expect(() =>
-      buildSolids({ ...p, doors: [{ area: 'garasi', wall: 'x0', at: 0, width: 1, height: 2 }] }),
+      buildSolids({
+        ...p,
+        doors: [{ area: 'garasi', wall: 'x0', at: 0, width: 1, height: 2, open: false }],
+      }),
     ).toThrow('run checkPlan first');
   });
 });
