@@ -150,18 +150,8 @@ const TOKENS: Tokens = {
   version: 1,
   color: {
     palette: { cream: '#fff8e7', ink: '#3b2f2f', pink: '#f8bbd0' },
-    swatches: [
-      '#e53935',
-      '#fb8c00',
-      '#fdd835',
-      '#43a047',
-      '#1e88e5',
-      '#8e24aa',
-      '#f06292',
-      '#8d6e63',
-      '#212121',
-      '#ffffff',
-    ],
+    // merah, kuning, biru, hijau, oranye, merah muda (the set proposed in #12).
+    swatches: ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fb8c00', '#f06292'],
     semantic: { interactive: '#ffb300', success: '#66bb6a', hint: '#fff59d', locked: '#b0bec5' },
     backdrop: '#fff8e7',
     tracing: {

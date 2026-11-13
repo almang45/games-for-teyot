@@ -22,7 +22,7 @@ import {
   SCREEN_IDS,
   layoutFileName,
 } from '../../contracts/screens';
-import { checkTokens, contrastRatio, tokens } from '../../contracts/tokens';
+import { checkTokens, contrastRatio, SWATCH_COUNT, tokens } from '../../contracts/tokens';
 import { motionFixture, screenFixture, tokensFixture } from './fixtures/contracts';
 
 const messages = (issues: { path: string; message: string }[]): string[] =>
@@ -173,7 +173,7 @@ describe('tokens', () => {
     expect(checkTokens(tokensFixture())).toEqual([]);
   });
 
-  it('caps the palette and wants exactly 10 swatches', () => {
+  it('caps the palette and wants exactly 6 swatches', () => {
     const t = tokensFixture();
     t.color.palette = Object.fromEntries(
       Array.from({ length: 25 }, (_, i) => [`c${i}`, '#000000']),
@@ -185,6 +185,13 @@ describe('tokens', () => {
       'color.palette',
       'color.swatches',
     ]);
+    // The old ten no longer fit the phone.
+    const ten = tokensFixture();
+    ten.color.swatches.push('#8e24aa', '#8d6e63', '#212121', '#ffffff');
+    expect(tokens.safeParse(ten).error?.issues.map((i) => i.path.join('.'))).toEqual([
+      'color.swatches',
+    ]);
+    expect(SWATCH_COUNT).toBe(6);
   });
 
   it('flags low contrast and repeated swatches', () => {
@@ -196,7 +203,7 @@ describe('tokens', () => {
       'color.tracing.ink: contrast against color.tracing.surface is 2.04:1, needs 3:1',
       'color.tracing.ink: contrast against color.tracing.guide is 1.00:1, needs 2:1',
       'color.parent.text: contrast against color.parent.surface is 1.92:1, needs 4.5:1',
-      'color.swatches: swatches must be 10 different colours',
+      'color.swatches: swatches must be 6 different colours',
     ]);
   });
 });

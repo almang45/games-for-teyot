@@ -229,7 +229,7 @@ review them in GitHub.
 ## 5. Design system v1 (`design/tokens.json` + `ui/`)
 
 **Tokens:**
-- the color palette (≤ 24) plus the 10 coloring swatches
+- the color palette (≤ 24) plus the 6 coloring swatches
 - semantic colors: interactive, success glow, hint glow, ink, guide, dotted guide, dim/locked
 - typography: one rounded, highly legible family, **bundled locally** (no remote fonts), with
   single-storey *a* and *g*. Andika (SIL OFL) is suggested.

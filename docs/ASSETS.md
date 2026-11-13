@@ -80,7 +80,7 @@ goes into git or the deployed site.
   higher saturation for things she can interact with, so tappable items stand out.
 - **Character**: chibi proportions (head ≈ 40% of height), large eyes, recognisably *her* (hair,
   skin tone, face shape), no exaggerated features.
-- **Palette**: define once in `design/tokens.json` (`color.palette`, ≤ 24 colours, plus the 10
+- **Palette**: define once in `design/tokens.json` (`color.palette`, ≤ 24 colours, plus the 6
   `color.swatches` for coloring) and reuse it everywhere. The game and the art read the same file.
 - **No text inside images.** Every letter and word is rendered by the game, so Indonesian text and
   curriculum changes never need new art.
