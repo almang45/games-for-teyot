@@ -150,8 +150,15 @@ const TOKENS: Tokens = {
   version: 1,
   color: {
     palette: { cream: '#fff8e7', ink: '#3b2f2f', pink: '#f8bbd0' },
-    // merah, kuning, biru, hijau, oranye, merah muda (the set proposed in #12).
-    swatches: ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fb8c00', '#f06292'],
+    // The six co-signed in #22, in palette-bar order.
+    swatches: [
+      { name: 'merah', hex: '#e53935' },
+      { name: 'kuning', hex: '#fdd835' },
+      { name: 'biru', hex: '#1e88e5' },
+      { name: 'hijau', hex: '#43a047' },
+      { name: 'oranye', hex: '#fb8c00' },
+      { name: 'merah-muda', hex: '#f06292' },
+    ],
     semantic: { interactive: '#ffb300', success: '#66bb6a', hint: '#fff59d', locked: '#b0bec5' },
     backdrop: '#fff8e7',
     tracing: {

@@ -143,7 +143,8 @@ review them in GitHub.
 - **Color**:
   - the page (line art per `ASSETS.md` §6)
   - a palette of 6 big swatches, ≥ 96 dp each (10 don't fit beside the page on the phone; the
-    contract change is #12)
+    contract change is #12). Each swatch is named (`merah`, …, `merah-muda`) so the voice says its
+    colour (#24).
   - the selected-swatch indicator
   - the "oops" undo button (≥ 96 dp)
   - a "done" moment when ≥ 80% of the page is filled

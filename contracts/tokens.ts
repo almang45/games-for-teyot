@@ -11,6 +11,13 @@ const scale = z.record(kebabId, px);
  */
 export const SWATCH_COUNT = 6;
 
+/**
+ * One coloring swatch. The voice says its colour from the `color.<name>` clip (AUDIO.md), so the
+ * name travels with the colour and the palette bar can be reordered safely (#24).
+ */
+export const swatch = z.strictObject({ name: kebabId, hex: hexColor });
+export type Swatch = z.infer<typeof swatch>;
+
 /** `design/tokens.json` (WORKFLOW.md §3). Becomes CSS variables and TS constants at build time. */
 export const tokens = z.strictObject({
   $schema: schemaRef,
@@ -21,7 +28,7 @@ export const tokens = z.strictObject({
       message: 'at most 24 palette colours',
     }),
     /** The coloring swatches, in the order they appear in the palette bar. */
-    swatches: z.array(hexColor).length(SWATCH_COUNT),
+    swatches: z.array(swatch).length(SWATCH_COUNT),
     semantic: z.strictObject({
       interactive: hexColor,
       success: hexColor,
@@ -157,8 +164,11 @@ export function checkTokens(t: Tokens): Issue[] {
       );
     }
   }
-  const swatches = t.color.swatches.map((s) => s.toLowerCase());
-  if (new Set(swatches).size !== swatches.length) {
+  const distinct = (values: string[]): boolean => new Set(values).size === values.length;
+  if (!distinct(t.color.swatches.map((s) => s.name))) {
+    issues.push(error('color.swatches', `swatches must have ${SWATCH_COUNT} different names`));
+  }
+  if (!distinct(t.color.swatches.map((s) => s.hex.toLowerCase()))) {
     issues.push(error('color.swatches', `swatches must be ${SWATCH_COUNT} different colours`));
   }
   return issues;

@@ -187,7 +187,12 @@ describe('tokens', () => {
     ]);
     // The old ten no longer fit the phone.
     const ten = tokensFixture();
-    ten.color.swatches.push('#8e24aa', '#8d6e63', '#212121', '#ffffff');
+    ten.color.swatches.push(
+      { name: 'ungu', hex: '#8e24aa' },
+      { name: 'cokelat', hex: '#8d6e63' },
+      { name: 'hitam', hex: '#212121' },
+      { name: 'putih', hex: '#ffffff' },
+    );
     expect(tokens.safeParse(ten).error?.issues.map((i) => i.path.join('.'))).toEqual([
       'color.swatches',
     ]);
@@ -198,13 +203,31 @@ describe('tokens', () => {
     const t = tokensFixture();
     t.color.tracing.ink = '#3f6b60';
     t.color.parent.text = '#bbbbbb';
-    t.color.swatches[1] = t.color.swatches[0]?.toUpperCase() ?? '';
+    t.color.swatches[1] = { name: 'kuning', hex: t.color.swatches[0]?.hex.toUpperCase() ?? '' };
     expect(messages(checkTokens(t))).toEqual([
       'color.tracing.ink: contrast against color.tracing.surface is 2.04:1, needs 3:1',
       'color.tracing.ink: contrast against color.tracing.guide is 1.00:1, needs 2:1',
       'color.parent.text: contrast against color.parent.surface is 1.92:1, needs 4.5:1',
       'color.swatches: swatches must be 6 different colours',
     ]);
+  });
+
+  it('names every swatch once, in clip-key form', () => {
+    const t = tokensFixture();
+    t.color.swatches[2] = { name: 'merah', hex: '#1e88e5' };
+    expect(messages(checkTokens(t))).toEqual([
+      'color.swatches: swatches must have 6 different names',
+    ]);
+    // `color.merah muda` can't be a clip key; the co-sign spelled it merah-muda.
+    const spaced = tokensFixture();
+    spaced.color.swatches[5] = { name: 'merah muda', hex: '#f06292' };
+    expect(tokens.safeParse(spaced).error?.issues.map((i) => i.path.join('.'))).toEqual([
+      'color.swatches.5.name',
+    ]);
+    // A bare hex, the shape before #24, is refused.
+    const bare = tokensFixture() as unknown as { color: { swatches: unknown[] } };
+    bare.color.swatches[0] = '#e53935';
+    expect(tokens.safeParse(bare).success).toBe(false);
   });
 });
 

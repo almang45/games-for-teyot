@@ -47,7 +47,7 @@ M1 is about **110 clips per voice**:
 - tracing instructions and the 7 pre-writing strokes: 15
 - digits 0–10: 11
 - counting phrases and objects: 20
-- colors: 6
+- colors: 6, one `color.<name>` clip per swatch name in `design/tokens.json`
 - praise: 20
 - hints: 12
 - bedtime: 6
