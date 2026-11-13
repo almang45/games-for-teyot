@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -20,6 +21,7 @@ import {
   findVideos,
   frameTimes,
   framesDirOf,
+  grabArgs,
   type FrameTools,
 } from '../../tools/inputs/keyframes';
 
@@ -145,11 +147,30 @@ describe('US-REF-01 reference:check', () => {
   });
 });
 
+interface Fakes {
+  /** Seconds per video name; 0 or less fails the probe. */
+  readonly durations?: Record<string, number>;
+  /** ffmpeg isn't installed. */
+  readonly missing?: boolean;
+  /** Past this time ffmpeg exits 0 but writes nothing. */
+  readonly blankAfter?: number;
+}
+
 /** Writes a placeholder frame and records each call. */
-function fakeTools(durations: Record<string, number> = {}): FrameTools & { calls: string[] } {
+function fakeTools({
+  durations = {},
+  missing = false,
+  blankAfter = Infinity,
+}: Fakes = {}): FrameTools & {
+  calls: string[];
+} {
   const calls: string[] = [];
   return {
     calls,
+    check() {
+      calls.push('check');
+      if (missing) throw new Error('ffprobe not found: install ffmpeg (brew install ffmpeg)');
+    },
     probe(file) {
       const name = file.slice(file.lastIndexOf('/') + 1);
       const d = durations[name] ?? 10;
@@ -158,7 +179,7 @@ function fakeTools(durations: Record<string, number> = {}): FrameTools & { calls
     },
     grab(file, at, out, maxSide) {
       calls.push(`${file.slice(file.indexOf('reference/'))}@${at.toFixed(2)}:${maxSide}`);
-      writeFileSync(out, 'jpg');
+      if (at <= blankAfter) writeFileSync(out, 'jpg');
     },
   };
 }
@@ -201,6 +222,7 @@ describe('US-REF-01 reference:frames', () => {
       { source: 'bubu/video/turn.mp4', out: 'frames/bubu/turn', status: 'written', frames: 3 },
     ]);
     expect(tools.calls).toEqual([
+      'check',
       'reference/bubu/video/turn.mp4@1.67:800',
       'reference/bubu/video/turn.mp4@5.00:800',
       'reference/bubu/video/turn.mp4@8.33:800',
@@ -246,11 +268,80 @@ describe('US-REF-01 reference:frames', () => {
     expect(extractFrames(root, { count: 2 }, fakeTools())[0]?.status).toBe('written');
     writeFileSync(join(dir, 'source.json'), '{broken');
     expect(extractFrames(root, { count: 2 }, fakeTools())[0]?.status).toBe('written');
+    writeFileSync(join(dir, 'source.json'), 'null');
+    expect(extractFrames(root, { count: 2 }, fakeTools())[0]?.status).toBe('written');
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'reports a stamp it cannot read instead of re-extracting',
+    () => {
+      touch('bubu/video/turn.mp4', 'ocica/video/turn.mp4');
+      extractFrames(root, { count: 2 }, fakeTools());
+      const stamp = join(root, 'reference/frames/bubu/turn/source.json');
+      chmodSync(stamp, 0o000);
+      try {
+        const results = extractFrames(root, { count: 2 }, fakeTools());
+        expect(results.map((r) => r.status)).toEqual(['failed', 'fresh']);
+        expect(results[0]?.message).toMatch(/EACCES/);
+        expect(readdirSync(join(root, 'reference/frames/bubu/turn'))).toContain('frame-01.jpg');
+      } finally {
+        chmodSync(stamp, 0o644);
+      }
+    },
+  );
+
+  it('keeps the old frames when a new run fails', () => {
+    touch('bubu/video/turn.mp4');
+    extractFrames(root, { count: 2 }, fakeTools());
+    const dir = join(root, 'reference/frames/bubu/turn');
+    const before = readdirSync(dir).sort();
+
+    expect(() =>
+      extractFrames(root, { count: 2, force: true }, fakeTools({ missing: true })),
+    ).toThrow('ffprobe not found');
+    const probeFails = fakeTools({ durations: { 'turn.mp4': 0 } });
+    expect(extractFrames(root, { count: 2, force: true }, probeFails)[0]?.status).toBe('failed');
+    const [blank] = extractFrames(root, { count: 2, force: true }, fakeTools({ blankAfter: 3 }));
+    expect(blank).toMatchObject({ status: 'failed', message: 'ffmpeg wrote no frame at 7.500 s' });
+
+    expect(readdirSync(dir).sort()).toEqual(before);
+    expect(readdirSync(join(root, 'reference/frames/bubu')).sort()).toEqual(['turn']);
+    expect(extractFrames(root, { count: 2 }, fakeTools())[0]?.status).toBe('fresh');
+  });
+
+  it('checks for ffmpeg once, and not at all when every video is fresh', () => {
+    touch('bubu/video/turn.mp4', 'ocica/video/turn.mp4');
+    const first = fakeTools();
+    extractFrames(root, { count: 1 }, first);
+    expect(first.calls.filter((c) => c === 'check')).toHaveLength(1);
+    expect(
+      extractFrames(root, { count: 1 }, fakeTools({ missing: true })).map((r) => r.status),
+    ).toEqual(['fresh', 'fresh']);
+  });
+
+  it('refuses two videos that would share a frames folder', () => {
+    touch('bubu/video/turn.mp4', 'bubu/Turn.MOV', 'ocica/video/turn.mp4');
+    const tools = fakeTools();
+    const results = extractFrames(root, { count: 1 }, tools);
+    expect(results.map((r) => [r.source, r.status, r.message])).toEqual([
+      [
+        'bubu/Turn.MOV',
+        'failed',
+        'frames/bubu/Turn/ would also hold bubu/video/turn.mp4: rename one of the videos',
+      ],
+      [
+        'bubu/video/turn.mp4',
+        'failed',
+        'frames/bubu/turn/ would also hold bubu/Turn.MOV: rename one of the videos',
+      ],
+      ['ocica/video/turn.mp4', 'written', undefined],
+    ]);
+    expect(tools.calls.some((c) => c.includes('bubu'))).toBe(false);
   });
 
   it('reports a video it cannot read and carries on with the rest', () => {
     touch('bubu/video/rusak.mp4', 'ocica/video/turn.mp4');
-    const results = extractFrames(root, { count: 2 }, fakeTools({ 'rusak.mp4': 0 }));
+    const results = extractFrames(root, { count: 2 }, fakeTools({ durations: { 'rusak.mp4': 0 } }));
     expect(results.map((r) => [r.source, r.status, r.message])).toEqual([
       ['bubu/video/rusak.mp4', 'failed', 'ffprobe: no duration for rusak.mp4'],
       ['ocica/video/turn.mp4', 'written', undefined],
@@ -295,6 +386,19 @@ describe('US-REF-01 reference:frames', () => {
     };
     expect(info.streams[0]).toMatchObject({ width: 160, height: 120 });
     expect(info.format.tags?.location).toBeUndefined();
+    // No EXIF block (APP1 "Exif") and no trace of the GPS tag anywhere in the file.
+    const bytes = readFileSync(frame);
+    expect(bytes.includes('Exif')).toBe(false);
+    expect(bytes.includes('+00.0000+000.0000')).toBe(false);
+  });
+
+  it('asks ffmpeg to drop every metadata tag', () => {
+    const args = grabArgs('in.mp4', 1, 'out.jpg', 1600);
+    expect(args.slice(args.indexOf('-map_metadata'), args.indexOf('-map_metadata') + 2)).toEqual([
+      '-map_metadata',
+      '-1',
+    ]);
+    expect(args.at(-1)).toBe('out.jpg');
   });
 
   it('explains a missing ffmpeg', () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// npm run reference:frames [-- --count N] [-- --force]: key frames from every video under
+// npm run reference:frames [-- [--count N] [--force]]: key frames from every video under
 // reference/ into reference/frames/ (PRD US-REF-01). Videos whose frames are current are skipped.
 import { parseArgs } from 'node:util';
 import { extractFrames } from './keyframes.ts';
