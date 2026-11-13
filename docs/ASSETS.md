@@ -81,7 +81,8 @@ goes into git or the deployed site.
 - **Character**: chibi proportions (head ≈ 40% of height), large eyes, recognisably *her* (hair,
   skin tone, face shape), no exaggerated features.
 - **Palette**: define once in `design/tokens.json` (`color.palette`, ≤ 24 colours, plus the 6
-  `color.swatches` for coloring) and reuse it everywhere. The game and the art read the same file.
+  `color.swatches` for coloring, each a `{ name, hex }` whose name picks the `color.<name>` voice
+  clip) and reuse it everywhere. The game and the art read the same file.
 - **No text inside images.** Every letter and word is rendered by the game, so Indonesian text and
   curriculum changes never need new art.
 - **Consistency gate**: each new asset is reviewed side by side with `assets/style/reference-sheet.png`
