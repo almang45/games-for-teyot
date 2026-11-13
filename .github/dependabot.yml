@@ -16,6 +16,10 @@ updates:
     commit-message:
       prefix: chore
     open-pull-requests-limit: 5
+    ignore:
+      # TS 7 has no JS compiler API and typescript-eslint wants <6.1; lift once it supports 7 (#7).
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
     groups:
       dev-tooling:
         dependency-type: development
