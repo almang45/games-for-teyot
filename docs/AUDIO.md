@@ -47,11 +47,11 @@ M1 is about **110 clips per voice**:
 - tracing instructions and the 7 pre-writing strokes: 15
 - digits 0–10: 11
 - counting phrases and objects: 20
-- colors: 10
+- colors: 6
 - praise: 20
 - hints: 12
 - bedtime: 6
-- spare: about 6
+- spare: about 10
 
 At about 3 seconds per clip plus pauses, that is roughly **15 minutes of recording per parent**,
 split into sessions.

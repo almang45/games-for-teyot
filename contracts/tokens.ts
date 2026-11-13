@@ -5,6 +5,12 @@ const px = z.number().min(0).max(2048);
 
 const scale = z.record(kebabId, px);
 
+/**
+ * Coloring swatches in the palette bar. On the phone, Theia's main device, six 96 dp swatches fit
+ * beside a usable page and the HUD buttons (#12).
+ */
+export const SWATCH_COUNT = 6;
+
 /** `design/tokens.json` (WORKFLOW.md §3). Becomes CSS variables and TS constants at build time. */
 export const tokens = z.strictObject({
   $schema: schemaRef,
@@ -15,7 +21,7 @@ export const tokens = z.strictObject({
       message: 'at most 24 palette colours',
     }),
     /** The coloring swatches, in the order they appear in the palette bar. */
-    swatches: z.array(hexColor).length(10),
+    swatches: z.array(hexColor).length(SWATCH_COUNT),
     semantic: z.strictObject({
       interactive: hexColor,
       success: hexColor,
@@ -153,7 +159,7 @@ export function checkTokens(t: Tokens): Issue[] {
   }
   const swatches = t.color.swatches.map((s) => s.toLowerCase());
   if (new Set(swatches).size !== swatches.length) {
-    issues.push(error('color.swatches', 'swatches must be 10 different colours'));
+    issues.push(error('color.swatches', `swatches must be ${SWATCH_COUNT} different colours`));
   }
   return issues;
 }

@@ -160,7 +160,7 @@ Notes:
 - **Tap-to-fill** by default: tap a closed area and it fills with the selected color. No precision
   needed.
 - **Brush mode** later, as a free-drawing reward.
-- 8–10 large color swatches. The voice names each color when tapped: *merah, kuning, biru*, and so on.
+- 6 large color swatches (all that fit beside the page on the phone). The voice names each color when tapped: *merah, kuning, biru*, and so on.
 - Pages are tied to progress. Each letter learned unlocks one page (A = Ayam, B = Bola…), and
   finished pages appear on the fridge in the house.
 
