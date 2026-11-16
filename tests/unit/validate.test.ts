@@ -557,6 +557,10 @@ describe('validateDesign', () => {
 
   it('rejects files that are not design artifacts', () => {
     put('design/notes.txt', 'hello');
+    put('design/notes.md', '# Notes');
+    // Notes next to the review material are fine (#27).
+    put('design/concepts/M1/house/inventory.md', '# Inventory');
+    put('design/mockups/SCR-TRACE/notes.md', '# Notes');
     put('design/mockups/SCR-TRACE/spec.pdf', 'pdf');
     put('design/layouts/old/scr-trace.json', '{}');
     put('ui/helpers.js', 'export {}');
@@ -568,6 +572,7 @@ describe('validateDesign', () => {
       expect.stringMatching(
         /^design\/mockups\/SCR-TRACE\/spec\.pdf : not a design artifact/,
       ) as string,
+      expect.stringMatching(/^design\/notes\.md : not a design artifact/) as string,
       expect.stringMatching(/^design\/notes\.txt : not a design artifact/) as string,
       expect.stringMatching(
         /^ui\/Fancy\.svelte : Fancy is not a contracts\/ui\.ts component/,
