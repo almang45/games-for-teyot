@@ -57,9 +57,6 @@ export async function emulateAutoplayPolicy(page: Page): Promise<void> {
   });
 }
 
-/** 200 design px below the center lands in the front room (ruang-keluarga) of the placeholder house. */
-export const FRONT_ROOM_OFFSET = 200;
-
 /** Design-frame height; Scale.EXPAND keeps it on every 16:10-or-wider test viewport. */
 const DESIGN_HEIGHT = 1200;
 
@@ -79,4 +76,30 @@ export async function tapCanvas(page: Page, touch: boolean, offsetY = 0): Promis
 /** The "Mulai" button sits over the canvas center, so a center tap/click hits it on every viewport. */
 export async function pressStart(page: Page, touch: boolean): Promise<void> {
   await tapCanvas(page, touch);
+}
+
+/**
+ * Taps (touch) or clicks (mouse) a room's stand. HouseScene logs every stand in game pixels on
+ * each `house.layout`, so this works on any viewport and after a resize.
+ */
+export async function tapRoom(
+  page: Page,
+  touch: boolean,
+  log: readonly LoggedEvent[],
+  room: string,
+): Promise<void> {
+  await expect.poll(() => log.some((e) => e.event === 'house.layout')).toBe(true);
+  const latest = log.filter((e) => e.event === 'house.layout').at(-1)?.data as
+    { width: number; height: number; stands: Record<string, [number, number]> } | undefined;
+  const stand = latest?.stands[room];
+  if (!latest || !stand) throw new Error(`house.layout logged no stand for ${room}`);
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('Game canvas has no layout box');
+  const x = box.x + (stand[0] * box.width) / latest.width;
+  const y = box.y + (stand[1] * box.height) / latest.height;
+  if (touch) {
+    await page.touchscreen.tap(x, y);
+  } else {
+    await page.mouse.click(x, y);
+  }
 }

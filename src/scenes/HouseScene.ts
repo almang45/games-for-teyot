@@ -1,36 +1,38 @@
 import * as Phaser from 'phaser';
-import {
-  depthKey,
-  toScreen,
-  type IsoProjection,
-  type ScreenPoint,
-  type WorldPoint,
-} from '../engine/iso/projection';
+import type { Point } from '../../contracts/common.ts';
+import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
+import type { RoomId } from '../../contracts/rooms.ts';
+import { buildNavGraph } from '../engine/nav/graph';
+import { roomAt } from '../engine/nav/hit';
+import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
-import {
-  PLACEHOLDER_WALL_HEIGHT,
-  placeholderRooms,
-  type PlaceholderRoom,
-} from '../placeholder/house';
+import { buildPlaceholderHouse, type PlaceholderHouse } from '../placeholder/house';
 import { placeholderPalette as pal } from '../placeholder/palette';
 
-const TILE_WIDTH = 180;
-const GRID_TILES = 8;
+/** Theia's walking speed in layout px per second: a room's width in about a second. */
+const WALK_SPEED = 420;
 const RESIZE_SETTLE_MS = 120;
+const THEIA_RADIUS = 34;
+const OUTLINE = 4;
 
 /**
- * SCR-HOUSE placeholder: a code-drawn isometric cutaway with tappable rooms. The real hub replaces
- * the drawing with Antigravity's layers and design/layouts/house.json; the tap → walk flow stays.
+ * SCR-HOUSE on the placeholder house: tap a room and Theia walks there along the waypoint graph
+ * (PRD US-HOUSE-01, ARCHITECTURE §6). Everything is placed in layout.json space inside one stage
+ * container, so a resize only refits the stage and a walk in progress carries on. The real hub
+ * swaps the drawing for Antigravity's layers; the layout, the graph and the walk stay.
  */
 export class HouseScene extends Phaser.Scene {
   static readonly KEY = 'House';
 
   private log!: Logger;
-  private theia!: Phaser.GameObjects.Arc;
-  private roomLayer!: Phaser.GameObjects.Container;
-  /** Theia's position is kept as a room, not screen pixels, so it survives every resize. */
-  private theiaRoom: PlaceholderRoom | undefined;
+  private layout!: HouseLayout;
+  private walker!: NavWalker;
+  private stage!: Phaser.GameObjects.Container;
+  private theia!: Phaser.GameObjects.Container;
+  private theiaEye!: Phaser.GameObjects.Arc;
+  private floors = new Map<RoomId, (highlight: boolean) => void>();
+  private hovered: RoomId | undefined;
 
   constructor() {
     super(HouseScene.KEY);
@@ -39,18 +41,30 @@ export class HouseScene extends Phaser.Scene {
   create(): void {
     this.log = servicesOf(this).logger.forScene(HouseScene.KEY);
     this.cameras.main.setBackgroundColor(pal.sky);
-    this.roomLayer = this.add.container(0, 0);
-    this.theia = this.add.circle(0, 0, 40, pal.theia).setStrokeStyle(6, pal.outline);
-    this.theia.setDepth(1000);
-    this.theiaRoom = placeholderRooms[0];
+    const house = buildPlaceholderHouse();
+    this.layout = house.layout;
+    this.walker = new NavWalker(buildNavGraph(this.layout), this.layout.start, WALK_SPEED);
 
-    this.draw();
-    // A window drag or rotation fires dozens of RESIZE events; rebuild once the size settles.
+    this.stage = this.add.container(0, 0);
+    this.drawHouse(house);
+    this.theia = this.drawTheia();
+    this.stage.add(this.theia);
+    this.placeTheia();
+
+    this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
+      this.onTap(this.toLayout(p));
+    });
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
+      this.hover(roomAt(this.layout, this.toLayout(p))?.id);
+    });
+
+    this.fit();
+    // A window drag or rotation fires dozens of RESIZE events; refit once the size settles.
     let settle: Phaser.Time.TimerEvent | undefined;
     const onResize = (): void => {
       settle?.remove();
       settle = this.time.delayedCall(RESIZE_SETTLE_MS, () => {
-        this.draw();
+        this.fit();
       });
     };
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
@@ -59,127 +73,148 @@ export class HouseScene extends Phaser.Scene {
     });
 
     markActiveScene(HouseScene.KEY);
-    this.log.info('scene.ready', { rooms: placeholderRooms.length });
+    this.log.info('scene.ready', { rooms: this.layout.rooms.length, start: this.layout.start });
   }
 
-  /** Centers the house, walls included, in the current camera view. */
-  private projection(): IsoProjection {
-    const { centerX, centerY } = this.cameras.main;
-    const atOrigin: IsoProjection = { tileWidth: TILE_WIDTH, origin: { x: 0, y: 0 } };
-    const top = toScreen({ x: 0, y: 0, z: PLACEHOLDER_WALL_HEIGHT }, atOrigin).y;
-    const bottom = toScreen({ x: GRID_TILES, y: GRID_TILES }, atOrigin).y;
-    return { tileWidth: TILE_WIDTH, origin: { x: centerX, y: centerY - (top + bottom) / 2 } };
-  }
-
-  private draw(): void {
-    const proj = this.projection();
-    this.roomLayer.removeAll(true);
-    const sorted = [...placeholderRooms].sort(
-      (a, b) => depthKey({ x: a.x, y: a.y }) - depthKey({ x: b.x, y: b.y }),
-    );
-    for (const room of sorted) {
-      this.roomLayer.add(this.drawRoom(room, proj));
+  override update(_time: number, delta: number): void {
+    const arrival = this.walker.advance(delta);
+    this.placeTheia();
+    if (arrival) {
+      this.log.info('house.arrived', { room: arrival.room, theia: roundPoint(arrival.pos) });
     }
-    // A walk in progress was tweening toward old screen coordinates: land her in its target room.
-    this.tweens.killTweensOf(this.theia);
-    if (this.theiaRoom) this.theia.setPosition(...centerOf(this.theiaRoom, proj));
+  }
+
+  /** Scales the 1920 × 1200 layout frame to fit the view, centred; EXPAND adds side area only. */
+  private fit(): void {
+    const { width, height } = this.scale;
+    const scale = Math.min(width / HOUSE_SIZE[0], height / HOUSE_SIZE[1]);
+    this.stage.setScale(scale);
+    this.stage.setPosition(
+      (width - HOUSE_SIZE[0] * scale) / 2,
+      (height - HOUSE_SIZE[1] * scale) / 2,
+    );
+    const toGame = ([x, y]: Point): Point => [
+      Math.round(this.stage.x + x * scale),
+      Math.round(this.stage.y + y * scale),
+    ];
     this.log.info('house.layout', {
-      width: this.scale.width,
-      height: this.scale.height,
-      theiaRoom: this.theiaRoom?.id ?? null,
-      // Her actual position against her room's centre; the resize E2E test compares the two.
-      theia: { x: Math.round(this.theia.x), y: Math.round(this.theia.y) },
-      roomCenter: this.theiaRoom ? roundPoint(centerOf(this.theiaRoom, proj)) : null,
+      width,
+      height,
+      scale,
+      theiaRoom: this.walker.room,
+      theia: roundPoint(this.walker.position),
+      // Each room's stand in game pixels, so E2E tests can tap a room on any viewport.
+      stands: Object.fromEntries(this.layout.rooms.map((r) => [r.id, toGame(r.stand)])),
     });
   }
 
-  private drawRoom(room: PlaceholderRoom, proj: IsoProjection): Phaser.GameObjects.Graphics {
-    const floor: readonly WorldPoint[] = [
-      { x: room.x, y: room.y },
-      { x: room.x + room.w, y: room.y },
-      { x: room.x + room.w, y: room.y + room.d },
-      { x: room.x, y: room.y + room.d },
-    ];
-    const outline = floor.map((p) => toVec(toScreen(p, proj)));
+  private toLayout(p: Phaser.Input.Pointer): Point {
+    const s = this.stage.scale;
+    return [(p.x - this.stage.x) / s, (p.y - this.stage.y) / s];
+  }
+
+  private onTap(at: Point): void {
+    const room = roomAt(this.layout, at);
+    if (!room) {
+      // Bubu's head tilt (PRD US-HOUSE-01) hooks in here once the companions exist.
+      this.log.info('house.tap_outside', { at: roundPoint(at) });
+      return;
+    }
+    this.log.info('house.room_tap', { room: room.id });
+    const plan = this.walker.walkTo(room.id);
+    if (!plan) {
+      // checkHouseLayout proves every room reachable, so this is a broken layout, not a user error.
+      this.log.error('house.route_missing', new Error(`no route to ${room.id}`), { room: room.id });
+      return;
+    }
+    this.log.info('house.walk', { room: plan.room, via: [...plan.via] });
+  }
+
+  private hover(room: RoomId | undefined): void {
+    if (room === this.hovered) return;
+    if (this.hovered) this.floors.get(this.hovered)?.(false);
+    if (room) this.floors.get(room)?.(true);
+    this.hovered = room;
+  }
+
+  private placeTheia(): void {
+    const [x, y] = this.walker.position;
+    this.theia.setPosition(x, y - THEIA_RADIUS);
+    const { view, flipX } = this.walker.facing;
+    // Placeholder facing: the eye sits toward where she looks, low when facing the viewer.
+    this.theiaEye.setPosition(flipX ? -14 : 14, view === 'fr' ? -4 : -16);
+  }
+
+  private drawHouse(house: PlaceholderHouse): void {
+    const drawOrder = [...this.layout.rooms].sort(
+      (a, b) => a.storey - b.storey || a.stand[1] - b.stand[1],
+    );
+    for (const room of drawOrder) {
+      for (const wall of house.walls.filter((w) => w.room === room.id)) {
+        this.stage.add(
+          polygon(this, wall.quad, wall.side === 'left' ? pal.wallLeft : pal.wallRight),
+        );
+      }
+      for (const slab of house.slabs.filter((s) => s.room === room.id)) {
+        this.stage.add(polygon(this, slab.quad, pal.wallRight));
+      }
+      this.stage.add(this.drawFloor(room));
+    }
+    this.stage.add(this.drawStairs());
+  }
+
+  private drawFloor(room: HouseRoom): Phaser.GameObjects.Graphics {
     const g = this.add.graphics();
-
     // Repaints from scratch so hover never accumulates draw commands in the Graphics buffer.
-    const paint = (floorColor: number): void => {
+    const paint = (highlight: boolean): void => {
       g.clear();
-      // Cutaway: only back walls (on the far edges of the house) are drawn.
-      const [back, right, , left] = floor;
-      if (back && right && room.y === 0) fillWall(g, back, right, proj, pal.wallRight);
-      if (back && left && room.x === 0) fillWall(g, back, left, proj, pal.wallLeft);
-      g.fillStyle(floorColor, 1);
-      g.fillPoints(outline, true);
-      g.lineStyle(4, pal.outline, 1);
-      g.strokePoints(outline, true);
+      g.fillStyle(highlight ? pal.highlight : pal.floor, 1);
+      g.fillPoints(room.walk.map(toVec), true);
+      g.lineStyle(OUTLINE, pal.outline, 1);
+      g.strokePoints(room.walk.map(toVec), true);
     };
-    paint(pal.floor);
-
-    g.setInteractive({
-      hitArea: new Phaser.Geom.Polygon(outline),
-      hitAreaCallback: (area: Phaser.Geom.Polygon, x: number, y: number) => area.contains(x, y),
-      useHandCursor: true,
-    });
-    g.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      paint(pal.highlight);
-    });
-    g.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      paint(pal.floor);
-    });
-    g.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-      this.walkTo(room, proj);
-    });
+    paint(false);
+    this.floors.set(room.id, paint);
     return g;
   }
 
-  private walkTo(room: PlaceholderRoom, proj: IsoProjection): void {
-    const [x, y] = centerOf(room, proj);
-    this.log.info('house.room_tap', { room: room.id });
-    this.theiaRoom = room;
-    this.tweens.killTweensOf(this.theia);
-    // Straight-line stand-in; waypoint navigation (ARCHITECTURE §6) replaces it.
-    this.tweens.add({
-      targets: this.theia,
-      x,
-      y,
-      duration: 600,
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        this.log.info('house.arrived', {
-          room: room.id,
-          theia: { x: Math.round(this.theia.x), y: Math.round(this.theia.y) },
-        });
-      },
-    });
+  /** Each climbed edge as a ramp line: enough to read where the stairs are. */
+  private drawStairs(): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics();
+    const stairs = new Map(this.layout.waypoints.filter((w) => w.stair).map((w) => [w.id, w.pos]));
+    g.lineStyle(18, pal.outline, 1);
+    for (const [a, b] of this.layout.edges) {
+      const from = stairs.get(a);
+      const to = stairs.get(b);
+      if (from && to) g.lineBetween(from[0], from[1], to[0], to[1]);
+    }
+    return g;
+  }
+
+  private drawTheia(): Phaser.GameObjects.Container {
+    const body = this.add.circle(0, 0, THEIA_RADIUS, pal.theia).setStrokeStyle(6, pal.outline);
+    this.theiaEye = this.add.circle(0, 0, 7, pal.outline);
+    return this.add.container(0, 0, [body, this.theiaEye]);
   }
 }
 
-function toVec(p: ScreenPoint): Phaser.Math.Vector2 {
-  return new Phaser.Math.Vector2(p.x, p.y);
-}
-
-function roundPoint([x, y]: [number, number]): { x: number; y: number } {
-  return { x: Math.round(x), y: Math.round(y) };
-}
-
-function centerOf(room: PlaceholderRoom, proj: IsoProjection): [number, number] {
-  const c = toScreen({ x: room.x + room.w / 2, y: room.y + room.d / 2 }, proj);
-  return [c.x, c.y];
-}
-
-function fillWall(
-  g: Phaser.GameObjects.Graphics,
-  a: WorldPoint,
-  b: WorldPoint,
-  proj: IsoProjection,
+function polygon(
+  scene: Phaser.Scene,
+  points: readonly Point[],
   color: number,
-): void {
-  const h = PLACEHOLDER_WALL_HEIGHT;
-  const points = [a, b, { ...b, z: h }, { ...a, z: h }].map((p) => toVec(toScreen(p, proj)));
+): Phaser.GameObjects.Graphics {
+  const g = scene.add.graphics();
   g.fillStyle(color, 1);
-  g.fillPoints(points, true);
-  g.lineStyle(4, pal.outline, 1);
-  g.strokePoints(points, true);
+  g.fillPoints(points.map(toVec), true);
+  g.lineStyle(OUTLINE, pal.outline, 1);
+  g.strokePoints(points.map(toVec), true);
+  return g;
+}
+
+function toVec([x, y]: Point): Phaser.Math.Vector2 {
+  return new Phaser.Math.Vector2(x, y);
+}
+
+function roundPoint([x, y]: Point): Point {
+  return [Math.round(x), Math.round(y)];
 }

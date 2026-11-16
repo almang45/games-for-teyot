@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
-  FRONT_ROOM_OFFSET,
   GAME_URL,
   emulateAutoplayPolicy,
   collectLog,
   expectScene,
   pressStart,
-  tapCanvas,
+  tapRoom,
   type LoggedEvent,
 } from './helpers';
 
@@ -54,7 +53,7 @@ test.describe('US-OFF-01: install and offline play', () => {
     // "The placeholder house is playable" offline: start, reach the house, walk to a room.
     await pressStart(page, hasTouch);
     await expectScene(page, 'House');
-    await tapCanvas(page, hasTouch, FRONT_ROOM_OFFSET);
+    await tapRoom(page, hasTouch, log, 'ruang-keluarga');
     await expect
       .poll(() => log.find((e) => e.event === 'house.room_tap')?.data.room)
       .toBe('ruang-keluarga');
