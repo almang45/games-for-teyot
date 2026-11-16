@@ -21,6 +21,18 @@
       "room": "ruang-keluarga"
     },
     {
+      "key": "house.props.ruang-keluarga.sofa-l",
+      "type": "image",
+      "path": "house/props/ruang-keluarga/sofa-l.png",
+      "room": "ruang-keluarga"
+    },
+    {
+      "key": "house.props.ruang-keluarga.puf",
+      "type": "image",
+      "path": "house/props/ruang-keluarga/puf.png",
+      "room": "ruang-keluarga"
+    },
+    {
       "key": "house.props.kamar-tidur.kasur",
       "type": "image",
       "path": "house/props/kamar-tidur/kasur.png",
