@@ -150,3 +150,21 @@ test('SCR-HOUSE carries a walk on through a resize and keeps her where she arriv
   expect(latest?.theia).toEqual(latest?.stands.dapur);
   expect(events(log, 'house.arrived')).toHaveLength(1);
 });
+
+test('US-HOUSE-02 Bubu and Ocica follow Theia up the stairs and settle by her in the room', async ({
+  page,
+  hasTouch,
+}) => {
+  const log = await openHouse(page, hasTouch);
+  await tapRoom(page, hasTouch, log, 'kamar-tidur');
+  const [arrival] = await arrivals(log, 1);
+  expect(arrival?.data.room).toBe('kamar-tidur');
+
+  await expect
+    .poll(() => events(log, 'house.companions_parked').at(0)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'kamar-tidur', onSpots: true });
+  // Ocica waddles in behind her, so the two only settle once Theia is there.
+  const order = log.map((e) => e.event);
+  expect(order.indexOf('house.companions_parked')).toBeGreaterThan(order.indexOf('house.arrived'));
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});

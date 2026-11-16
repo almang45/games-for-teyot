@@ -13,6 +13,10 @@ export const placeholderPalette = {
   button: 0xff8a80,
   buttonPressed: 0xe57373,
   theia: 0xffb74d,
+  /** Pink, like the doll (ASSETS.md §3.3). */
+  bubu: 0xf48fb1,
+  /** Warm off-white: pure white would vanish on the light floor (ASSETS.md §3.3). */
+  ocica: 0xfff3e0,
   installWarning: 0xffe0b2,
   text: '#5d4037',
   textOnButton: '#ffffff',

@@ -99,6 +99,16 @@ export class NavWalker {
     return this.#target ?? this.#room;
   }
 
+  /** What is left of her walk as a polyline from where she is now; just her position when idle. */
+  get route(): Point[] {
+    return [this.#pos, ...this.#ahead.map((n) => n.pos)];
+  }
+
+  /** Length of {@link route}, in layout px. */
+  get remaining(): number {
+    return pathLength(this.route);
+  }
+
   /**
    * Routes to a room from where she is now, mid-walk included (PRD US-HOUSE-01). Mid-segment she
    * may turn back, whichever end of the segment gives the shorter walk. Undefined when the room
