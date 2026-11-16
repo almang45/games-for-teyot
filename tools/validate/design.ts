@@ -30,9 +30,12 @@ const TOKENS_FILE = `${DESIGN_LANE}/tokens.json`;
 const MOTION_FILE = `${DESIGN_LANE}/motion.json`;
 const LAYOUTS_DIR = `${DESIGN_LANE}/layouts/`;
 
-/** Review material: concepts, mockups (also the visual baselines), motion reference GIFs. */
+/**
+ * Review material: concepts, mockups (also the visual baselines), motion reference GIFs, and
+ * Markdown notes that go with them, such as an object inventory (#27).
+ */
 const MEDIA_DIRS = ['concepts/', 'mockups/', 'motion/'].map((d) => `${DESIGN_LANE}/${d}`);
-const MEDIA = /\.(?:png|webp|gif|jpe?g|svg)$/;
+const MEDIA = /\.(?:png|webp|gif|jpe?g|svg|md)$/;
 
 /** ui/: components, their tests, and nothing else. */
 const UI_FILE = /^ui\/[A-Z][A-Za-z]+\.svelte$|^ui\/[A-Za-z]+\.test\.ts$/;
@@ -121,7 +124,7 @@ function checkDesignFile(
     {
       ...error(
         '',
-        'not a design artifact: tokens.json, motion.json, layouts/<screen>.json, or media in concepts/, mockups/, motion/',
+        'not a design artifact: tokens.json, motion.json, layouts/<screen>.json, or media and .md notes in concepts/, mockups/, motion/',
       ),
       file: f.path,
     },
