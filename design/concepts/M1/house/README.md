@@ -85,38 +85,38 @@ In accordance with `AGENTS.md`:
 ### `house.props.ruang-keluarga.sofa`
 - **Layout Rect**: `[1036, 681, 323, 242]` (2× asset: `646 × 484 px`)
 - **Base Footprint**: `[[1131, 762], [1359, 876], [1264, 923], [1036, 809]]` (12 × 5 cells, 240 × 100 cm).
-- **Real Appearance in Photos** (`ruang-keluarga.jpg`):
-  - **Form & Type**: The long section of the modular sectional sofa sitting against the rear wall, with a high structured backrest and padded right armrest.
-  - **Color & Material**: Upholstered in dark charcoal / slate grey textured woven fabric with neat button tufting indents and cushion seams.
-  - **Details to Keep**:
-    - Segmented backrest cushions with pillow-top headrest ridges.
-    - Solid closed volume with thick seat cushions (~80 px) and fabric skirt down to floor; no gaps through which the floor is visible.
+- **Real Appearance in Photos** (`ruang-keluarga.jpg`) & **Delivered Asset**:
+  - **Form & Type**: The long section of the modular sectional sofa sitting against the rear wall, with one uniform row of three equal-height back cushions resting on the seat and a padded boxy right armrest.
+  - **Color & Material**: Upholstered in dark charcoal / slate grey textured woven fabric with neat tufted button dimples, subtle dashed stitch lines, and cushion seams.
+  - **Details Included**:
+    - Three aligned back cushions of equal height (`0.785 m`) resting solidly on the seat cushions with a horizontal mid-cushion seam (no offset tiers).
+    - Solid closed volume with thick tufted seat cushions (`0.45 m`), upholstered lower base apron, and short dark corner feet joined cleanly to the base with no gaps.
     - Padded boxy armrest on the right wall end.
-    - Delightful row of plush toys perched atop the backrest against the rear wall:
-      - Lotso bear (strawberry pink with dark magenta nose)
+    - Three generic plush toys perched atop the backrest:
       - Chubby brown teddy bear
-      - Soft white bunny with floppy pink-lined ears.
+      - Generic pastel-pink teddy bear (cream muzzle and dark teddy nose)
+      - Soft white bunny with pink-lined ears.
   - **Placement**: Sits against the rear wall facing the TV, flush with `sofa-l`.
 
 ### `house.props.ruang-keluarga.sofa-l`
 - **Layout Rect**: `[979, 766, 152, 119]` (2× asset: `304 × 238 px`)
 - **Base Footprint**: `[[1036, 809], [1131, 857], [1074, 885], [979, 838]]` (5 × 3 cells, 100 × 60 cm).
-- **Real Appearance in Photos** (`ruang-keluarga.jpg`):
-  - **Form & Type**: The leg of the L-sectional, a seat without a back.
+- **Real Appearance in Photos** (`ruang-keluarga.jpg`) & **Delivered Asset**:
+  - **Form & Type**: The leg of the L-sectional, a backless chaise seat.
   - **Color & Material**: Dark charcoal / slate grey textured woven fabric matching `sofa`.
-  - **Details to Keep**:
-    - Solid, closed volume: seat with real thickness (~80 px), clean stitch lines and center button tufting, vertical skirt down to floor base.
+  - **Details Included**:
+    - Solid, closed volume: tufted seat cushion (`0.45 m`) with dashed stitch lines and two button dimples, upholstered base apron, and short dark corner feet.
     - Aligns flush against `sofa`'s front edge along `(2072, 1618)` to `(2262, 1714)` with zero gaps.
 
 ### `house.props.ruang-keluarga.puf`
 - **Layout Rect**: `[903, 804, 152, 119]` (2× asset: `304 × 238 px`)
 - **Base Footprint**: `[[960, 847], [1055, 895], [998, 923], [903, 876]]` (5 × 3 cells, 100 × 60 cm).
-- **Real Appearance in Photos** (`ruang-keluarga.jpg`):
+- **Real Appearance in Photos** (`ruang-keluarga.jpg`) & **Delivered Asset**:
   - **Form & Type**: Separate matching rectangular ottoman bench / footstool.
   - **Color & Material**: Dark charcoal / slate grey textured woven fabric matching the sofa.
-  - **Details to Keep**:
-    - Solid, closed volume with tufted cushion top and vertical fabric apron down to floor.
-    - Placed side by side with `sofa-l`, reading as a complete lounge ensemble with the L-sofa.
+  - **Details Included**:
+    - Solid, closed volume with tufted cushion lid, horizontal body seam, small pull-tab loop on the front-left side, and short dark corner feet.
+    - Placed one cell (`20 cm`) in front of `sofa-l`, reading as a complete lounge ensemble with the L-sofa.
 
 ### `house.props.ruang-keluarga.rak-tv`
 - **Layout Rect**: `[808, 885, 114, 133]` (2× asset: `228 × 266 px`)
@@ -195,17 +195,16 @@ In accordance with `AGENTS.md`:
 - **Layout Rect**: `[1074, 401, 342, 275]` (2× asset: `684 × 550 px`)
 - **Base Footprint**: `[[1264, 505], [1416, 581], [1226, 676], [1074, 600]]` (8 × 10 cells, 160 × 200 cm queen size).
 - **Blockout Height**: 1.1 m tall box (209 px at 2×) extending to the top of the headboard against the `wall-y0` back wall.
-- **Real Appearance in Photos** (`atas-kamar-tidur/kamar-tidur-1.jpg`, `kamar-tidur-2.jpg`):
-  - **Form & Type**: Queen-size master platform bed with solid dark brown walnut base incorporating pull-out under-bed storage drawers and a tall padded headboard.
-  - **Color & Material**: Dark brown walnut wooden base (`#4a3120` to `#2d1c11`); tailored rectangular padded headboard upholstered in textured grey fabric (`#7a818c` to `#555a63`) with vertical channel tufting.
-  - **Details to Keep**:
-    - Grey upholstered headboard stands 1.1 m tall against the back (`y0`) wall.
-    - Two plush pillows propped upright against the headboard.
-    - Mattress top sits at ~0.5 m (~95 px at 2×) on the dark brown walnut drawer base with visible drawer divider lines and minimalist pulls on the left face.
-    - Dressed in neat pale mint/sage green bedsheet printed with tiny subtle dinosaur motifs.
-    - Theia's matching mint dino bolster (`guling`) with white tied ruffles, and Papa's iconic black-and-white vertically striped Juventus bolster along the right side.
-    - Small folded blanket (heather grey waffle fleece over soft pink layer) resting neatly on the mattress, well clear of and never hanging over the front edge.
-    - The sticker-wall / pin board spot (`spots.sticker-wall` at `[1302, 344, 114, 114]`, 2× `[2604, 688, 228, 228]`) hangs on `wall-y0` directly above the headboard.
+- **Real Appearance in Photos** (`atas-kamar-tidur/kamar-tidur-1.jpg`, `kamar-tidur-2.jpg`) & **Delivered Asset**:
+  - **Form & Type**: Queen-size master platform bed with solid dark brown walnut base incorporating pull-out under-bed storage drawers and a full-height tailored headboard.
+  - **Color & Material**: Dark brown walnut wooden base (`#523c2d` to `#34241a`); tailored rectangular padded headboard upholstered in warm medium grey fabric (`#9e9a93` to `#67635c`) with an inset perimeter stitch seam.
+  - **Details Included**:
+    - Grey upholstered headboard stands full height (~1.085 m) against the back (`y0`) wall without clipping.
+    - Two plump mint dinosaur pillows propped against the headboard.
+    - Mattress top sits at `0.50 m` (`95 px` at 2×) on the dark brown walnut base, with three pull-out storage drawers and warm wood pull bars along the right (`x = 1.60 m`) side.
+    - Dressed in pale mint/sage green fitted sheet printed with green, coral-red, and blue cartoon dinosaurs and tiny palm motifs.
+    - Two mint dinosaur bolsters (`guling`) with tied white rosette ends and one black-and-white vertically striped bolster with a small yellow dot accent resting on the mattress; no folded blankets hanging over the edges.
+    - The sticker-wall board (`spots.sticker-wall` at `[1302, 344, 114, 114]`, 2× `[2604, 688, 228, 228]`) hangs on `wall-y0` directly above the headboard in the `kamar-tidur` previews.
   - **In-Game Role**: Key anchor for bedtime storytelling and ending sequence (`SCR-BEDTIME`).
 
 ### `house.props.kamar-tidur.lemari`
@@ -272,7 +271,7 @@ The following elements are prominent in the actual reference photos and video st
    - *Real details*: Black powder-coated wire shelf holding the rice cooker, electric kettle, and sterilizer.
 8. **Plush Toy Row on Sofa Back**:
    - *Location*: Along the top ledge of the sofa back against the wall (visible in `ruang-keluarga.jpg`).
-   - *Real details*: Lotso bear, brown bear, and character dolls.
+   - *Real details*: Pink bear, brown bear, and white bunny plushies (stylized as a generic pink teddy, brown teddy, and white bunny in the asset).
 
 ### B. Classification & Placement Discrepancies in `layout.json`
 1. **`house.props.dapur.kotak-mainan` Room Assignment**:
