@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
-import type { RoomId, Storey } from '../../contracts/rooms.ts';
+import { STOREYS, type RoomId, type Storey } from '../../contracts/rooms.ts';
 import { fitView, HouseCamera, type Ease } from '../engine/camera/houseCamera';
 import { Companions } from '../engine/nav/companions';
 import { buildNavGraph, samePoint } from '../engine/nav/graph';
@@ -85,7 +85,7 @@ export class HouseScene extends Phaser.Scene {
     this.zoomEase = (t) => ease(t);
 
     this.stage = this.add.container(0, 0);
-    this.storeys = [0, 1, 2, 3].map(() => this.add.container(0, 0));
+    this.storeys = STOREYS.map(() => this.add.container(0, 0));
     this.stage.add(this.storeys);
     this.drawHouse(house);
     this.theia = theiaView(this);
@@ -203,6 +203,8 @@ export class HouseScene extends Phaser.Scene {
       theiaRoom: this.walker.room,
       theia: toGame(this.walker.position),
       zoomedTo: this.camera.room ?? null,
+      // Read back from the layers, so a test sees the fade as drawn.
+      storeys: this.storeys.map((layer) => Math.round(layer.alpha * 100) / 100),
       view: this.camera.shot.view.map(Math.round),
       stands: Object.fromEntries(this.layout.rooms.map((r) => [r.id, toGame(r.stand)])),
     });

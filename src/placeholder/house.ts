@@ -1,6 +1,7 @@
 import { CONTRACT_VERSION, type Point, type Rect } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import type { Activity, RoomId, Storey } from '../../contracts/rooms.ts';
+import { boundsOf, focusRect } from '../engine/camera/focus.ts';
 import { toScreen, type IsoProjection, type WorldPoint } from '../engine/iso/projection.ts';
 
 /**
@@ -76,7 +77,6 @@ const TILE_WIDTH = 180;
 /** Back-wall height above each floor, and the floor slab's thickness, in tiles. */
 const WALL_HEIGHT = 1.2;
 const SLAB = 0.15;
-const FOCUS_PAD = 0.1;
 
 export interface PlaceholderHouse {
   readonly layout: HouseLayout;
@@ -110,31 +110,6 @@ function frameProjection(): IsoProjection {
   };
 }
 
-function boundsOf(points: readonly Point[]): Rect {
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
-}
-
-/**
- * The room with its back walls and a border, widened to the frame's 16:10 so the zoom fills a
- * tablet like the activity scenes will, then slid back onto the 1920 × 1200 frame.
- */
-function focusOf(points: readonly Point[]): Rect {
-  const [x, y, w, h] = boundsOf(points);
-  const pad = FOCUS_PAD * Math.max(w, h);
-  const aspect = HOUSE_SIZE[0] / HOUSE_SIZE[1];
-  const fw = Math.min(HOUSE_SIZE[0], Math.max(w + 2 * pad, (h + 2 * pad) * aspect));
-  const fh = fw / aspect;
-  const fx = clamp(x + w / 2 - fw / 2, 0, HOUSE_SIZE[0] - fw);
-  const fy = clamp(y + h / 2 - fh / 2, 0, HOUSE_SIZE[1] - fh);
-  return [Math.floor(fx), Math.floor(fy), Math.floor(fw), Math.floor(fh)];
-}
-
-const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
-
 export function buildPlaceholderHouse(): PlaceholderHouse {
   const proj = frameProjection();
   const px = (p: WorldPoint): Point => {
@@ -162,7 +137,8 @@ export function buildPlaceholderHouse(): PlaceholderHouse {
       walk: floor,
       stand: px(lift(r, r.w / 2, r.d / 2)),
       storey: r.storey,
-      focus: focusOf([...floor, ...floorOf(r, r.z + WALL_HEIGHT)]),
+      // The floor and its back walls, so the zoom shows the whole cutaway room.
+      focus: focusRect([...floor, ...floorOf(r, r.z + WALL_HEIGHT)]),
       parking: {
         bubu: px(lift(r, r.w / 2 + 0.9, r.d / 2)),
         ocica: px(lift(r, r.w / 2, r.d / 2 + 0.9)),

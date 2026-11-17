@@ -1,13 +1,10 @@
 import type { Rect } from '../../../contracts/common.ts';
-import type { RoomId, Storey } from '../../../contracts/rooms.ts';
-
-/** Storeys 0–3 of the split-level house (ASSETS.md §4), the index into {@link Shot.alpha}. */
-const STOREY_COUNT = 4;
+import { STOREYS, type RoomId, type Storey } from '../../../contracts/rooms.ts';
 
 /** What the camera shows: a rect of layout space, and how visible each storey is. */
 export interface Shot {
   readonly view: Rect;
-  /** Opacity per storey, indexed by storey: 1 shown, 0 faded out. */
+  /** Opacity per storey of the contract's STOREYS, indexed by storey: 1 shown, 0 faded out. */
   readonly alpha: readonly number[];
 }
 
@@ -55,7 +52,7 @@ export class HouseCamera {
   #settled = true;
 
   constructor(overview: Rect) {
-    this.#overview = { view: overview, alpha: Array.from({ length: STOREY_COUNT }, () => 1) };
+    this.#overview = { view: overview, alpha: STOREYS.map(() => 1) };
     this.#from = this.#overview;
     this.#to = this.#overview;
     this.#shot = this.#overview;

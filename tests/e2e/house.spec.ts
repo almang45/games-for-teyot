@@ -8,6 +8,8 @@ import {
   tapSky,
   type LoggedEvent,
 } from './helpers';
+import type { Point } from '../../contracts/common';
+import { roomAt } from '../../src/engine/nav/hit';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
 /**
@@ -35,33 +37,75 @@ async function arrivals(log: readonly LoggedEvent[], count: number): Promise<Log
   return events(log, 'house.arrived');
 }
 
-/** Waits for the camera's `count`th zoom into a room to settle. */
+/**
+ * Whether the `house.layout` the camera logs on settling has come in after the latest `settle`
+ * event: they are separate console lines, so one can be collected before the other.
+ */
+const layoutAfter = (log: readonly LoggedEvent[], settle: string): boolean => {
+  const settled = log.findLastIndex((e) => e.event === settle);
+  return settled >= 0 && log.findLastIndex((e) => e.event === 'house.layout') > settled;
+};
+
+/** Waits for the camera's `count`th zoom into a room to settle and log its layout. */
 async function focused(log: readonly LoggedEvent[], count: number): Promise<LoggedEvent[]> {
   await expect
-    .poll(() => events(log, 'house.room_focused').length, { timeout: ARRIVAL_TIMEOUT })
-    .toBeGreaterThanOrEqual(count);
+    .poll(
+      () =>
+        events(log, 'house.room_focused').length >= count && layoutAfter(log, 'house.room_focused'),
+      { timeout: ARRIVAL_TIMEOUT },
+    )
+    .toBe(true);
   return events(log, 'house.room_focused');
+}
+
+/** Waits for the camera to settle back on the overview and log its layout. */
+async function overviewAfter(log: readonly LoggedEvent[], overviews: number): Promise<void> {
+  await expect
+    .poll(
+      () => events(log, 'house.overview').length > overviews && layoutAfter(log, 'house.overview'),
+      { timeout: ARRIVAL_TIMEOUT },
+    )
+    .toBe(true);
 }
 
 /** Leaves the room she is zoomed into the placeholder way, a tap on the sky, and waits for the overview. */
 async function leaveRoom(page: Page, touch: boolean, log: readonly LoggedEvent[]): Promise<void> {
   const overviews = events(log, 'house.overview').length;
   await tapSky(page, touch);
-  await expect
-    .poll(() => events(log, 'house.overview').length, { timeout: ARRIVAL_TIMEOUT })
-    .toBe(overviews + 1);
+  await overviewAfter(log, overviews);
 }
 
 interface HouseLayoutLog {
   readonly scale: number;
   readonly zoomedTo: string | null;
   readonly view: readonly number[];
+  readonly storeys: readonly number[];
+  readonly width: number;
   readonly theia: readonly number[];
   readonly stands: Record<string, readonly number[]>;
 }
 
 const lastLayout = (log: readonly LoggedEvent[]): HouseLayoutLog | undefined =>
   events(log, 'house.layout').at(-1)?.data as HouseLayoutLog | undefined;
+
+/** Taps a point in layout space, placed through the latest layout's scale and a room's stand. */
+async function tapLayoutPoint(
+  page: Page,
+  touch: boolean,
+  log: readonly LoggedEvent[],
+  at: Point,
+  anchor: { readonly id: string; readonly stand: Point },
+): Promise<void> {
+  const latest = lastLayout(log);
+  const stand = latest?.stands[anchor.id];
+  const box = await page.locator('canvas').boundingBox();
+  if (!latest || !stand || stand.length < 2 || !box) throw new Error('No house.layout or canvas');
+  const k = box.width / latest.width;
+  const x = box.x + ((stand[0] ?? 0) + (at[0] - anchor.stand[0]) * latest.scale) * k;
+  const y = box.y + ((stand[1] ?? 0) + (at[1] - anchor.stand[1]) * latest.scale) * k;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
 
 test('US-HOUSE-01 Theia walks to the tapped room through the door and up the stairs', async ({
   page,
@@ -219,13 +263,22 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
   hasTouch,
 }) => {
   test.slow();
-  const dapur = buildPlaceholderHouse().layout.rooms.find((r) => r.id === 'dapur');
-  if (!dapur) throw new Error('placeholder house has no dapur');
+  const { layout } = buildPlaceholderHouse();
+  const dapur = layout.rooms.find((r) => r.id === 'dapur');
+  const office = layout.rooms.find((r) => r.id === 'kantor-papa');
+  if (!dapur || !office) throw new Error('placeholder house rooms missing');
+  // A spot on the office floor (storey 1) inside the kitchen's shot, with no ground-floor room under it.
+  const [fx, , fw] = dapur.focus;
+  const officeFloor: Point = [fx + fw - 40, office.stand[1]];
+  expect(roomAt(layout, officeFloor)?.id).toBe('kantor-papa');
+  expect(roomAt(layout, officeFloor, (r) => r.storey === 0)).toBeUndefined();
+
   const log = await openHouse(page, hasTouch);
   await expect.poll(() => lastLayout(log)).toBeDefined();
   const overview = lastLayout(log);
   expect(overview?.zoomedTo).toBeNull();
   expect(overview?.view).toEqual([0, 0, 1920, 1200]);
+  expect(overview?.storeys).toEqual([1, 1, 1, 1]);
 
   await tapRoom(page, hasTouch, log, 'dapur');
   await arrivals(log, 1);
@@ -235,6 +288,8 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
   expect(zoomed?.zoomedTo).toBe('dapur');
   expect(zoomed?.view).toEqual(dapur.focus);
   expect(zoomed?.scale).toBeGreaterThan(overview?.scale ?? Infinity);
+  // Every storey above the kitchen has faded out.
+  expect(zoomed?.storeys).toEqual([1, 0, 0, 0]);
 
   // A tap on the room she is in belongs to its activity: no walk, no zoom.
   await tapRoom(page, hasTouch, log, 'dapur');
@@ -242,12 +297,16 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
   expect(events(log, 'house.walk')).toHaveLength(1);
   expect(events(log, 'house.zoom_out')).toEqual([]);
 
-  // Leaving zooms out without a walk, a tilt or a tap_outside.
-  await leaveRoom(page, hasTouch, log);
+  // The faded office floor does not catch the tap: it only leaves the kitchen, with no walk.
+  const overviews = events(log, 'house.overview').length;
+  await tapLayoutPoint(page, hasTouch, log, officeFloor, dapur);
+  await overviewAfter(log, overviews);
   expect(events(log, 'house.zoom_out').map((e) => e.data)).toEqual([{ room: 'dapur' }]);
+  expect(events(log, 'house.room_tap').map((e) => e.data.room)).toEqual(['dapur']);
   const back = lastLayout(log);
   expect(back?.zoomedTo).toBeNull();
   expect(back?.view).toEqual([0, 0, 1920, 1200]);
+  expect(back?.storeys).toEqual([1, 1, 1, 1]);
   expect(events(log, 'house.walk')).toHaveLength(1);
   expect(events(log, 'house.tap_outside')).toEqual([]);
   expect(events(log, 'house.bubu_tilt')).toEqual([]);

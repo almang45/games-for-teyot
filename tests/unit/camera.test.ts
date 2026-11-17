@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Point, Rect } from '../../contracts/common';
-import { HOUSE_SIZE } from '../../contracts/houseLayout';
+import { HOUSE_SIZE, type HouseLayout } from '../../contracts/houseLayout';
+import { MOTION_KINDS, REQUIRED_MOMENTS, motionEntry } from '../../contracts/motion';
 import { fitView, HouseCamera, type FocusTarget } from '../../src/engine/camera/houseCamera';
 import { roomAt } from '../../src/engine/nav/hit';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
@@ -115,8 +116,16 @@ describe('HouseCamera', () => {
 });
 
 describe('the hub zoom on the placeholder house', () => {
-  it('stays within the transition cap of the motion contract', () => {
-    expect(placeholderMotion['house.room-zoom'].duration).toBeLessThanOrEqual(600);
+  it('gives every placeholder moment a contract-valid entry within its caps', () => {
+    for (const [key, entry] of Object.entries(placeholderMotion)) {
+      // A mistyped easing would compile and Phaser would quietly run it linear.
+      expect(() => motionEntry.parse(entry), key).not.toThrow();
+      const rule: { kind: string; max?: number } =
+        REQUIRED_MOMENTS[key as keyof typeof placeholderMotion];
+      expect(entry.kind, key).toBe(rule.kind);
+      const cap = Math.min(MOTION_KINDS[entry.kind].max, rule.max ?? Infinity);
+      expect(entry.duration, key).toBeLessThanOrEqual(cap);
+    }
   });
 
   it('gives every room a 16:10 focus on the frame that holds its whole floor', () => {
@@ -134,10 +143,19 @@ describe('the hub zoom on the placeholder house', () => {
   });
 
   it('lets a tap fall through a faded storey to the room below it', () => {
-    const upstairs = layout.rooms.find((r) => r.storey === 2);
-    if (!upstairs) throw new Error('fixture has no upstairs room');
-    const { stand } = upstairs;
-    expect(roomAt(layout, stand)?.id).toBe(upstairs.id);
-    expect(roomAt(layout, stand, (r) => r.storey <= 0)?.id).not.toBe(upstairs.id);
+    // The placeholder rooms do not overlap, so stack an upstairs room right over the kitchen.
+    const kitchen = layout.rooms.find((r) => r.id === 'dapur');
+    const bedroom = layout.rooms.find((r) => r.storey === 2);
+    if (!kitchen || !bedroom) throw new Error('fixture rooms missing');
+    const stacked: HouseLayout = {
+      ...layout,
+      rooms: [kitchen, { ...bedroom, polygon: kitchen.polygon }],
+    };
+    const camera = new HouseCamera(OVERVIEW);
+    const shown = (r: { storey: FocusTarget['storey'] }): boolean => camera.shows(r.storey);
+    expect(roomAt(stacked, kitchen.stand, shown)?.id).toBe(bedroom.id);
+    camera.focusOn(kitchen, 600, linear);
+    camera.advance(400);
+    expect(roomAt(stacked, kitchen.stand, shown)?.id).toBe(kitchen.id);
   });
 });
