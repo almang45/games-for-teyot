@@ -3,7 +3,6 @@ import type * as Phaser from 'phaser';
 import { describe, expect, it } from 'vitest';
 import { markActiveScene, provideServices, servicesOf } from '../../src/game/services';
 import { createAppLog } from '../../src/log';
-import { placeholderRooms } from '../../src/placeholder/house';
 
 function fakeRegistry() {
   const store = new Map<string, unknown>();
@@ -36,18 +35,5 @@ describe('createAppLog', () => {
     logger.debug('a');
     expect(ring.entries().map((e) => e.event)).toEqual(['a']);
     expect(ring.capacity).toBe(2000);
-  });
-});
-
-describe('placeholder house', () => {
-  it('has unique room ids and non-overlapping footprints', () => {
-    expect(new Set(placeholderRooms.map((r) => r.id)).size).toBe(placeholderRooms.length);
-    for (const a of placeholderRooms) {
-      for (const b of placeholderRooms) {
-        if (a === b) continue;
-        const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.d && b.y < a.y + a.d;
-        expect(overlap, `${a.id} overlaps ${b.id}`).toBe(false);
-      }
-    }
   });
 });

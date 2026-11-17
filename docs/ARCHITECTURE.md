@@ -187,8 +187,9 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   - room polygons (tap areas)
   - a standing spot for each room
   - waypoints (doors, stair top and bottom) with edges
-- BFS over the waypoint graph (a few dozen nodes, so A* is unnecessary). The character tweens along
-  the polyline at constant speed.
+- Dijkstra over the waypoint graph, weighted by segment length (a few dozen nodes, so a linear scan
+  beats a heap and A* is unnecessary; a room with two doors makes a loop where the fewest hops is not
+  the shortest walk). The character walks the polyline at constant speed.
 - **Isometric facing**: each segment's screen direction picks `fr` or `br` (toward or away from
   the viewer) plus a horizontal flip, which gives 4 directions from 2 drawn facings.
 - **Depth sorting**: characters and props sort by feet y. `occluders` from `layout.json` are drawn
