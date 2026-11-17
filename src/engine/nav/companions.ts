@@ -1,5 +1,5 @@
 import type { Point } from '../../../contracts/common.ts';
-import { distance, pathLength } from './graph.ts';
+import { distance, pathLength, samePoint } from './graph.ts';
 import { Polyline } from './polyline.ts';
 import { facingAlong, type Facing } from './walker.ts';
 
@@ -23,6 +23,14 @@ export interface TheiaState {
   /** Length of what is left of her walk (NavWalker.remaining). */
   readonly remaining: number;
   readonly walking: boolean;
+}
+
+/** How the two keep to Theia along her walk, in layout px; both positive while they follow her. */
+export interface CompanionSpacing {
+  /** Bubu's lead on her along her route; negative while he still catches up. */
+  readonly bubuAhead: number;
+  /** How far Ocica trails her along the trail she walked. */
+  readonly ocicaBehind: number;
 }
 
 export interface CompanionTuning {
@@ -87,6 +95,9 @@ export class Companions {
   #theiaArc = 0;
   /** Points Theia passed that Ocica still has to walk, in order. */
   #trail: Point[] = [];
+  /** Theia's current route, and how much of it is already in the trail. */
+  #route: Polyline | undefined;
+  #trailArc = 0;
   #ocicaParking: Point | undefined;
 
   constructor(parking: Parking, tuning: CompanionTuning) {
@@ -107,11 +118,24 @@ export class Companions {
     return this.#ocica.pose;
   }
 
-  /** Theia got a new route (NavWalker.route right after walkTo) to a room with these spots. */
-  follow(route: readonly Point[], parking: Parking): void {
+  get spacing(): CompanionSpacing {
+    return {
+      bubuAhead: this.#bubuS - this.#theiaArc,
+      ocicaBehind: pathLength([this.#ocica.pos, ...this.#trail]),
+    };
+  }
+
+  /**
+   * Theia got a new route (NavWalker.route right after walkTo) to a room with these spots. Call it
+   * on every route, empty ones included: a second tap in the same frame can keep her where she
+   * stands but change the room. False when nothing changes: she stays, and they are already bound
+   * for these spots.
+   */
+  follow(route: readonly Point[], parking: Parking): boolean {
     const [start] = route;
-    // Already standing in that room: nobody needs to move.
-    if (!start || pathLength(route) === 0) return;
+    if (!start) return false;
+    const last = this.#bubuPath.points.at(-1);
+    if (pathLength(route) === 0 && last && samePoint(last, parking.bubu)) return false;
     // Bubu gets back to where Theia is along the path he was on, so a turn never crosses a wall.
     const back = this.#bubuPath.between(this.#bubuS, this.#theiaArc);
     this.#routeStart = pathLength([...back, start]);
@@ -121,7 +145,10 @@ export class Companions {
     this.#theiaArc = this.#routeStart;
 
     this.#trail.push(start);
+    this.#route = new Polyline(route);
+    this.#trailArc = 0;
     this.#ocicaParking = parking.ocica;
+    return true;
   }
 
   update(dtMs: number, theia: TheiaState): void {
@@ -135,13 +162,16 @@ export class Companions {
     this.#bubuS = Math.max(this.#bubuS, Math.min(this.#bubuS + bubuStep, cap));
     this.#bubu.step(this.#bubuPath.at(this.#bubuS), theia.pos);
 
+    // Her route, not her per-frame position: a long frame can carry her round a corner, and
+    // Ocica must turn it too rather than cut across.
+    if (this.#route && walked > this.#trailArc) {
+      this.#trail.push(...this.#route.between(this.#trailArc, walked).slice(1));
+      this.#trailArc = walked;
+    }
     let keep = this.#tuning.gap;
-    if (theia.walking) {
-      const last = this.#trail.at(-1);
-      if (!last || distance(last, theia.pos) > 0) this.#trail.push(theia.pos);
-    } else {
+    if (!theia.walking) {
       if (this.#ocicaParking) {
-        this.#trail.push(theia.pos, this.#ocicaParking);
+        this.#trail.push(this.#ocicaParking);
         this.#ocicaParking = undefined;
       }
       keep = 0;

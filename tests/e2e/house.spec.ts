@@ -65,18 +65,25 @@ test('US-HOUSE-01 a tap on another room while walking re-routes from her current
   test.slow();
   const log = await openHouse(page, hasTouch);
   await tapRoom(page, hasTouch, log, 'kamar-tidur');
-  await expect.poll(() => events(log, 'house.walk').length).toBe(1);
-  await page.waitForTimeout(300);
+  // Halfway up the house, whatever the frame rate: she is well off the stand she started on.
+  await expect
+    .poll(() => events(log, 'house.companions_following').length, { timeout: ARRIVAL_TIMEOUT })
+    .toBe(1);
   await tapRoom(page, hasTouch, log, 'dapur');
 
   await expect.poll(() => events(log, 'house.walk').length).toBe(2);
-  const via = events(log, 'house.walk').at(1)?.data.via as string[];
+  const [first, second] = events(log, 'house.walk');
+  const via = second?.data.via as string[];
   expect(via.at(-1)).toBe('dapur');
   expect(via).not.toContain('kamar-tidur');
+  // Logged after the re-route: still where she was, not back at the start.
+  expect(second?.data.theia).not.toEqual(first?.data.theia);
   const [arrival] = await arrivals(log, 1);
   expect(arrival?.data.room).toBe('dapur');
-  // The first walk was dropped, not finished afterwards.
-  await page.waitForTimeout(500);
+  // Parking needs her standing still in dapur, so the dropped walk did not resume.
+  await expect
+    .poll(() => events(log, 'house.companions_parked').at(-1)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'dapur' });
   expect(events(log, 'house.arrived').map((e) => e.data.room)).toEqual(['dapur']);
 });
 
@@ -159,11 +166,14 @@ test('US-HOUSE-02 Bubu and Ocica follow Theia up the stairs and settle by her in
   const [arrival] = await arrivals(log, 1);
   expect(arrival?.data.room).toBe('kantor-papa');
 
+  // Halfway there: Bubu hops ahead of her and Ocica waddles behind.
+  const following = events(log, 'house.companions_following').at(0)?.data as
+    { bubuAhead: number; ocicaBehind: number } | undefined;
+  expect(following?.bubuAhead).toBeGreaterThan(0);
+  expect(following?.ocicaBehind).toBeGreaterThan(0);
+
   await expect
     .poll(() => events(log, 'house.companions_parked').at(0)?.data, { timeout: ARRIVAL_TIMEOUT })
-    .toEqual({ room: 'kantor-papa', onSpots: true });
-  // Ocica waddles in behind her, so the two only settle once Theia is there.
-  const order = log.map((e) => e.event);
-  expect(order.indexOf('house.companions_parked')).toBeGreaterThan(order.indexOf('house.arrived'));
+    .toEqual({ room: 'kantor-papa' });
   expect(log.filter((e) => e.level === 'error')).toEqual([]);
 });

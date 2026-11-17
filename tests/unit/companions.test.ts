@@ -46,9 +46,9 @@ function start(at: RoomId): Run {
   return { walker, companions: new Companions(room(at).parking, TUNING) };
 }
 
-function walkTo({ walker, companions }: Run, to: RoomId): void {
+function walkTo({ walker, companions }: Run, to: RoomId): boolean {
   walker.walkTo(to);
-  companions.follow(walker.route, room(to).parking);
+  return companions.follow(walker.route, room(to).parking);
 }
 
 /** Runs frames, calling `check` after each; returns the frame Theia arrived on, if any. */
@@ -56,11 +56,12 @@ function run(
   { walker, companions }: Run,
   frames: number,
   check: (frame: number) => void = () => undefined,
+  frameMs = FRAME,
 ): number | undefined {
   let arrivedAt: number | undefined;
   for (let f = 0; f < frames; f++) {
-    if (walker.advance(FRAME)) arrivedAt ??= f;
-    companions.update(FRAME, {
+    if (walker.advance(frameMs)) arrivedAt ??= f;
+    companions.update(frameMs, {
       pos: walker.position,
       remaining: walker.remaining,
       walking: walker.walking,
@@ -175,10 +176,55 @@ describe('Companions', () => {
 
   it('stay put when she taps the room she is already in', () => {
     const r = start('dapur');
-    walkTo(r, 'dapur');
+    expect(walkTo(r, 'dapur')).toBe(false);
     run(r, 30);
     expect(r.companions.bubu.travelled).toBe(0);
     expect(r.companions.ocica.travelled).toBe(0);
+  });
+
+  it('settle in her room when a second tap in the same frame keeps her there', () => {
+    const r = start('ruang-keluarga');
+    walkTo(r, 'kamar-tidur');
+    // No frame in between: she is still on her stand, so the second walk is empty.
+    expect(walkTo(r, 'ruang-keluarga')).toBe(true);
+    run(r, 300, (f) => {
+      expect(walkable(r.companions.bubu.pos), `Bubu off the floor at frame ${f}`).toBe(true);
+      expect(walkable(r.companions.ocica.pos), `Ocica off the floor at frame ${f}`).toBe(true);
+    });
+    const parking = room('ruang-keluarga').parking;
+    expect(r.walker.room).toBe('ruang-keluarga');
+    expect(r.companions.bubu.pos).toEqual(parking.bubu);
+    expect(r.companions.ocica.pos).toEqual(parking.ocica);
+  });
+
+  it('keep to the floor and the stairs on a slow device, long frames and all', () => {
+    const r = start('ruang-keluarga');
+    walkTo(r, 'kamar-tidur');
+    // About 5.6 fps: one frame carries her from the floor onto the stairs, and a trail of
+    // per-frame samples would have had Ocica cut that corner in mid-air.
+    run(
+      r,
+      60,
+      (f) => {
+        expect(walkable(r.companions.bubu.pos), `Bubu off the floor at frame ${f}`).toBe(true);
+        expect(walkable(r.companions.ocica.pos), `Ocica off the floor at frame ${f}`).toBe(true);
+      },
+      179,
+    );
+    expect(r.companions.ocica.pos).toEqual(room('kamar-tidur').parking.ocica);
+  });
+
+  it('report Bubu ahead and Ocica behind halfway up to the office', () => {
+    const r = start('ruang-keluarga');
+    walkTo(r, 'kantor-papa');
+    const half = r.walker.remaining / 2;
+    run(r, 400, () => {
+      if (!r.walker.walking || r.walker.remaining > half) return;
+      const { bubuAhead, ocicaBehind } = r.companions.spacing;
+      expect(bubuAhead).toBeGreaterThan(0);
+      expect(bubuAhead).toBeLessThanOrEqual(TUNING.lead + 1e-6);
+      expect(ocicaBehind).toBeGreaterThan(0);
+    });
   });
 
   it('face their direction of travel, and turn to look at her once they stop', () => {

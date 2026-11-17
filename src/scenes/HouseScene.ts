@@ -3,7 +3,7 @@ import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import type { RoomId } from '../../contracts/rooms.ts';
 import { Companions } from '../engine/nav/companions';
-import { buildNavGraph } from '../engine/nav/graph';
+import { buildNavGraph, samePoint } from '../engine/nav/graph';
 import { paintOrder, roomAt } from '../engine/nav/hit';
 import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
@@ -45,6 +45,8 @@ export class HouseScene extends Phaser.Scene {
   private ocica!: ActorView;
   /** The room the companions are heading to, until both stand on its parking spots. */
   private parkingIn: RoomId | undefined;
+  /** Theia's remaining walk at its halfway point, where the companions' spacing is logged once. */
+  private spacingAt: number | undefined;
   private floors!: Map<RoomId, (highlight: boolean) => void>;
   private hovered: RoomId | undefined;
 
@@ -58,6 +60,7 @@ export class HouseScene extends Phaser.Scene {
     this.floors = new Map();
     this.hovered = undefined;
     this.parkingIn = undefined;
+    this.spacingAt = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
     const house = buildPlaceholderHouse();
     this.layout = house.layout;
@@ -121,14 +124,29 @@ export class HouseScene extends Phaser.Scene {
     if (arrival) {
       this.log.info('house.arrived', { room: arrival.room, theia: roundPoint(arrival.pos) });
     }
-    const { bubu, ocica } = this.companions;
-    if (this.parkingIn && !this.walker.walking && !bubu.moving && !ocica.moving) {
-      const { parking } = this.roomById(this.parkingIn);
-      this.log.info('house.companions_parked', {
-        room: this.parkingIn,
-        // The E2E test checks that they ended on the spots layout.json gives that room.
-        onSpots: samePoint(bubu.pos, parking.bubu) && samePoint(ocica.pos, parking.ocica),
+    if (
+      this.spacingAt !== undefined &&
+      this.walker.walking &&
+      this.walker.remaining <= this.spacingAt
+    ) {
+      // Lets the E2E test see Bubu ahead of her and Ocica behind (PRD US-HOUSE-02).
+      const { bubuAhead, ocicaBehind } = this.companions.spacing;
+      this.log.info('house.companions_following', {
+        bubuAhead: Math.round(bubuAhead),
+        ocicaBehind: Math.round(ocicaBehind),
       });
+      this.spacingAt = undefined;
+    }
+    this.logParked();
+  }
+
+  /** Once both stand on the spots layout.json gives the room; position, not a still frame, decides. */
+  private logParked(): void {
+    if (!this.parkingIn || this.walker.walking) return;
+    const { parking } = this.roomById(this.parkingIn);
+    const { bubu, ocica } = this.companions;
+    if (samePoint(bubu.pos, parking.bubu) && samePoint(ocica.pos, parking.ocica)) {
+      this.log.info('house.companions_parked', { room: this.parkingIn });
       this.parkingIn = undefined;
     }
   }
@@ -181,11 +199,14 @@ export class HouseScene extends Phaser.Scene {
       this.log.error('house.route_missing', new Error(`no route to ${room.id}`), { room: room.id });
       return;
     }
-    this.log.info('house.walk', { room: plan.room, via: [...plan.via] });
-    if (plan.via.length > 0) {
-      this.companions.follow(this.walker.route, room.parking);
-      this.parkingIn = room.id;
-    }
+    this.log.info('house.walk', {
+      room: plan.room,
+      via: [...plan.via],
+      theia: roundPoint(this.walker.position),
+    });
+    if (this.companions.follow(this.walker.route, room.parking)) this.parkingIn = room.id;
+    const remaining = this.walker.remaining;
+    this.spacingAt = remaining > 0 ? remaining / 2 : undefined;
   }
 
   private tiltBubu(): void {
@@ -289,10 +310,6 @@ function isTap(p: Phaser.Input.Pointer): boolean {
 
 function toVec([x, y]: Point): Phaser.Math.Vector2 {
   return new Phaser.Math.Vector2(x, y);
-}
-
-function samePoint(a: Point, b: Point): boolean {
-  return a[0] === b[0] && a[1] === b[1];
 }
 
 function roundPoint([x, y]: Point): Point {
