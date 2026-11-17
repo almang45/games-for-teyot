@@ -25,6 +25,8 @@ export class NavGraphError extends Error {
 
 export const distance = ([ax, ay]: Point, [bx, by]: Point): number => Math.hypot(bx - ax, by - ay);
 
+export const samePoint = (a: Point, b: Point): boolean => a[0] === b[0] && a[1] === b[1];
+
 export const lerp = (a: Point, b: Point, t: number): Point =>
   t >= 1 ? b : [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 

@@ -2,21 +2,28 @@ import * as Phaser from 'phaser';
 import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import type { RoomId } from '../../contracts/rooms.ts';
-import { buildNavGraph } from '../engine/nav/graph';
+import { Companions } from '../engine/nav/companions';
+import { buildNavGraph, samePoint } from '../engine/nav/graph';
 import { paintOrder, roomAt } from '../engine/nav/hit';
 import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
 import { buildPlaceholderHouse, type PlaceholderHouse } from '../placeholder/house';
 import { placeholderPalette as pal } from '../placeholder/palette';
+import { bubuView, ocicaView, theiaView, type ActorView } from './house/actors';
 
 /** Theia's walking speed in layout px per second: a room's width in about a second. */
 const WALK_SPEED = 420;
 const RESIZE_SETTLE_MS = 120;
 /** Game px a pointer may travel between down and up and still count as a tap, not a drag. */
 const TAP_SLOP = 30;
-const THEIA_RADIUS = 34;
 const OUTLINE = 4;
+/** Bubu hops at most this far ahead of Theia and Ocica keeps this far behind, in layout px. */
+const BUBU_LEAD = 110;
+const OCICA_GAP = 90;
+/** Bubu's head tilt when a tap lands outside every room (PRD US-HOUSE-01). */
+const TILT_RAD = 0.3;
+const TILT_MS = 220;
 
 /**
  * SCR-HOUSE on the placeholder house: tap a room and Theia walks there along the waypoint graph
@@ -31,8 +38,15 @@ export class HouseScene extends Phaser.Scene {
   private layout!: HouseLayout;
   private walker!: NavWalker;
   private stage!: Phaser.GameObjects.Container;
-  private theia!: Phaser.GameObjects.Container;
-  private theiaEye!: Phaser.GameObjects.Arc;
+  private companions!: Companions;
+  private actors!: Phaser.GameObjects.Container;
+  private theia!: ActorView;
+  private bubu!: ActorView;
+  private ocica!: ActorView;
+  /** The room the companions are heading to, until both stand on its parking spots. */
+  private parkingIn: RoomId | undefined;
+  /** Theia's remaining walk at its halfway point, where the companions' spacing is logged once. */
+  private spacingAt: number | undefined;
   private floors!: Map<RoomId, (highlight: boolean) => void>;
   private hovered: RoomId | undefined;
 
@@ -45,16 +59,26 @@ export class HouseScene extends Phaser.Scene {
     // Phaser reuses the scene instance on restart, so per-run state starts over here.
     this.floors = new Map();
     this.hovered = undefined;
+    this.parkingIn = undefined;
+    this.spacingAt = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
     const house = buildPlaceholderHouse();
     this.layout = house.layout;
     this.walker = new NavWalker(buildNavGraph(this.layout), this.layout.start, WALK_SPEED);
+    this.companions = new Companions(this.roomById(this.layout.start).parking, {
+      theiaSpeed: WALK_SPEED,
+      lead: BUBU_LEAD,
+      gap: OCICA_GAP,
+    });
 
     this.stage = this.add.container(0, 0);
     this.drawHouse(house);
-    this.theia = this.drawTheia();
-    this.stage.add(this.theia);
-    this.placeTheia();
+    this.theia = theiaView(this);
+    this.bubu = bubuView(this);
+    this.ocica = ocicaView(this);
+    this.actors = this.add.container(0, 0, [this.theia.root, this.bubu.root, this.ocica.root]);
+    this.stage.add(this.actors);
+    this.placeActors();
 
     this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
       // A touch has no hover: the highlight it set while down must not stay behind.
@@ -91,9 +115,39 @@ export class HouseScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     const arrival = this.walker.advance(delta);
-    this.placeTheia();
+    this.companions.update(delta, {
+      pos: this.walker.position,
+      remaining: this.walker.remaining,
+      walking: this.walker.walking,
+    });
+    this.placeActors();
     if (arrival) {
       this.log.info('house.arrived', { room: arrival.room, theia: roundPoint(arrival.pos) });
+    }
+    if (
+      this.spacingAt !== undefined &&
+      this.walker.walking &&
+      this.walker.remaining <= this.spacingAt
+    ) {
+      // Lets the E2E test see Bubu ahead of her and Ocica behind (PRD US-HOUSE-02).
+      const { bubuAhead, ocicaBehind } = this.companions.spacing;
+      this.log.info('house.companions_following', {
+        bubuAhead: Math.round(bubuAhead),
+        ocicaBehind: Math.round(ocicaBehind),
+      });
+      this.spacingAt = undefined;
+    }
+    this.logParked();
+  }
+
+  /** Once both stand on the spots layout.json gives the room; position, not a still frame, decides. */
+  private logParked(): void {
+    if (!this.parkingIn || this.walker.walking) return;
+    const { parking } = this.roomById(this.parkingIn);
+    const { bubu, ocica } = this.companions;
+    if (samePoint(bubu.pos, parking.bubu) && samePoint(ocica.pos, parking.ocica)) {
+      this.log.info('house.companions_parked', { room: this.parkingIn });
+      this.parkingIn = undefined;
     }
   }
 
@@ -134,8 +188,8 @@ export class HouseScene extends Phaser.Scene {
   private onTap(at: Point): void {
     const room = roomAt(this.layout, at);
     if (!room) {
-      // Bubu's head tilt (PRD US-HOUSE-01) hooks in here once the companions exist.
       this.log.info('house.tap_outside', { at: roundPoint(at) });
+      this.tiltBubu();
       return;
     }
     this.log.info('house.room_tap', { room: room.id });
@@ -145,7 +199,34 @@ export class HouseScene extends Phaser.Scene {
       this.log.error('house.route_missing', new Error(`no route to ${room.id}`), { room: room.id });
       return;
     }
-    this.log.info('house.walk', { room: plan.room, via: [...plan.via] });
+    this.log.info('house.walk', {
+      room: plan.room,
+      via: [...plan.via],
+      theia: roundPoint(this.walker.position),
+    });
+    if (this.companions.follow(this.walker.route, room.parking)) this.parkingIn = room.id;
+    const remaining = this.walker.remaining;
+    this.spacingAt = remaining > 0 ? remaining / 2 : undefined;
+  }
+
+  private tiltBubu(): void {
+    const figure = this.bubu.root;
+    if (this.tweens.isTweening(figure)) return;
+    this.log.info('house.bubu_tilt');
+    this.tweens.add({
+      targets: figure,
+      rotation: this.companions.bubu.facing.flipX ? -TILT_RAD : TILT_RAD,
+      duration: TILT_MS,
+      yoyo: true,
+      hold: TILT_MS,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private roomById(id: RoomId): HouseRoom {
+    const room = this.layout.rooms.find((r) => r.id === id);
+    if (!room) throw new Error(`layout has no room ${id}`);
+    return room;
   }
 
   private hover(room: RoomId | undefined): void {
@@ -156,12 +237,12 @@ export class HouseScene extends Phaser.Scene {
     this.input.setDefaultCursor(room ? 'pointer' : 'default');
   }
 
-  private placeTheia(): void {
-    const [x, y] = this.walker.position;
-    this.theia.setPosition(x, y - THEIA_RADIUS);
-    const { view, flipX } = this.walker.facing;
-    // Placeholder facing: the eye sits toward where she looks, low when facing the viewer.
-    this.theiaEye.setPosition(flipX ? -14 : 14, view === 'fr' ? -4 : -16);
+  private placeActors(): void {
+    const w = this.walker;
+    this.theia.place({ pos: w.position, facing: w.facing, moving: w.walking, travelled: 0 });
+    this.bubu.place(this.companions.bubu);
+    this.ocica.place(this.companions.ocica);
+    this.actors.sort('y');
   }
 
   private drawHouse(house: PlaceholderHouse): void {
@@ -206,12 +287,6 @@ export class HouseScene extends Phaser.Scene {
       if (from && to) g.lineBetween(from[0], from[1], to[0], to[1]);
     }
     return g;
-  }
-
-  private drawTheia(): Phaser.GameObjects.Container {
-    const body = this.add.circle(0, 0, THEIA_RADIUS, pal.theia).setStrokeStyle(6, pal.outline);
-    this.theiaEye = this.add.circle(0, 0, 7, pal.outline);
-    return this.add.container(0, 0, [body, this.theiaEye]);
   }
 }
 

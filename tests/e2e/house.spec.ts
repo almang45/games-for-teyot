@@ -8,8 +8,11 @@ import {
   type LoggedEvent,
 } from './helpers';
 
-/** The longest placeholder walk (ruang-keluarga → kamar-tidur) takes about 4 s. */
-const ARRIVAL_TIMEOUT = 15_000;
+/**
+ * The walks here take 1–3 s on a device, but Phaser caps each frame's delta at 1/60 s while the page
+ * is unfocused, so a slow, unfocused CI browser walks in slow motion.
+ */
+const ARRIVAL_TIMEOUT = 40_000;
 
 async function openHouse(page: Page, touch: boolean): Promise<LoggedEvent[]> {
   const log = collectLog(page);
@@ -34,34 +37,23 @@ test('US-HOUSE-01 Theia walks to the tapped room through the door and up the sta
   page,
   hasTouch,
 }) => {
+  test.slow();
   const log = await openHouse(page, hasTouch);
-  await tapRoom(page, hasTouch, log, 'kamar-tidur');
+  await tapRoom(page, hasTouch, log, 'kantor-papa');
 
-  await expect.poll(() => events(log, 'house.walk').at(0)?.data.room).toBe('kamar-tidur');
+  await expect.poll(() => events(log, 'house.walk').at(0)?.data.room).toBe('kantor-papa');
   expect(events(log, 'house.walk').at(0)?.data.via).toEqual([
     'tangga-1-bawah',
     'tangga-1-atas',
     'kantor-papa',
-    'tangga-2-bawah',
-    'tangga-2-atas',
-    'kamar-tidur',
   ]);
   const [arrival] = await arrivals(log, 1);
-  expect(arrival?.data.room).toBe('kamar-tidur');
+  expect(arrival?.data.room).toBe('kantor-papa');
 
   await tapRoom(page, hasTouch, log, 'dapur');
   await expect
     .poll(() => events(log, 'house.walk').at(1)?.data.via)
-    .toEqual([
-      'tangga-2-atas',
-      'tangga-2-bawah',
-      'kantor-papa',
-      'tangga-1-atas',
-      'tangga-1-bawah',
-      'ruang-keluarga',
-      'pintu-dapur',
-      'dapur',
-    ]);
+    .toEqual(['tangga-1-atas', 'tangga-1-bawah', 'ruang-keluarga', 'pintu-dapur', 'dapur']);
   expect((await arrivals(log, 2)).at(1)?.data.room).toBe('dapur');
   expect(log.filter((e) => e.level === 'error')).toEqual([]);
 });
@@ -70,24 +62,35 @@ test('US-HOUSE-01 a tap on another room while walking re-routes from her current
   page,
   hasTouch,
 }) => {
+  test.slow();
   const log = await openHouse(page, hasTouch);
   await tapRoom(page, hasTouch, log, 'kamar-tidur');
-  await expect.poll(() => events(log, 'house.walk').length).toBe(1);
-  await page.waitForTimeout(300);
+  // Halfway up the house, whatever the frame rate: she is well off the stand she started on.
+  await expect
+    .poll(() => events(log, 'house.companions_following').length, { timeout: ARRIVAL_TIMEOUT })
+    .toBe(1);
   await tapRoom(page, hasTouch, log, 'dapur');
 
   await expect.poll(() => events(log, 'house.walk').length).toBe(2);
-  const via = events(log, 'house.walk').at(1)?.data.via as string[];
+  const [first, second] = events(log, 'house.walk');
+  const via = second?.data.via as string[];
   expect(via.at(-1)).toBe('dapur');
   expect(via).not.toContain('kamar-tidur');
+  // Logged after the re-route: still where she was, not back at the start.
+  expect(second?.data.theia).not.toEqual(first?.data.theia);
   const [arrival] = await arrivals(log, 1);
   expect(arrival?.data.room).toBe('dapur');
-  // The first walk was dropped, not finished afterwards.
-  await page.waitForTimeout(500);
+  // Parking needs her standing still in dapur, so the dropped walk did not resume.
+  await expect
+    .poll(() => events(log, 'house.companions_parked').at(-1)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'dapur' });
   expect(events(log, 'house.arrived').map((e) => e.data.room)).toEqual(['dapur']);
 });
 
-test('US-HOUSE-01 a tap outside every room does nothing', async ({ page, hasTouch }) => {
+test('US-HOUSE-01 a tap outside every room walks nowhere and Bubu tilts her head', async ({
+  page,
+  hasTouch,
+}) => {
   const log = await openHouse(page, hasTouch);
   await expect.poll(() => events(log, 'house.layout').length).toBeGreaterThan(0);
   const box = await page.locator('canvas').boundingBox();
@@ -97,6 +100,7 @@ test('US-HOUSE-01 a tap outside every room does nothing', async ({ page, hasTouc
   else await page.mouse.click(box.x + 12, box.y + 12);
 
   await expect.poll(() => events(log, 'house.tap_outside').length).toBe(1);
+  expect(events(log, 'house.bubu_tilt')).toHaveLength(1);
   expect(events(log, 'house.room_tap')).toEqual([]);
   expect(events(log, 'house.walk')).toEqual([]);
 });
@@ -126,6 +130,7 @@ test('SCR-HOUSE carries a walk on through a resize and keeps her where she arriv
   page,
   hasTouch,
 }) => {
+  test.slow();
   const log = await openHouse(page, hasTouch);
   await tapRoom(page, hasTouch, log, 'dapur');
   await expect.poll(() => events(log, 'house.walk').length).toBe(1);
@@ -149,4 +154,26 @@ test('SCR-HOUSE carries a walk on through a resize and keeps her where she arriv
     { theia: [number, number]; stands: Record<string, [number, number]> } | undefined;
   expect(latest?.theia).toEqual(latest?.stands.dapur);
   expect(events(log, 'house.arrived')).toHaveLength(1);
+});
+
+test('US-HOUSE-02 Bubu and Ocica follow Theia up the stairs and settle by her in the room', async ({
+  page,
+  hasTouch,
+}) => {
+  test.slow();
+  const log = await openHouse(page, hasTouch);
+  await tapRoom(page, hasTouch, log, 'kantor-papa');
+  const [arrival] = await arrivals(log, 1);
+  expect(arrival?.data.room).toBe('kantor-papa');
+
+  // Halfway there: Bubu hops ahead of her and Ocica waddles behind.
+  const following = events(log, 'house.companions_following').at(0)?.data as
+    { bubuAhead: number; ocicaBehind: number } | undefined;
+  expect(following?.bubuAhead).toBeGreaterThan(0);
+  expect(following?.ocicaBehind).toBeGreaterThan(0);
+
+  await expect
+    .poll(() => events(log, 'house.companions_parked').at(0)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'kantor-papa' });
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
 });

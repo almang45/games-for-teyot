@@ -57,25 +57,17 @@ export async function emulateAutoplayPolicy(page: Page): Promise<void> {
   });
 }
 
-/** Design-frame height; Scale.EXPAND keeps it on every 16:10-or-wider test viewport. */
-const DESIGN_HEIGHT = 1200;
-
-/** Taps (touch) or clicks (mouse) at an offset from the canvas center, in design-frame pixels. */
-export async function tapCanvas(page: Page, touch: boolean, offsetY = 0): Promise<void> {
+/** The "Mulai" button sits over the canvas center, so a center tap/click hits it on every viewport. */
+export async function pressStart(page: Page, touch: boolean): Promise<void> {
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('Game canvas has no layout box');
   const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2 + offsetY * (box.height / DESIGN_HEIGHT);
+  const y = box.y + box.height / 2;
   if (touch) {
     await page.touchscreen.tap(x, y);
   } else {
     await page.mouse.click(x, y);
   }
-}
-
-/** The "Mulai" button sits over the canvas center, so a center tap/click hits it on every viewport. */
-export async function pressStart(page: Page, touch: boolean): Promise<void> {
-  await tapCanvas(page, touch);
 }
 
 /**
