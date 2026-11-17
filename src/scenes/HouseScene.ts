@@ -3,7 +3,7 @@ import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import type { RoomId } from '../../contracts/rooms.ts';
 import { buildNavGraph } from '../engine/nav/graph';
-import { roomAt } from '../engine/nav/hit';
+import { paintOrder, roomAt } from '../engine/nav/hit';
 import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
@@ -13,6 +13,8 @@ import { placeholderPalette as pal } from '../placeholder/palette';
 /** Theia's walking speed in layout px per second: a room's width in about a second. */
 const WALK_SPEED = 420;
 const RESIZE_SETTLE_MS = 120;
+/** Game px a pointer may travel between down and up and still count as a tap, not a drag. */
+const TAP_SLOP = 30;
 const THEIA_RADIUS = 34;
 const OUTLINE = 4;
 
@@ -31,7 +33,7 @@ export class HouseScene extends Phaser.Scene {
   private stage!: Phaser.GameObjects.Container;
   private theia!: Phaser.GameObjects.Container;
   private theiaEye!: Phaser.GameObjects.Arc;
-  private floors = new Map<RoomId, (highlight: boolean) => void>();
+  private floors!: Map<RoomId, (highlight: boolean) => void>;
   private hovered: RoomId | undefined;
 
   constructor() {
@@ -40,6 +42,9 @@ export class HouseScene extends Phaser.Scene {
 
   create(): void {
     this.log = servicesOf(this).logger.forScene(HouseScene.KEY);
+    // Phaser reuses the scene instance on restart, so per-run state starts over here.
+    this.floors = new Map();
+    this.hovered = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
     const house = buildPlaceholderHouse();
     this.layout = house.layout;
@@ -52,19 +57,27 @@ export class HouseScene extends Phaser.Scene {
     this.placeTheia();
 
     this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
-      this.onTap(this.toLayout(p));
+      // A touch has no hover: the highlight it set while down must not stay behind.
+      if (p.wasTouch) this.hover(undefined);
+      if (isTap(p)) this.onTap(this.toLayout(p));
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       this.hover(roomAt(this.layout, this.toLayout(p))?.id);
     });
+    this.input.on(Phaser.Input.Events.GAME_OUT, () => {
+      this.hover(undefined);
+    });
 
     this.fit();
-    // A window drag or rotation fires dozens of RESIZE events; refit once the size settles.
+    this.logLayout();
+    // Refit on every RESIZE so the frame never lags the window; a window drag or rotation fires
+    // dozens of them, so only the log waits for the size to settle.
     let settle: Phaser.Time.TimerEvent | undefined;
     const onResize = (): void => {
+      this.fit();
       settle?.remove();
       settle = this.time.delayedCall(RESIZE_SETTLE_MS, () => {
-        this.fit();
+        this.logLayout();
       });
     };
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
@@ -93,6 +106,12 @@ export class HouseScene extends Phaser.Scene {
       (width - HOUSE_SIZE[0] * scale) / 2,
       (height - HOUSE_SIZE[1] * scale) / 2,
     );
+  }
+
+  /** Points in game pixels, so E2E tests can tap a room and find Theia on any viewport. */
+  private logLayout(): void {
+    const { width, height } = this.scale;
+    const scale = this.stage.scale;
     const toGame = ([x, y]: Point): Point => [
       Math.round(this.stage.x + x * scale),
       Math.round(this.stage.y + y * scale),
@@ -102,8 +121,7 @@ export class HouseScene extends Phaser.Scene {
       height,
       scale,
       theiaRoom: this.walker.room,
-      theia: roundPoint(this.walker.position),
-      // Each room's stand in game pixels, so E2E tests can tap a room on any viewport.
+      theia: toGame(this.walker.position),
       stands: Object.fromEntries(this.layout.rooms.map((r) => [r.id, toGame(r.stand)])),
     });
   }
@@ -135,6 +153,7 @@ export class HouseScene extends Phaser.Scene {
     if (this.hovered) this.floors.get(this.hovered)?.(false);
     if (room) this.floors.get(room)?.(true);
     this.hovered = room;
+    this.input.setDefaultCursor(room ? 'pointer' : 'default');
   }
 
   private placeTheia(): void {
@@ -146,9 +165,7 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private drawHouse(house: PlaceholderHouse): void {
-    const drawOrder = [...this.layout.rooms].sort(
-      (a, b) => a.storey - b.storey || a.stand[1] - b.stand[1],
-    );
+    const drawOrder = [...this.layout.rooms].sort(paintOrder);
     for (const room of drawOrder) {
       for (const wall of house.walls.filter((w) => w.room === room.id)) {
         this.stage.add(
@@ -209,6 +226,11 @@ function polygon(
   g.lineStyle(OUTLINE, pal.outline, 1);
   g.strokePoints(points.map(toVec), true);
   return g;
+}
+
+/** The primary button (touch, pen tip, left mouse) let go near where it went down. */
+function isTap(p: Phaser.Input.Pointer): boolean {
+  return p.button === 0 && p.getDistance() <= TAP_SLOP;
 }
 
 function toVec([x, y]: Point): Phaser.Math.Vector2 {

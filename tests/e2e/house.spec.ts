@@ -101,6 +101,27 @@ test('US-HOUSE-01 a tap outside every room does nothing', async ({ page, hasTouc
   expect(events(log, 'house.walk')).toEqual([]);
 });
 
+test('US-HOUSE-01 a drag that ends on a room is not a tap', async ({ page, hasTouch }) => {
+  test.skip(hasTouch, 'Playwright touch input has no drag; the mouse covers the same pointer path');
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => events(log, 'house.layout').length).toBeGreaterThan(0);
+  const latest = events(log, 'house.layout').at(-1)?.data as
+    { width: number; stands: Record<string, [number, number]> } | undefined;
+  const stand = latest?.stands.dapur;
+  const box = await page.locator('canvas').boundingBox();
+  if (!latest || !stand || !box) throw new Error('No house.layout or canvas box');
+  const k = box.width / latest.width;
+  await page.mouse.move(box.x + 12, box.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(box.x + stand[0] * k, box.y + stand[1] * k, { steps: 5 });
+  await page.mouse.up();
+  await page.mouse.click(box.x + stand[0] * k, box.y + stand[1] * k, { button: 'right' });
+
+  await page.waitForTimeout(300);
+  expect(events(log, 'house.room_tap')).toEqual([]);
+  expect(events(log, 'house.tap_outside')).toEqual([]);
+});
+
 test('SCR-HOUSE carries a walk on through a resize and keeps her where she arrived', async ({
   page,
   hasTouch,
@@ -120,10 +141,12 @@ test('SCR-HOUSE carries a walk on through a resize and keeps her where she arriv
   const [arrival] = await arrivals(log, 1);
   expect(arrival?.data.room).toBe('dapur');
 
-  // Another resize after she arrived leaves her standing on the same layout point.
+  // Another resize after she arrived refits her with the house: still on the dapur stand.
   const settled = events(log, 'house.layout').length;
   await page.setViewportSize(size);
   await expect.poll(() => events(log, 'house.layout').length).toBeGreaterThan(settled);
-  expect(events(log, 'house.layout').at(-1)?.data.theia).toEqual(arrival?.data.theia);
+  const latest = events(log, 'house.layout').at(-1)?.data as
+    { theia: [number, number]; stands: Record<string, [number, number]> } | undefined;
+  expect(latest?.theia).toEqual(latest?.stands.dapur);
   expect(events(log, 'house.arrived')).toHaveLength(1);
 });

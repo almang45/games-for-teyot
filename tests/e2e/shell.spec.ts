@@ -53,10 +53,11 @@ test.describe('US-OFF-01: install and offline play', () => {
     // "The placeholder house is playable" offline: start, reach the house, walk to a room.
     await pressStart(page, hasTouch);
     await expectScene(page, 'House');
-    await tapRoom(page, hasTouch, log, 'ruang-keluarga');
+    // Not the start room, so she really walks: the scene's update loop runs offline too.
+    await tapRoom(page, hasTouch, log, 'dapur');
     await expect
-      .poll(() => log.find((e) => e.event === 'house.room_tap')?.data.room)
-      .toBe('ruang-keluarga');
+      .poll(() => log.find((e) => e.event === 'house.arrived')?.data.room, { timeout: 15_000 })
+      .toBe('dapur');
     expect(log.filter((e) => e.level === 'error')).toEqual([]);
   });
 });

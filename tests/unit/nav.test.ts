@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../contracts/common';
 import { checkHouseLayout, houseLayout, type HouseLayout } from '../../contracts/houseLayout';
-import { buildNavGraph, hops, NavGraphError, nodeOf, pathLength } from '../../src/engine/nav/graph';
-import { roomAt } from '../../src/engine/nav/hit';
+import {
+  buildNavGraph,
+  lerp,
+  NavGraphError,
+  nodeOf,
+  pathLength,
+  shortestPath,
+  type NavGraph,
+  type NavNode,
+} from '../../src/engine/nav/graph';
+import { paintOrder, roomAt } from '../../src/engine/nav/hit';
 import { facingAlong, NavWalker, type Facing } from '../../src/engine/nav/walker';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
@@ -11,6 +20,22 @@ const graph = buildNavGraph(layout);
 const SPEED = 400;
 
 const posOf = (id: string): Point => nodeOf(graph, id).pos;
+
+/** A graph built by hand, past buildNavGraph's layout checks, to test routing on its own. */
+function rawGraph(
+  nodes: Iterable<NavNode>,
+  edges: readonly (readonly [string, string])[],
+): NavGraph {
+  const byId = new Map([...nodes].map((n) => [n.id, n]));
+  const adjacency = new Map<string, string[]>([...byId.keys()].map((id) => [id, []]));
+  for (const [a, b] of edges) {
+    adjacency.get(a)?.push(b);
+    adjacency.get(b)?.push(a);
+  }
+  return { nodes: byId, adjacency };
+}
+
+const ground = (id: string, pos: Point, stair = false): NavNode => ({ id, pos, storey: 0, stair });
 
 /** Advances in 16 ms frames until she arrives; fails after `maxMs` of walking. */
 function walkUntilArrival(walker: NavWalker, maxMs = 20_000): { room: string; ms: number } {
@@ -40,7 +65,7 @@ describe('nav graph', () => {
   });
 
   it('routes through doors and up both flights of stairs', () => {
-    expect(hops(graph, 'ruang-keluarga', 'kamar-tidur')).toEqual([
+    expect(shortestPath(graph, 'ruang-keluarga', 'kamar-tidur')).toEqual([
       'ruang-keluarga',
       'tangga-1-bawah',
       'tangga-1-atas',
@@ -49,23 +74,46 @@ describe('nav graph', () => {
       'tangga-2-atas',
       'kamar-tidur',
     ]);
-    expect(hops(graph, 'dapur', 'dapur')).toEqual(['dapur']);
+    expect(shortestPath(graph, 'dapur', 'dapur')).toEqual(['dapur']);
+  });
+
+  it('takes the shortest walk, not the fewest hops, around a loop', () => {
+    // Two hops over a far corner, or three along the straight wall.
+    const loop = rawGraph(
+      [
+        ground('a', [0, 0]),
+        ground('far', [50, 500]),
+        ground('p', [33, 0]),
+        ground('q', [66, 0]),
+        ground('b', [100, 0]),
+      ],
+      [
+        ['a', 'far'],
+        ['far', 'b'],
+        ['a', 'p'],
+        ['p', 'q'],
+        ['q', 'b'],
+      ],
+    );
+    expect(shortestPath(loop, 'a', 'b')).toEqual(['a', 'p', 'q', 'b']);
   });
 
   it('returns undefined for an unreachable node and throws on an unknown one', () => {
-    const island = buildNavGraph({ ...layout, edges: [] });
-    expect(hops(island, 'dapur', 'kamar-tidur')).toBeUndefined();
-    expect(() => hops(graph, 'dapur', 'loteng')).toThrow(NavGraphError);
+    const island = rawGraph(graph.nodes.values(), []);
+    expect(shortestPath(island, 'dapur', 'kamar-tidur')).toBeUndefined();
+    expect(() => shortestPath(graph, 'dapur', 'loteng')).toThrow(NavGraphError);
   });
 
-  it('rejects layouts with duplicate ids or edges to unknown nodes', () => {
+  it('rejects any layout checkHouseLayout rejects', () => {
     const dupe = {
       ...layout,
       waypoints: [{ id: 'dapur', pos: [0, 0] as Point, storey: 0 as const }],
     };
     expect(() => buildNavGraph(dupe)).toThrow(/duplicate node id dapur/);
-    const dangling: HouseLayout = { ...layout, edges: [['dapur', 'loteng']] };
-    expect(() => buildNavGraph(dangling)).toThrow(/dapur → loteng names an unknown node/);
+    const dangling: HouseLayout = { ...layout, edges: [...layout.edges, ['dapur', 'loteng']] };
+    expect(() => buildNavGraph(dangling)).toThrow(/unknown node loteng/);
+    expect(() => buildNavGraph({ ...layout, edges: [] })).toThrow(NavGraphError);
+    expect(() => buildNavGraph({ ...layout, edges: [] })).toThrow(/not reachable/);
   });
 
   it('measures polylines', () => {
@@ -77,6 +125,12 @@ describe('nav graph', () => {
       ]),
     ).toBe(11);
     expect(pathLength([])).toBe(0);
+  });
+
+  it('interpolates and lands exactly on the far end', () => {
+    expect(lerp([0, 0], [10, 20], 0.5)).toEqual([5, 10]);
+    const end: Point = [0.1, 0.7];
+    expect(lerp([0.3, 0.2], end, 1)).toBe(end);
   });
 });
 
@@ -104,6 +158,8 @@ describe('roomAt', () => {
       ],
     };
     expect(roomAt(stacked, [50, 50])?.id).toBe(c.id);
+    // The hub paints in the same order, so the room a tap picks is the one drawn on top.
+    expect([...stacked.rooms].sort(paintOrder).at(-1)?.id).toBe(c.id);
   });
 });
 
@@ -204,8 +260,36 @@ describe('NavWalker', () => {
     expect(ms).toBeLessThanOrEqual(64);
   });
 
+  it('turns back from a node she has exactly reached without stepping onto the stair', () => {
+    // Integer lengths at 400 px/s, so one second lands her exactly on the stair foot.
+    const stairs = rawGraph(
+      [
+        ground('dapur', [0, 0]),
+        ground('tangga-bawah', [400, 0], true),
+        { id: 'tangga-atas', pos: [400, 400], storey: 1, stair: true },
+        { id: 'kantor-papa', pos: [800, 400], storey: 1, stair: false },
+      ],
+      [
+        ['dapur', 'tangga-bawah'],
+        ['tangga-bawah', 'tangga-atas'],
+        ['tangga-atas', 'kantor-papa'],
+      ],
+    );
+    const walker = new NavWalker(stairs, 'dapur', 400);
+    walker.walkTo('kantor-papa');
+    walker.advance(1000);
+    expect(walker.position).toEqual([400, 0]);
+
+    expect(walker.walkTo('dapur')?.via).toEqual(['dapur']);
+    expect(walker.storey).toBe(0);
+    walker.advance(16);
+    expect(walker.storey).toBe(0);
+    expect(walker.onStair).toBe(false);
+    expect(walkUntilArrival(walker).room).toBe('dapur');
+  });
+
   it('keeps walking when the new room cannot be reached', () => {
-    const island = buildNavGraph({ ...layout, edges: [['dapur', 'pintu-dapur']] });
+    const island = rawGraph(graph.nodes.values(), [['dapur', 'pintu-dapur']]);
     const walker = new NavWalker(island, 'dapur', SPEED);
     expect(walker.walkTo('kamar-tidur')).toBeUndefined();
     expect(walker.walking).toBe(false);

@@ -1,6 +1,14 @@
 import type { Point } from '../../../contracts/common.ts';
 import type { RoomId, Storey } from '../../../contracts/rooms.ts';
-import { distance, hops, nodeOf, pathLength, type NavGraph, type NavNode } from './graph.ts';
+import {
+  distance,
+  lerp,
+  nodeOf,
+  pathLength,
+  shortestPath,
+  type NavGraph,
+  type NavNode,
+} from './graph.ts';
 
 /** The two drawn facings (ASSETS.md §3.1): toward the viewer (`fr`) or away (`br`), both facing right. */
 export type FacingView = 'fr' | 'br';
@@ -101,7 +109,7 @@ export class NavWalker {
     const headingTo = this.#ahead[0];
     let best: { cost: number; nodes: NavNode[] } | undefined;
     for (const end of headingTo ? [from, headingTo] : [from]) {
-      const ids = hops(this.#graph, end.id, room);
+      const ids = shortestPath(this.#graph, end.id, room);
       if (!ids) continue;
       const nodes = ids.map((id) => nodeOf(this.#graph, id));
       const cost = distance(this.#pos, end.pos) + pathLength(nodes.map((n) => n.pos));
@@ -110,9 +118,9 @@ export class NavWalker {
     if (!best) return undefined;
     const nodes = best.nodes;
     if (nodes[0] === from) {
-      // Standing on it: no zero-length step. Mid-segment: she turns back, so the segment now
-      // starts at the end she was heading to.
-      if (headingTo) this.#from = headingTo;
+      // Mid-segment she turns back, so the segment now starts at the end she was heading to.
+      // Standing on that node (idle, or exactly reached), there is no step to take to it.
+      if (headingTo && distance(this.#pos, from.pos) > 0) this.#from = headingTo;
       else nodes.shift();
     }
     this.#ahead = nodes;
@@ -129,11 +137,7 @@ export class NavWalker {
       this.#onStair = this.#from.stair && next.stair;
       if (gap > 0) this.#facing = facingAlong(this.#pos, next.pos, this.#facing);
       if (gap > budget) {
-        const t = budget / gap;
-        this.#pos = [
-          this.#pos[0] + (next.pos[0] - this.#pos[0]) * t,
-          this.#pos[1] + (next.pos[1] - this.#pos[1]) * t,
-        ];
+        this.#pos = lerp(this.#pos, next.pos, budget / gap);
         return undefined;
       }
       budget -= gap;
