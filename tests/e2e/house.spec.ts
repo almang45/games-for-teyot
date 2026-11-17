@@ -80,7 +80,10 @@ test('US-HOUSE-01 a tap on another room while walking re-routes from her current
   expect(events(log, 'house.arrived').map((e) => e.data.room)).toEqual(['dapur']);
 });
 
-test('US-HOUSE-01 a tap outside every room does nothing', async ({ page, hasTouch }) => {
+test('US-HOUSE-01 a tap outside every room walks nowhere and Bubu tilts her head', async ({
+  page,
+  hasTouch,
+}) => {
   const log = await openHouse(page, hasTouch);
   await expect.poll(() => events(log, 'house.layout').length).toBeGreaterThan(0);
   const box = await page.locator('canvas').boundingBox();
@@ -90,6 +93,7 @@ test('US-HOUSE-01 a tap outside every room does nothing', async ({ page, hasTouc
   else await page.mouse.click(box.x + 12, box.y + 12);
 
   await expect.poll(() => events(log, 'house.tap_outside').length).toBe(1);
+  expect(events(log, 'house.bubu_tilt')).toHaveLength(1);
   expect(events(log, 'house.room_tap')).toEqual([]);
   expect(events(log, 'house.walk')).toEqual([]);
 });

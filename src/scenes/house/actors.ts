@@ -1,15 +1,8 @@
 import * as Phaser from 'phaser';
 import type { Point } from '../../../contracts/common.ts';
+import type { CompanionPose } from '../../engine/nav/companions';
 import type { Facing } from '../../engine/nav/walker';
 import { placeholderPalette as pal } from '../../placeholder/palette';
-
-export interface ActorPose {
-  readonly pos: Point;
-  readonly facing: Facing;
-  readonly moving: boolean;
-  /** Distance walked so far, in layout px; sets the phase of the hop or sway. */
-  readonly travelled: number;
-}
 
 /**
  * A placeholder character: code-drawn shapes standing on `root`'s origin (the feet), so the
@@ -17,7 +10,7 @@ export interface ActorPose {
  */
 export interface ActorView {
   readonly root: Phaser.GameObjects.Container;
-  place(pose: ActorPose): void;
+  place(pose: CompanionPose): void;
 }
 
 const STROKE = 5;

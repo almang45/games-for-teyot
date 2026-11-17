@@ -1,10 +1,5 @@
 import type { Point } from '../../../contracts/common.ts';
-import { distance } from './graph.ts';
-
-const lerp = (a: Point, b: Point, t: number): Point => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-];
+import { distance, lerp } from './graph.ts';
 
 /** An immutable polyline addressed by arc length from its first point. */
 export class Polyline {
@@ -30,16 +25,17 @@ export class Polyline {
 
   /** The point `s` along, clamped to the ends. */
   at(s: number): Point {
-    const target = Math.min(Math.max(s, 0), this.length);
+    const target = Math.max(s, 0);
     for (let i = 1; i < this.points.length; i++) {
       const end = this.#cumulative[i] ?? 0;
       const a = this.points[i - 1];
       const b = this.points[i];
-      if (a && b && target <= end) {
+      if (a && b && target < end) {
         const start = this.#cumulative[i - 1] ?? 0;
-        return end === start ? b : lerp(a, b, (target - start) / (end - start));
+        return lerp(a, b, (target - start) / (end - start));
       }
     }
+    // The full length lands here, on the far end itself: a companion parks exactly on its spot.
     return this.points.at(-1) ?? [0, 0];
   }
 

@@ -104,7 +104,6 @@ export class NavWalker {
     return [this.#pos, ...this.#ahead.map((n) => n.pos)];
   }
 
-  /** Length of {@link route}, in layout px. */
   get remaining(): number {
     return pathLength(this.route);
   }

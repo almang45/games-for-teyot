@@ -191,6 +191,7 @@ export class HouseScene extends Phaser.Scene {
   private tiltBubu(): void {
     const figure = this.bubu.root;
     if (this.tweens.isTweening(figure)) return;
+    this.log.info('house.bubu_tilt');
     this.tweens.add({
       targets: figure,
       rotation: this.companions.bubu.facing.flipX ? -TILT_RAD : TILT_RAD,
@@ -220,7 +221,6 @@ export class HouseScene extends Phaser.Scene {
     this.theia.place({ pos: w.position, facing: w.facing, moving: w.walking, travelled: 0 });
     this.bubu.place(this.companions.bubu);
     this.ocica.place(this.companions.ocica);
-    // Feet nearer the viewer are drawn later (ARCHITECTURE §6 depth sorting).
     this.actors.sort('y');
   }
 

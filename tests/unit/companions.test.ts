@@ -85,6 +85,13 @@ describe('Polyline', () => {
     expect(line.at(99)).toEqual([10, 10]);
   });
 
+  it('returns the far end itself at the full length, with no float drift', () => {
+    const end: Point = [1.3, 0.9];
+    const uneven = new Polyline([[0.1, 0.2], [0.7, 0.3], end]);
+    expect(uneven.at(uneven.length)).toBe(end);
+    expect(uneven.between(0, uneven.length).at(-1)).toBe(end);
+  });
+
   it('cuts out a part in either direction', () => {
     expect(line.between(5, 15)).toEqual([
       [5, 0],
