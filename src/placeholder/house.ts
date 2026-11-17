@@ -118,19 +118,22 @@ function boundsOf(points: readonly Point[]): Rect {
   return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
 }
 
-/** The room's bounds with a border, kept on the 1920 × 1200 frame. */
-function focusOf(polygon: readonly Point[]): Rect {
-  const [x, y, w, h] = boundsOf(polygon);
-  const pad = Math.round(FOCUS_PAD * Math.max(w, h));
-  const x0 = Math.max(0, x - pad);
-  const y0 = Math.max(0, y - pad);
-  return [
-    x0,
-    y0,
-    Math.min(HOUSE_SIZE[0], x + w + pad) - x0,
-    Math.min(HOUSE_SIZE[1], y + h + pad) - y0,
-  ];
+/**
+ * The room with its back walls and a border, widened to the frame's 16:10 so the zoom fills a
+ * tablet like the activity scenes will, then slid back onto the 1920 × 1200 frame.
+ */
+function focusOf(points: readonly Point[]): Rect {
+  const [x, y, w, h] = boundsOf(points);
+  const pad = FOCUS_PAD * Math.max(w, h);
+  const aspect = HOUSE_SIZE[0] / HOUSE_SIZE[1];
+  const fw = Math.min(HOUSE_SIZE[0], Math.max(w + 2 * pad, (h + 2 * pad) * aspect));
+  const fh = fw / aspect;
+  const fx = clamp(x + w / 2 - fw / 2, 0, HOUSE_SIZE[0] - fw);
+  const fy = clamp(y + h / 2 - fh / 2, 0, HOUSE_SIZE[1] - fh);
+  return [Math.floor(fx), Math.floor(fy), Math.floor(fw), Math.floor(fh)];
 }
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
 
 export function buildPlaceholderHouse(): PlaceholderHouse {
   const proj = frameProjection();
@@ -159,7 +162,7 @@ export function buildPlaceholderHouse(): PlaceholderHouse {
       walk: floor,
       stand: px(lift(r, r.w / 2, r.d / 2)),
       storey: r.storey,
-      focus: focusOf(floor),
+      focus: focusOf([...floor, ...floorOf(r, r.z + WALL_HEIGHT)]),
       parking: {
         bubu: px(lift(r, r.w / 2 + 0.9, r.d / 2)),
         ocica: px(lift(r, r.w / 2, r.d / 2 + 0.9)),

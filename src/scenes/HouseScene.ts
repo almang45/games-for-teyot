@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
 import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
-import type { RoomId } from '../../contracts/rooms.ts';
+import type { RoomId, Storey } from '../../contracts/rooms.ts';
+import { fitView, HouseCamera, type Ease } from '../engine/camera/houseCamera';
 import { Companions } from '../engine/nav/companions';
 import { buildNavGraph, samePoint } from '../engine/nav/graph';
 import { paintOrder, roomAt } from '../engine/nav/hit';
@@ -9,6 +10,7 @@ import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
 import { buildPlaceholderHouse, type PlaceholderHouse } from '../placeholder/house';
+import { placeholderMotion } from '../placeholder/motion';
 import { placeholderPalette as pal } from '../placeholder/palette';
 import { bubuView, ocicaView, theiaView, type ActorView } from './house/actors';
 
@@ -25,11 +27,14 @@ const OCICA_GAP = 90;
 const TILT_RAD = 0.3;
 const TILT_MS = 220;
 
+const ROOM_ZOOM = placeholderMotion['house.room-zoom'];
+
 /**
  * SCR-HOUSE on the placeholder house: tap a room and Theia walks there along the waypoint graph
- * (PRD US-HOUSE-01, ARCHITECTURE §6). Everything is placed in layout.json space inside one stage
- * container, so a resize only refits the stage and a walk in progress carries on. The real hub
- * swaps the drawing for Antigravity's layers; the layout, the graph and the walk stay.
+ * (PRD US-HOUSE-01, ARCHITECTURE §6), and the camera zooms into it on arrival. Everything is placed
+ * in layout.json space inside one stage container that the camera's shot scales and moves, so a
+ * resize only refits the stage and a walk or zoom in progress carries on. The real hub swaps the
+ * drawing for Antigravity's layers; the layout, the graph, the walk and the camera stay.
  */
 export class HouseScene extends Phaser.Scene {
   static readonly KEY = 'House';
@@ -38,6 +43,10 @@ export class HouseScene extends Phaser.Scene {
   private layout!: HouseLayout;
   private walker!: NavWalker;
   private stage!: Phaser.GameObjects.Container;
+  private camera!: HouseCamera;
+  private zoomEase!: Ease;
+  /** Each storey's drawing, indexed by storey, so the zoom can fade the storeys above a room. */
+  private storeys!: Phaser.GameObjects.Container[];
   private companions!: Companions;
   private actors!: Phaser.GameObjects.Container;
   private theia!: ActorView;
@@ -71,7 +80,13 @@ export class HouseScene extends Phaser.Scene {
       gap: OCICA_GAP,
     });
 
+    this.camera = new HouseCamera([0, 0, HOUSE_SIZE[0], HOUSE_SIZE[1]]);
+    const ease = Phaser.Tweens.Builders.GetEaseFunction(ROOM_ZOOM.easing) as Ease;
+    this.zoomEase = (t) => ease(t);
+
     this.stage = this.add.container(0, 0);
+    this.storeys = [0, 1, 2, 3].map(() => this.add.container(0, 0));
+    this.stage.add(this.storeys);
     this.drawHouse(house);
     this.theia = theiaView(this);
     this.bubu = bubuView(this);
@@ -86,7 +101,7 @@ export class HouseScene extends Phaser.Scene {
       if (isTap(p)) this.onTap(this.toLayout(p));
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
-      this.hover(roomAt(this.layout, this.toLayout(p))?.id);
+      this.hover(this.roomAt(this.toLayout(p))?.id);
     });
     this.input.on(Phaser.Input.Events.GAME_OUT, () => {
       this.hover(undefined);
@@ -114,6 +129,13 @@ export class HouseScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    const settled = this.camera.advance(delta);
+    this.fit();
+    if (settled) {
+      if (settled.on === 'room') this.log.info('house.room_focused', { room: settled.room });
+      else this.log.info('house.overview');
+      this.logLayout();
+    }
     const arrival = this.walker.advance(delta);
     this.companions.update(delta, {
       pos: this.walker.position,
@@ -123,6 +145,8 @@ export class HouseScene extends Phaser.Scene {
     this.placeActors();
     if (arrival) {
       this.log.info('house.arrived', { room: arrival.room, theia: roundPoint(arrival.pos) });
+      // The room's activity starts once the zoom has settled (house.room_focused).
+      this.camera.focusOn(this.roomById(arrival.room), ROOM_ZOOM.duration, this.zoomEase);
     }
     if (
       this.spacingAt !== undefined &&
@@ -151,15 +175,17 @@ export class HouseScene extends Phaser.Scene {
     }
   }
 
-  /** Scales the 1920 × 1200 layout frame to fit the view, centred; EXPAND adds side area only. */
+  /** Fits the camera's shot to the view, centred (EXPAND adds side area), and fades the storeys. */
   private fit(): void {
-    const { width, height } = this.scale;
-    const scale = Math.min(width / HOUSE_SIZE[0], height / HOUSE_SIZE[1]);
+    const { view, alpha } = this.camera.shot;
+    const { scale, x, y } = fitView(view, this.scale.width, this.scale.height);
     this.stage.setScale(scale);
-    this.stage.setPosition(
-      (width - HOUSE_SIZE[0] * scale) / 2,
-      (height - HOUSE_SIZE[1] * scale) / 2,
-    );
+    this.stage.setPosition(x, y);
+    this.storeys.forEach((layer, s) => layer.setAlpha(alpha[s] ?? 1));
+  }
+
+  private roomAt(at: Point): HouseRoom | undefined {
+    return roomAt(this.layout, at, (r) => this.camera.shows(r.storey));
   }
 
   /** Points in game pixels, so E2E tests can tap a room and find Theia on any viewport. */
@@ -176,6 +202,8 @@ export class HouseScene extends Phaser.Scene {
       scale,
       theiaRoom: this.walker.room,
       theia: toGame(this.walker.position),
+      zoomedTo: this.camera.room ?? null,
+      view: this.camera.shot.view.map(Math.round),
       stands: Object.fromEntries(this.layout.rooms.map((r) => [r.id, toGame(r.stand)])),
     });
   }
@@ -186,8 +214,18 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private onTap(at: Point): void {
-    const room = roomAt(this.layout, at);
+    const room = this.roomAt(at);
+    const zoomed = this.camera.room;
+    // In the room she is already in, its activity has the screen.
+    if (zoomed && room?.id === zoomed) return;
+    if (zoomed) {
+      // Leaving zooms back out (PRD US-HOUSE-01). Until the activity scenes and their way home
+      // exist, any tap off her room is how she leaves.
+      this.log.info('house.zoom_out', { room: zoomed });
+      this.camera.zoomOut(ROOM_ZOOM.duration, this.zoomEase);
+    }
     if (!room) {
+      if (zoomed) return;
       this.log.info('house.tap_outside', { at: roundPoint(at) });
       this.tiltBubu();
       return;
@@ -248,17 +286,22 @@ export class HouseScene extends Phaser.Scene {
   private drawHouse(house: PlaceholderHouse): void {
     const drawOrder = [...this.layout.rooms].sort(paintOrder);
     for (const room of drawOrder) {
+      const layer = this.layerOf(room.storey);
       for (const wall of house.walls.filter((w) => w.room === room.id)) {
-        this.stage.add(
-          polygon(this, wall.quad, wall.side === 'left' ? pal.wallLeft : pal.wallRight),
-        );
+        layer.add(polygon(this, wall.quad, wall.side === 'left' ? pal.wallLeft : pal.wallRight));
       }
       for (const slab of house.slabs.filter((s) => s.room === room.id)) {
-        this.stage.add(polygon(this, slab.quad, pal.wallRight));
+        layer.add(polygon(this, slab.quad, pal.wallRight));
       }
-      this.stage.add(this.drawFloor(room));
+      layer.add(this.drawFloor(room));
     }
-    this.stage.add(this.drawStairs());
+    this.drawStairs();
+  }
+
+  private layerOf(storey: Storey): Phaser.GameObjects.Container {
+    const layer = this.storeys[storey];
+    if (!layer) throw new Error(`no layer for storey ${storey}`);
+    return layer;
   }
 
   private drawFloor(room: HouseRoom): Phaser.GameObjects.Graphics {
@@ -276,17 +319,21 @@ export class HouseScene extends Phaser.Scene {
     return g;
   }
 
-  /** Each climbed edge as a ramp line: enough to read where the stairs are. */
-  private drawStairs(): Phaser.GameObjects.Graphics {
-    const g = this.add.graphics();
-    const stairs = new Map(this.layout.waypoints.filter((w) => w.stair).map((w) => [w.id, w.pos]));
-    g.lineStyle(18, pal.outline, 1);
+  /**
+   * Each climbed edge as a ramp line: enough to read where the stairs are. A flight belongs to the
+   * storey it climbs to, so it fades with the floor it leads up to.
+   */
+  private drawStairs(): void {
+    const stairs = new Map(this.layout.waypoints.filter((w) => w.stair).map((w) => [w.id, w]));
     for (const [a, b] of this.layout.edges) {
       const from = stairs.get(a);
       const to = stairs.get(b);
-      if (from && to) g.lineBetween(from[0], from[1], to[0], to[1]);
+      if (!from || !to) continue;
+      const g = this.add.graphics();
+      g.lineStyle(18, pal.outline, 1);
+      g.lineBetween(from.pos[0], from.pos[1], to.pos[0], to.pos[1]);
+      this.layerOf(from.storey > to.storey ? from.storey : to.storey).add(g);
     }
-    return g;
   }
 }
 
