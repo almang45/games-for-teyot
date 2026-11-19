@@ -58,6 +58,8 @@ export class HouseScene extends Phaser.Scene {
   private spacingAt: number | undefined;
   private floors!: Map<RoomId, (highlight: boolean) => void>;
   private hovered: RoomId | undefined;
+  /** The mouse while it is over the game, so hover can follow the stage as the camera moves. */
+  private mouse: Phaser.Input.Pointer | undefined;
 
   constructor() {
     super(HouseScene.KEY);
@@ -68,6 +70,7 @@ export class HouseScene extends Phaser.Scene {
     // Phaser reuses the scene instance on restart, so per-run state starts over here.
     this.floors = new Map();
     this.hovered = undefined;
+    this.mouse = undefined;
     this.parkingIn = undefined;
     this.spacingAt = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
@@ -97,13 +100,18 @@ export class HouseScene extends Phaser.Scene {
 
     this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
       // A touch has no hover: the highlight it set while down must not stay behind.
-      if (p.wasTouch) this.hover(undefined);
+      if (p.wasTouch) {
+        this.mouse = undefined;
+        this.hover(undefined);
+      }
       if (isTap(p)) this.onTap(this.toLayout(p));
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
+      this.mouse = p.wasTouch ? undefined : p;
       this.hover(this.roomAt(this.toLayout(p))?.id);
     });
     this.input.on(Phaser.Input.Events.GAME_OUT, () => {
+      this.mouse = undefined;
       this.hover(undefined);
     });
 
@@ -131,6 +139,10 @@ export class HouseScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     const settled = this.camera.advance(delta);
     this.fit();
+    // The stage moves under a resting mouse, and a fading storey stops catching it.
+    if (this.mouse && (this.camera.moving || settled)) {
+      this.hover(this.roomAt(this.toLayout(this.mouse))?.id);
+    }
     if (settled) {
       if (settled.on === 'room') this.log.info('house.room_focused', { room: settled.room });
       else this.log.info('house.overview');
@@ -219,7 +231,10 @@ export class HouseScene extends Phaser.Scene {
     const room = this.roomAt(at);
     const zoomed = this.camera.room;
     // In the room she is already in, its activity has the screen.
-    if (zoomed && room?.id === zoomed) return;
+    if (zoomed && room?.id === zoomed) {
+      this.log.info('house.tap_in_room', { room: zoomed });
+      return;
+    }
     if (zoomed) {
       // Leaving zooms back out (PRD US-HOUSE-01). Until the activity scenes and their way home
       // exist, any tap off her room is how she leaves.

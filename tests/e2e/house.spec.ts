@@ -293,7 +293,9 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
 
   // A tap on the room she is in belongs to its activity: no walk, no zoom.
   await tapRoom(page, hasTouch, log, 'dapur');
-  await page.waitForTimeout(300);
+  await expect
+    .poll(() => events(log, 'house.tap_in_room').map((e) => e.data))
+    .toEqual([{ room: 'dapur' }]);
   expect(events(log, 'house.walk')).toHaveLength(1);
   expect(events(log, 'house.zoom_out')).toEqual([]);
 

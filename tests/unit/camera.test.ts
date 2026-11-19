@@ -120,11 +120,13 @@ describe('the hub zoom on the placeholder house', () => {
     for (const [key, entry] of Object.entries(placeholderMotion)) {
       // A mistyped easing would compile and Phaser would quietly run it linear.
       expect(() => motionEntry.parse(entry), key).not.toThrow();
-      const rule: { kind: string; max?: number } =
+      // The same rules as checkMotion in contracts/motion.ts: kind, both caps and the floor.
+      const rule: { kind: string; min?: number; max?: number } =
         REQUIRED_MOMENTS[key as keyof typeof placeholderMotion];
       expect(entry.kind, key).toBe(rule.kind);
       const cap = Math.min(MOTION_KINDS[entry.kind].max, rule.max ?? Infinity);
       expect(entry.duration, key).toBeLessThanOrEqual(cap);
+      expect(entry.duration, key).toBeGreaterThanOrEqual(rule.min ?? 0);
     }
   });
 
