@@ -1,0 +1,113 @@
+{
+  "$schema": "../contracts/schema/motion.schema.json",
+  "version": 1,
+  "moments": {
+    "house.walk-start": {
+      "kind": "transition",
+      "duration": 220,
+      "easing": "Quad.easeIn"
+    },
+    "house.walk-stop": {
+      "kind": "transition",
+      "duration": 260,
+      "easing": "Quad.easeOut"
+    },
+    "house.bubu-follow": {
+      "kind": "transition",
+      "duration": 300,
+      "easing": "Sine.easeInOut",
+      "delay": -150
+    },
+    "house.ocica-follow": {
+      "kind": "transition",
+      "duration": 360,
+      "easing": "Sine.easeInOut",
+      "delay": 200
+    },
+    "house.room-zoom": {
+      "kind": "transition",
+      "duration": 550,
+      "easing": "Sine.easeInOut"
+    },
+    "trace.snap": {
+      "kind": "feedback",
+      "duration": 240,
+      "easing": "Cubic.easeOut"
+    },
+    "trace.miss-fade": {
+      "kind": "feedback",
+      "duration": 380,
+      "easing": "Sine.easeOut"
+    },
+    "count.tap-bounce": {
+      "kind": "feedback",
+      "duration": 120,
+      "easing": "Back.easeOut"
+    },
+    "count.drop-squash": {
+      "kind": "feedback",
+      "duration": 150,
+      "easing": "Back.easeOut"
+    },
+    "count.hop-back": {
+      "kind": "feedback",
+      "duration": 460,
+      "easing": "Quad.easeInOut"
+    },
+    "tidy.mess": {
+      "kind": "sequence",
+      "duration": 900,
+      "easing": "Bounce.easeOut"
+    },
+    "tidy.toy-in": {
+      "kind": "feedback",
+      "duration": 280,
+      "easing": "Back.easeOut"
+    },
+    "tidy.toy-miss": {
+      "kind": "feedback",
+      "duration": 380,
+      "easing": "Quad.easeOut"
+    },
+    "color.fill": {
+      "kind": "feedback",
+      "duration": 180,
+      "easing": "Cubic.easeOut"
+    },
+    "celebrate": {
+      "kind": "celebration",
+      "duration": 1400,
+      "easing": "Back.easeOut"
+    },
+    "bedtime": {
+      "kind": "sequence",
+      "duration": 2600,
+      "easing": "Sine.easeInOut"
+    },
+    "boot.breathe": {
+      "kind": "ambient",
+      "duration": 2400,
+      "easing": "Sine.easeInOut"
+    },
+    "hud.speaker-pulse": {
+      "kind": "ambient",
+      "duration": 1600,
+      "easing": "Sine.easeInOut"
+    },
+    "hud.home-hold": {
+      "kind": "sequence",
+      "duration": 1000,
+      "easing": "Linear"
+    },
+    "room.sparkle": {
+      "kind": "ambient",
+      "duration": 2200,
+      "easing": "Sine.easeInOut"
+    },
+    "bedtime.twinkle": {
+      "kind": "ambient",
+      "duration": 3600,
+      "easing": "Sine.easeInOut"
+    }
+  }
+}
