@@ -9,6 +9,24 @@
       "room": "global"
     },
     {
+      "key": "house.structure.mezzanine-1",
+      "type": "image",
+      "path": "house/structure/mezzanine-1.png",
+      "room": "global"
+    },
+    {
+      "key": "house.structure.lt-atas",
+      "type": "image",
+      "path": "house/structure/lt-atas.png",
+      "room": "global"
+    },
+    {
+      "key": "house.structure.mezzanine-2",
+      "type": "image",
+      "path": "house/structure/mezzanine-2.png",
+      "room": "global"
+    },
+    {
       "key": "house.props.dapur.kulkas",
       "type": "image",
       "path": "house/props/dapur/kulkas.png",
