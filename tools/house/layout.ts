@@ -1,16 +1,11 @@
-import {
-  CONTRACT_VERSION,
-  warning,
-  type Issue,
-  type Point,
-  type Rect,
-} from '../../contracts/common.ts';
+import { CONTRACT_VERSION, warning, type Issue, type Point } from '../../contracts/common.ts';
 import {
   HOUSE_SIZE,
   type HouseLayout,
   type HouseProp,
   type HouseRoom,
 } from '../../contracts/houseLayout.ts';
+import { boundsOf, focusRect } from '../../src/engine/camera/focus.ts';
 import { convexHull, project, type Fit, type Vec3 } from './iso.ts';
 import {
   ffl,
@@ -32,10 +27,6 @@ import { hiddenBy, hiddenQuad } from './visibility.ts';
 /** The blockout canvas: the 1920 × 1200 layout space at 2× (ASSETS.md §4.1). */
 export const CANVAS: readonly [number, number] = [HOUSE_SIZE[0] * 2, HOUSE_SIZE[1] * 2];
 
-/** The focus rect keeps this share of the room's size as a border, then grows to 16:10. */
-const FOCUS_PAD = 0.1;
-const FRAME_ASPECT = HOUSE_SIZE[0] / HOUSE_SIZE[1];
-
 /** Layout coordinates are whole pixels, like hand-placed JSON. */
 const toLayout = (p: Vec3, fit: Fit): Point => {
   const [x, y] = project(p, fit);
@@ -43,31 +34,6 @@ const toLayout = (p: Vec3, fit: Fit): Point => {
 };
 
 const at = (p: PlanPoint, z: number): Vec3 => ({ x: p[0], y: p[1], z });
-
-function bounds(points: readonly Point[]): Rect {
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return [x, y, Math.max(1, Math.max(...xs) - x), Math.max(1, Math.max(...ys) - y)];
-}
-
-/** The room's bounds padded and grown to the frame's aspect, kept on the frame. */
-export function focusRect(polygon: readonly Point[]): Rect {
-  const [bx, by, bw, bh] = bounds(polygon);
-  const pad = FOCUS_PAD * Math.max(bw, bh);
-  let w = bw + 2 * pad;
-  let h = bh + 2 * pad;
-  if (w / h < FRAME_ASPECT) w = h * FRAME_ASPECT;
-  else h = w / FRAME_ASPECT;
-  // Round the size before placing it, so the rounded rect can't poke 1 px past the frame.
-  w = Math.round(w);
-  h = Math.round(h);
-  if (w > HOUSE_SIZE[0] || h > HOUSE_SIZE[1]) return [0, 0, HOUSE_SIZE[0], HOUSE_SIZE[1]];
-  const place = (centre: number, size: number, max: number): number =>
-    Math.min(Math.max(Math.round(centre - size / 2), 0), max - size);
-  return [place(bx + bw / 2, w, HOUSE_SIZE[0]), place(by + bh / 2, h, HOUSE_SIZE[1]), w, h];
-}
 
 /** Floor plus the tops of its back walls: what a tap on the room should hit. */
 function tapPolygon(plan: FloorPlan, a: PlanArea, fit: Fit): Point[] {
@@ -104,7 +70,7 @@ function propOf(
   const z0 = floorZ(a) + f.lift;
   const base = quadZ(z0, f.rect);
   const top = quadZ(z0 + f.height, f.rect);
-  const rect = bounds([...base, ...top].map((p) => toLayout(p, fit)));
+  const rect = boundsOf([...base, ...top].map((p) => toLayout(p, fit)));
   const issues: Issue[] = [];
   const [w, h] = [rect[2] * 2, rect[3] * 2];
   const [b0, b1, b2, b3] = base;
@@ -224,7 +190,7 @@ export function draftLayout(plan: FloorPlan, fit: Fit, solids: readonly Solid[])
         ),
       );
     }
-    return { room: s.room, rect: bounds(face.map((p) => toLayout(p, fit))) };
+    return { room: s.room, rect: boundsOf(face.map((p) => toLayout(p, fit))) };
   };
 
   const props = plan.furniture.map((f, i): HouseProp => {

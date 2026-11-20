@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout';
 import { toScreen } from '../../src/engine/iso/projection';
 import { convexHull, fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
-import { CANVAS, draftLayout, focusRect, percent } from '../../tools/house/layout';
+import { focusRect } from '../../src/engine/camera/focus';
+import { CANVAS, draftLayout, percent } from '../../tools/house/layout';
 import { checkPlan, defaultWalk, floorPlan, type FloorPlan } from '../../tools/house/plan';
 import { runBlockout } from '../../tools/house/run';
 import {

@@ -1,6 +1,7 @@
 import { CONTRACT_VERSION, type Point, type Rect } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import type { Activity, RoomId, Storey } from '../../contracts/rooms.ts';
+import { boundsOf, focusRect } from '../engine/camera/focus.ts';
 import { toScreen, type IsoProjection, type WorldPoint } from '../engine/iso/projection.ts';
 
 /**
@@ -76,7 +77,6 @@ const TILE_WIDTH = 180;
 /** Back-wall height above each floor, and the floor slab's thickness, in tiles. */
 const WALL_HEIGHT = 1.2;
 const SLAB = 0.15;
-const FOCUS_PAD = 0.1;
 
 export interface PlaceholderHouse {
   readonly layout: HouseLayout;
@@ -110,28 +110,6 @@ function frameProjection(): IsoProjection {
   };
 }
 
-function boundsOf(points: readonly Point[]): Rect {
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
-}
-
-/** The room's bounds with a border, kept on the 1920 × 1200 frame. */
-function focusOf(polygon: readonly Point[]): Rect {
-  const [x, y, w, h] = boundsOf(polygon);
-  const pad = Math.round(FOCUS_PAD * Math.max(w, h));
-  const x0 = Math.max(0, x - pad);
-  const y0 = Math.max(0, y - pad);
-  return [
-    x0,
-    y0,
-    Math.min(HOUSE_SIZE[0], x + w + pad) - x0,
-    Math.min(HOUSE_SIZE[1], y + h + pad) - y0,
-  ];
-}
-
 export function buildPlaceholderHouse(): PlaceholderHouse {
   const proj = frameProjection();
   const px = (p: WorldPoint): Point => {
@@ -159,7 +137,8 @@ export function buildPlaceholderHouse(): PlaceholderHouse {
       walk: floor,
       stand: px(lift(r, r.w / 2, r.d / 2)),
       storey: r.storey,
-      focus: focusOf(floor),
+      // The floor and its back walls, so the zoom shows the whole cutaway room.
+      focus: focusRect([...floor, ...floorOf(r, r.z + WALL_HEIGHT)]),
       parking: {
         bubu: px(lift(r, r.w / 2 + 0.9, r.d / 2)),
         ocica: px(lift(r, r.w / 2, r.d / 2 + 0.9)),

@@ -70,9 +70,18 @@ export async function pressStart(page: Page, touch: boolean): Promise<void> {
   }
 }
 
+/** Taps the top-left corner of the canvas: sky in the overview and in every room's zoom. */
+export async function tapSky(page: Page, touch: boolean): Promise<void> {
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('Game canvas has no layout box');
+  if (touch) await page.touchscreen.tap(box.x + 12, box.y + 12);
+  else await page.mouse.click(box.x + 12, box.y + 12);
+}
+
 /**
  * Taps (touch) or clicks (mouse) a room's stand. HouseScene logs every stand in game pixels on
- * each `house.layout`, so this works on any viewport and after a resize.
+ * each `house.layout`, so this works on any viewport and after a resize. The camera logs it again
+ * once a zoom settles, so wait for `house.overview` or `house.room_focused` before tapping.
  */
 export async function tapRoom(
   page: Page,

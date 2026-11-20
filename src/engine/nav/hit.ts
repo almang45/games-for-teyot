@@ -11,11 +11,19 @@ export function paintOrder(a: HouseRoom, b: HouseRoom): number {
   return a.storey - b.storey || a.stand[1] - b.stand[1];
 }
 
-/** The room a tap in layout space lands on, or undefined outside every room (PRD US-HOUSE-01). */
-export function roomAt(layout: HouseLayout, p: Point): HouseRoom | undefined {
+/**
+ * The room a tap in layout space lands on, or undefined outside every room (PRD US-HOUSE-01).
+ * `shown` leaves out rooms the camera has faded away, so a tap reaches the room the child sees.
+ */
+export function roomAt(
+  layout: HouseLayout,
+  p: Point,
+  shown: (room: HouseRoom) => boolean = () => true,
+): HouseRoom | undefined {
   let hit: HouseRoom | undefined;
   for (const room of layout.rooms) {
-    if (pointInPolygon(p, room.polygon) && (!hit || paintOrder(room, hit) > 0)) hit = room;
+    if (!shown(room) || !pointInPolygon(p, room.polygon)) continue;
+    if (!hit || paintOrder(room, hit) > 0) hit = room;
   }
   return hit;
 }

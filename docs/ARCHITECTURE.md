@@ -200,8 +200,10 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 - **Camera**:
   - **Overview**: the whole diorama. Default on the tablet and the laptops.
   - **On arrival**: a smooth zoom (about 600 ms) into the room's `focus` rect. The room fills the
-    screen like one of the sticker-book scenes, then the activity starts.
-  - **Leaving**: zooms back out.
+    screen like one of the sticker-book scenes, then the activity starts. The storeys above the
+    room fade out with the zoom, and a storey that is mostly faded does not catch taps.
+  - **Leaving**: zooms back out. Until the activity scenes exist, a tap anywhere off her room
+    leaves it (`HouseScene.onTap`).
   - **Phone** (the main device): the overview opens zoomed to the current room. Drag to pan with
     inertia. Tapping a room that is partly on screen pans to it, so she never needs to pinch.
     Pinch-out shows the whole house.
