@@ -2,6 +2,8 @@ import * as Phaser from 'phaser';
 import type { Point } from '../../contracts/common.ts';
 import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
 import { STOREYS, type RoomId, type Storey } from '../../contracts/rooms.ts';
+import { isPhone, tapSize } from '../engine/camera/device';
+import { boundsOf } from '../engine/camera/focus';
 import { fitView, HouseCamera, type Ease } from '../engine/camera/houseCamera';
 import { Companions } from '../engine/nav/companions';
 import { buildNavGraph, samePoint } from '../engine/nav/graph';
@@ -28,13 +30,17 @@ const TILT_RAD = 0.3;
 const TILT_MS = 220;
 
 const ROOM_ZOOM = placeholderMotion['house.room-zoom'];
+/** The grid an E2E tap point is searched on, per room, when its stand is off screen or covered. */
+const TAP_SEARCH_GRID = 12;
 
 /**
  * SCR-HOUSE on the placeholder house: tap a room and Theia walks there along the waypoint graph
- * (PRD US-HOUSE-01, ARCHITECTURE §6), and the camera zooms into it on arrival. Everything is placed
- * in layout.json space inside one stage container that the camera's shot scales and moves, so a
- * resize only refits the stage and a walk or zoom in progress carries on. The real hub swaps the
- * drawing for Antigravity's layers; the layout, the graph, the walk and the camera stay.
+ * (PRD US-HOUSE-01, ARCHITECTURE §6), and the camera zooms into it on arrival. On a phone the hub
+ * opens framed on her room instead of the whole house: a drag pans, a pinch zooms, and a tapped
+ * room is framed as she walks there (US-HOUSE-05). Everything is placed in layout.json space inside
+ * one stage container that the camera's shot scales and moves, so a resize only refits the stage
+ * and a walk or zoom in progress carries on. The real hub swaps the drawing for Antigravity's
+ * layers; the layout, the graph, the walk and the camera stay.
  */
 export class HouseScene extends Phaser.Scene {
   static readonly KEY = 'House';
@@ -60,6 +66,13 @@ export class HouseScene extends Phaser.Scene {
   private hovered: RoomId | undefined;
   /** The mouse while it is over the game, so hover can follow the stage as the camera moves. */
   private mouse: Phaser.Input.Pointer | undefined;
+  /** Phone-sized screen: the hub opens framed on her room, and drag and pinch move the view. */
+  private phone = false;
+  /** Pointers down on a phone, by id, at the position the camera last moved them to. */
+  private fingers = new Map<number, Point>();
+  /** Set once a drag passes the tap slop or two fingers pinch; the touch that ends it is no tap. */
+  private gestured = false;
+  private wasGliding = false;
 
   constructor() {
     super(HouseScene.KEY);
@@ -71,6 +84,9 @@ export class HouseScene extends Phaser.Scene {
     this.floors = new Map();
     this.hovered = undefined;
     this.mouse = undefined;
+    this.fingers = new Map();
+    this.gestured = false;
+    this.wasGliding = false;
     this.parkingIn = undefined;
     this.spacingAt = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
@@ -83,7 +99,9 @@ export class HouseScene extends Phaser.Scene {
       gap: OCICA_GAP,
     });
 
-    this.camera = new HouseCamera([0, 0, HOUSE_SIZE[0], HOUSE_SIZE[1]]);
+    // A pinch zooms in no closer than the tightest room framing.
+    const closest = Math.min(...this.layout.rooms.map((r) => r.focus[2]));
+    this.camera = new HouseCamera([0, 0, HOUSE_SIZE[0], HOUSE_SIZE[1]], closest);
     const ease = Phaser.Tweens.Builders.GetEaseFunction(ROOM_ZOOM.easing) as Ease;
     this.zoomEase = (t) => ease(t);
 
@@ -98,16 +116,24 @@ export class HouseScene extends Phaser.Scene {
     this.stage.add(this.actors);
     this.placeActors();
 
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
+      this.onFingerDown(p);
+    });
     this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
       // A touch has no hover: the highlight it set while down must not stay behind.
       if (p.wasTouch) {
         this.mouse = undefined;
         this.hover(undefined);
       }
-      if (isTap(p)) this.onTap(this.toLayout(p));
+      const gesture = this.onFingerUp(p);
+      if (!gesture && isTap(p)) this.onTap(this.toLayout(p));
+    });
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, (p: Phaser.Input.Pointer) => {
+      this.onFingerUp(p);
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       this.mouse = p.wasTouch ? undefined : p;
+      this.onFingerMove(p);
       this.hover(this.roomAt(this.toLayout(p))?.id);
     });
     this.input.on(Phaser.Input.Events.GAME_OUT, () => {
@@ -115,12 +141,16 @@ export class HouseScene extends Phaser.Scene {
       this.hover(undefined);
     });
 
+    this.phone = this.onPhone();
+    this.camera.resize({ width: this.scale.width, height: this.scale.height });
+    if (this.phone) this.camera.frameNow(this.roomById(this.layout.start));
     this.fit();
     this.logLayout();
     // Refit on every RESIZE so the frame never lags the window; a window drag or rotation fires
     // dozens of them, so only the log waits for the size to settle.
     let settle: Phaser.Time.TimerEvent | undefined;
     const onResize = (): void => {
+      this.onScreenChange();
       this.fit();
       settle?.remove();
       settle = this.time.delayedCall(RESIZE_SETTLE_MS, () => {
@@ -143,8 +173,11 @@ export class HouseScene extends Phaser.Scene {
     if (this.mouse && (this.camera.moving || settled)) {
       this.hover(this.roomAt(this.toLayout(this.mouse))?.id);
     }
+    if (this.wasGliding && !this.camera.gliding) this.logPanned();
+    this.wasGliding = this.camera.gliding;
     if (settled) {
       if (settled.on === 'room') this.log.info('house.room_focused', { room: settled.room });
+      else if (settled.on === 'framed') this.log.info('house.framed', { room: settled.room });
       else this.log.info('house.overview');
       this.logLayout();
     }
@@ -187,6 +220,75 @@ export class HouseScene extends Phaser.Scene {
     }
   }
 
+  /** CSS px are dp on Android; the canvas fills the window (EXPAND), so its CSS size is the screen's. */
+  private onPhone(): boolean {
+    const { width, height } = this.scale.displaySize;
+    return isPhone(width, height);
+  }
+
+  /** A resize can cross the phone size, e.g. a tablet split screen: the view starts over then. */
+  private onScreenChange(): void {
+    this.camera.resize({ width: this.scale.width, height: this.scale.height });
+    const phone = this.onPhone();
+    if (phone === this.phone) return;
+    this.phone = phone;
+    this.fingers.clear();
+    this.log.info('house.device', { phone });
+    // Zoomed into a room, she stays there; leaving brings the new screen's own view.
+    if (this.camera.room) return;
+    if (phone) this.camera.frameNow(this.roomById(this.walker.room));
+    else this.camera.overviewNow();
+  }
+
+  private onFingerDown(p: Phaser.Input.Pointer): void {
+    if (!this.phone || p.button !== 0) return;
+    if (this.fingers.size === 0) this.gestured = false;
+    this.fingers.set(p.id, [p.x, p.y]);
+    this.camera.hold(p.downTime);
+  }
+
+  /** One finger past the tap slop pans the house; two pinch it about their midpoint. */
+  private onFingerMove(p: Phaser.Input.Pointer): void {
+    const last = this.fingers.get(p.id);
+    if (!last) return;
+    const other = [...this.fingers].find(([id]) => id !== p.id)?.[1];
+    const now: Point = [p.x, p.y];
+    if (other) {
+      this.gestured = true;
+      const before = midpoint(last, other);
+      const after = midpoint(now, other);
+      const spread = Math.hypot(last[0] - other[0], last[1] - other[1]);
+      if (spread > 0) this.camera.pinch(Math.hypot(p.x - other[0], p.y - other[1]) / spread, after);
+      this.camera.drag(after[0] - before[0], after[1] - before[1], p.moveTime);
+    } else {
+      // Below the slop the finger may still be tapping, so the house waits, then catches up.
+      if (!this.gestured && p.getDistance() <= TAP_SLOP) return;
+      this.gestured = true;
+      this.camera.drag(p.x - last[0], p.y - last[1], p.moveTime);
+    }
+    this.fingers.set(p.id, now);
+  }
+
+  /** Returns whether the pointer was part of a drag or pinch, so its release is not a tap. */
+  private onFingerUp(p: Phaser.Input.Pointer): boolean {
+    if (!this.fingers.delete(p.id) || !this.gestured) return false;
+    if (this.fingers.size > 0) {
+      // The finger left behind carries the pan on from here, without the pinch's motion.
+      this.camera.hold(p.upTime);
+      return true;
+    }
+    if (!this.camera.release(p.upTime)) this.logPanned();
+    return true;
+  }
+
+  /** Once a drag or pinch, and any glide after it, comes to rest. */
+  private logPanned(): void {
+    // A release comes between frames: the stage must show the view before the layout reads it.
+    this.fit();
+    this.log.info('house.panned', { view: this.camera.shot.view.map(Math.round) });
+    this.logLayout();
+  }
+
   /** Fits the camera's shot to the view, centred (EXPAND adds side area), and fades the storeys. */
   private fit(): void {
     const { view, alpha } = this.camera.shot;
@@ -208,10 +310,15 @@ export class HouseScene extends Phaser.Scene {
       Math.round(this.stage.x + x * scale),
       Math.round(this.stage.y + y * scale),
     ];
+    const dpPerPx = this.scale.displaySize.width / width;
+    const minTap = Math.min(...this.layout.rooms.map((r) => tapSize(r.polygon, r.stand)));
     this.log.info('house.layout', {
       width,
       height,
       scale,
+      phone: this.phone,
+      // The smallest room's tap area as drawn now (PRD US-HOUSE-05: never under 72 dp).
+      minTapDp: Math.round(minTap * scale * dpPerPx),
       theiaRoom: this.walker.room,
       theia: toGame(this.walker.position),
       zoomedTo: this.camera.room ?? null,
@@ -219,7 +326,38 @@ export class HouseScene extends Phaser.Scene {
       storeys: this.storeys.map((layer) => Math.round(layer.alpha * 100) / 100),
       view: this.camera.shot.view.map(Math.round),
       stands: Object.fromEntries(this.layout.rooms.map((r) => [r.id, toGame(r.stand)])),
+      taps: Object.fromEntries(
+        this.layout.rooms.map((r) => {
+          const at = this.tapPoint(r);
+          return [r.id, at ? toGame(at) : null];
+        }),
+      ),
     });
+  }
+
+  /**
+   * A layout point on screen where a tap lands on `room`: its stand when that shows, else the
+   * nearest point that does, or undefined when none of the room is on screen. A point within the
+   * tap slop of the screen's edge does not count: a sliver there is no place to tap.
+   */
+  private tapPoint(room: HouseRoom): Point | undefined {
+    const [x, y, w, h] = boundsOf(room.polygon);
+    const side = TAP_SEARCH_GRID + 1;
+    const grid = Array.from({ length: side * side }, (_, i): Point => [
+      x + (w * (i % side)) / TAP_SEARCH_GRID,
+      y + (h * Math.floor(i / side)) / TAP_SEARCH_GRID,
+    ]);
+    const near = ([px, py]: Point): number => Math.hypot(px - room.stand[0], py - room.stand[1]);
+    const s = this.stage.scale;
+    const onScreen = ([px, py]: Point): boolean => {
+      const gx = this.stage.x + px * s;
+      const gy = this.stage.y + py * s;
+      const { width, height } = this.scale;
+      return Math.min(gx, gy, width - gx, height - gy) >= TAP_SLOP;
+    };
+    return [room.stand, ...grid.sort((a, b) => near(a) - near(b))].find(
+      (p) => onScreen(p) && this.roomAt(p)?.id === room.id,
+    );
   }
 
   private toLayout(p: Phaser.Input.Pointer): Point {
@@ -236,10 +374,12 @@ export class HouseScene extends Phaser.Scene {
       return;
     }
     if (zoomed) {
-      // Leaving zooms back out (PRD US-HOUSE-01). Until the activity scenes and their way home
-      // exist, any tap off her room is how she leaves.
+      // Leaving zooms back out (PRD US-HOUSE-01): to the whole house, or on a phone to her room
+      // with every storey back. Until the activity scenes and their way home exist, any tap off
+      // her room is how she leaves.
       this.log.info('house.zoom_out', { room: zoomed });
-      this.camera.zoomOut(ROOM_ZOOM.duration, this.zoomEase);
+      if (!this.phone) this.camera.zoomOut(ROOM_ZOOM.duration, this.zoomEase);
+      else if (!room) this.camera.frame(this.roomById(zoomed), ROOM_ZOOM.duration, this.zoomEase);
     }
     if (!room) {
       if (zoomed) return;
@@ -259,6 +399,8 @@ export class HouseScene extends Phaser.Scene {
       via: [...plan.via],
       theia: roundPoint(this.walker.position),
     });
+    // On a phone the room she is heading to comes into view, so she never needs to pinch.
+    if (this.phone) this.camera.frame(room, ROOM_ZOOM.duration, this.zoomEase);
     if (this.companions.follow(this.walker.route, room.parking)) this.parkingIn = room.id;
     const remaining = this.walker.remaining;
     this.spacingAt = remaining > 0 ? remaining / 2 : undefined;
@@ -370,6 +512,10 @@ function polygon(
 /** The primary button (touch, pen tip, left mouse) let go near where it went down. */
 function isTap(p: Phaser.Input.Pointer): boolean {
   return p.button === 0 && p.getDistance() <= TAP_SLOP;
+}
+
+function midpoint([ax, ay]: Point, [bx, by]: Point): Point {
+  return [(ax + bx) / 2, (ay + by) / 2];
 }
 
 function toVec([x, y]: Point): Phaser.Math.Vector2 {
