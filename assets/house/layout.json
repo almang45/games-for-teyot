@@ -1,0 +1,283 @@
+{
+  "$schema": "../../contracts/schema/house-layout.schema.json",
+  "version": 1,
+  "size": [1920, 1200],
+  "rooms": [
+    {
+      "id": "ruang-keluarga",
+      "activities": ["coloring", "tidy"],
+      "polygon": [
+        [751, 952],
+        [1131, 458],
+        [1397, 591],
+        [1397, 895],
+        [1017, 1085]
+      ],
+      "walk": [
+        [1093, 781],
+        [1359, 914],
+        [1074, 1056],
+        [808, 923]
+      ],
+      "stand": [1074, 923],
+      "storey": 0,
+      "focus": [469, 394, 1210, 756],
+      "parking": {
+        "bubu": [960, 923],
+        "ocica": [1074, 980]
+      }
+    },
+    {
+      "id": "dapur",
+      "activities": ["counting"],
+      "polygon": [
+        [542, 638],
+        [922, 448],
+        [1131, 553],
+        [1131, 762],
+        [751, 952],
+        [542, 847]
+      ],
+      "walk": [
+        [884, 714],
+        [1055, 800],
+        [865, 895],
+        [694, 809]
+      ],
+      "stand": [799, 795],
+      "storey": 0,
+      "focus": [339, 389, 995, 622],
+      "parking": {
+        "bubu": [799, 823],
+        "ocica": [818, 776]
+      }
+    },
+    {
+      "id": "kamar-tidur",
+      "activities": ["tracing", "bedtime"],
+      "polygon": [
+        [827, 439],
+        [1207, 249],
+        [1454, 372],
+        [1454, 600],
+        [1074, 790],
+        [827, 667]
+      ],
+      "walk": [
+        [1207, 505],
+        [1426, 614],
+        [1074, 790],
+        [856, 681]
+      ],
+      "stand": [1084, 668],
+      "storey": 2,
+      "focus": [608, 187, 1066, 666],
+      "parking": {
+        "bubu": [1055, 610],
+        "ocica": [1122, 700]
+      }
+    },
+    {
+      "id": "kantor-papa",
+      "activities": [],
+      "polygon": [
+        [352, 410],
+        [580, 296],
+        [770, 391],
+        [770, 600],
+        [542, 714],
+        [352, 619]
+      ],
+      "walk": [
+        [580, 534],
+        [742, 614],
+        [542, 714],
+        [381, 633]
+      ],
+      "stand": [561, 619],
+      "storey": 1,
+      "focus": [160, 254, 803, 502],
+      "parking": {
+        "bubu": [466, 629],
+        "ocica": [552, 671]
+      }
+    },
+    {
+      "id": "kamar-anak",
+      "activities": [],
+      "polygon": [
+        [352, 163],
+        [580, 49],
+        [770, 144],
+        [770, 372],
+        [542, 486],
+        [352, 391]
+      ],
+      "walk": [
+        [580, 306],
+        [742, 386],
+        [542, 486],
+        [381, 405]
+      ],
+      "stand": [542, 353],
+      "storey": 3,
+      "focus": [142, 6, 839, 524],
+      "parking": {
+        "bubu": [590, 320],
+        "ocica": [504, 448]
+      }
+    }
+  ],
+  "spots": {
+    "fridge": {
+      "room": "dapur",
+      "rect": [903, 543, 57, 95]
+    },
+    "sticker-wall": {
+      "room": "kamar-tidur",
+      "rect": [1302, 344, 114, 114]
+    }
+  },
+  "occluders": [],
+  "props": [
+    {
+      "key": "house.props.dapur.kulkas",
+      "storey": 0,
+      "room": "dapur",
+      "rect": [846, 515, 114, 209],
+      "base": [
+        [903, 667],
+        [960, 695],
+        [903, 724],
+        [846, 695]
+      ]
+    },
+    {
+      "key": "house.props.ruang-keluarga.sofa",
+      "storey": 0,
+      "room": "ruang-keluarga",
+      "rect": [1036, 681, 323, 242],
+      "base": [
+        [1131, 762],
+        [1359, 876],
+        [1264, 923],
+        [1036, 809]
+      ]
+    },
+    {
+      "key": "house.props.ruang-keluarga.sofa-l",
+      "storey": 0,
+      "room": "ruang-keluarga",
+      "rect": [979, 766, 152, 119],
+      "base": [
+        [1036, 809],
+        [1131, 857],
+        [1074, 885],
+        [979, 838]
+      ]
+    },
+    {
+      "key": "house.props.ruang-keluarga.puf",
+      "storey": 0,
+      "room": "ruang-keluarga",
+      "rect": [903, 804, 152, 119],
+      "base": [
+        [960, 847],
+        [1055, 895],
+        [998, 923],
+        [903, 876]
+      ]
+    },
+    {
+      "key": "house.props.kamar-tidur.kasur",
+      "storey": 2,
+      "room": "kamar-tidur",
+      "rect": [1074, 401, 342, 275],
+      "base": [
+        [1264, 505],
+        [1416, 581],
+        [1226, 676],
+        [1074, 600]
+      ]
+    }
+  ],
+  "waypoints": [
+    {
+      "id": "tangga-1-bawah",
+      "pos": [1036, 1023],
+      "storey": 0,
+      "stair": true
+    },
+    {
+      "id": "bordes-1",
+      "pos": [903, 1032],
+      "storey": 0,
+      "stair": true
+    },
+    {
+      "id": "tangga-2-atas",
+      "pos": [618, 719],
+      "storey": 1,
+      "stair": true
+    },
+    {
+      "id": "kantor-papa-pintu",
+      "pos": [599, 676],
+      "storey": 1,
+      "stair": true
+    },
+    {
+      "id": "tangga-3-bawah",
+      "pos": [689, 693],
+      "storey": 1,
+      "stair": true
+    },
+    {
+      "id": "tangga-3-atas",
+      "pos": [808, 538],
+      "storey": 2,
+      "stair": true
+    },
+    {
+      "id": "kamar-tidur-pintu",
+      "pos": [1017, 610],
+      "storey": 2,
+      "stair": true
+    },
+    {
+      "id": "tangga-4-bawah",
+      "pos": [832, 488],
+      "storey": 2,
+      "stair": true
+    },
+    {
+      "id": "tangga-4-atas",
+      "pos": [651, 270],
+      "storey": 3,
+      "stair": true
+    },
+    {
+      "id": "kamar-anak-pintu",
+      "pos": [580, 320],
+      "storey": 3,
+      "stair": true
+    }
+  ],
+  "edges": [
+    ["dapur", "ruang-keluarga"],
+    ["ruang-keluarga", "tangga-1-bawah"],
+    ["tangga-1-bawah", "bordes-1"],
+    ["bordes-1", "tangga-2-atas"],
+    ["tangga-2-atas", "kantor-papa-pintu"],
+    ["kantor-papa-pintu", "kantor-papa"],
+    ["tangga-2-atas", "tangga-3-bawah"],
+    ["tangga-3-bawah", "tangga-3-atas"],
+    ["tangga-3-atas", "kamar-tidur-pintu"],
+    ["kamar-tidur-pintu", "kamar-tidur"],
+    ["tangga-3-atas", "tangga-4-bawah"],
+    ["tangga-4-bawah", "tangga-4-atas"],
+    ["tangga-4-atas", "kamar-anak-pintu"],
+    ["kamar-anak-pintu", "kamar-anak"]
+  ],
+  "start": "ruang-keluarga"
+}

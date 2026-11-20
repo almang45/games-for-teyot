@@ -3,6 +3,12 @@
   "version": 1,
   "assets": [
     {
+      "key": "house.layout",
+      "type": "layout",
+      "path": "house/layout.json",
+      "room": "global"
+    },
+    {
       "key": "house.structure.lt-dasar",
       "type": "image",
       "path": "house/structure/lt-dasar.png",
