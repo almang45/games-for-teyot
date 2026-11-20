@@ -242,7 +242,8 @@ export class HouseScene extends Phaser.Scene {
 
   private onFingerDown(p: Phaser.Input.Pointer): void {
     if (!this.phone || p.button !== 0) return;
-    if (this.fingers.size === 0) this.gestured = false;
+    // A touch that catches a glide only stops the house: letting go is not a tap.
+    if (this.fingers.size === 0) this.gestured = this.camera.gliding;
     this.fingers.set(p.id, [p.x, p.y]);
     this.camera.hold(p.downTime);
   }
@@ -255,11 +256,7 @@ export class HouseScene extends Phaser.Scene {
     const now: Point = [p.x, p.y];
     if (other) {
       this.gestured = true;
-      const before = midpoint(last, other);
-      const after = midpoint(now, other);
-      const spread = Math.hypot(last[0] - other[0], last[1] - other[1]);
-      if (spread > 0) this.camera.pinch(Math.hypot(p.x - other[0], p.y - other[1]) / spread, after);
-      this.camera.drag(after[0] - before[0], after[1] - before[1], p.moveTime);
+      this.camera.twoFingers([last, other], [now, other], p.moveTime);
     } else {
       // Below the slop the finger may still be tapping, so the house waits, then catches up.
       if (!this.gestured && p.getDistance() <= TAP_SLOP) return;
@@ -277,7 +274,9 @@ export class HouseScene extends Phaser.Scene {
       this.camera.hold(p.upTime);
       return true;
     }
-    if (!this.camera.release(p.upTime)) this.logPanned();
+    // A glide can end on its first frame, before update() would see it start: mark it here.
+    if (this.camera.release(p.upTime)) this.wasGliding = true;
+    else this.logPanned();
     return true;
   }
 
@@ -512,10 +511,6 @@ function polygon(
 /** The primary button (touch, pen tip, left mouse) let go near where it went down. */
 function isTap(p: Phaser.Input.Pointer): boolean {
   return p.button === 0 && p.getDistance() <= TAP_SLOP;
-}
-
-function midpoint([ax, ay]: Point, [bx, by]: Point): Point {
-  return [(ax + bx) / 2, (ay + by) / 2];
 }
 
 function toVec([x, y]: Point): Phaser.Math.Vector2 {

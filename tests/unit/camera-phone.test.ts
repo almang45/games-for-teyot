@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Point, Polygon, Rect } from '../../contracts/common';
 import { HOUSE_SIZE } from '../../contracts/houseLayout';
-import { isPhone, MIN_TAP_DP, tapSize } from '../../src/engine/camera/device';
+import { minHitFramePx } from '../../contracts/screenLayout';
+import { isPhone, tapSize } from '../../src/engine/camera/device';
 import {
   clampView,
   fitView,
@@ -95,12 +96,10 @@ describe('tapSize', () => {
 
   it('keeps every placeholder room at least 72 dp on the phone with the whole house shown', () => {
     const { layout } = buildPlaceholderHouse();
-    // The phone's 411 dp height fits the frame's 1200 px.
-    const dpPerLayoutPx = 1080 / 2.625 / HOUSE_SIZE[1];
+    // The house is drawn on the 1920 × 1200 frame, so layout px are frame px.
+    const minSide = minHitFramePx('phone', 'secondary');
     for (const room of layout.rooms) {
-      expect(tapSize(room.polygon, room.stand) * dpPerLayoutPx, room.id).toBeGreaterThanOrEqual(
-        MIN_TAP_DP,
-      );
+      expect(tapSize(room.polygon, room.stand), room.id).toBeGreaterThanOrEqual(minSide);
     }
   });
 });
@@ -233,6 +232,41 @@ describe('HouseCamera on the phone', () => {
     const after = under();
     expect(after[0]).toBeCloseTo(before[0]);
     expect(after[1]).toBeCloseTo(before[1]);
+  });
+
+  it('moves the spot under two fingers along with their midpoint as one moves and the other stays', () => {
+    const camera = phoneCamera();
+    camera.frameNow(middle);
+    const still: Point = [PHONE.width * 0.4, PHONE.height * 0.5];
+    const from: Point = [PHONE.width * 0.6, PHONE.height * 0.5];
+    const to: Point = [PHONE.width * 0.56, PHONE.height * 0.45];
+    const under = ([gx, gy]: Point): Point => {
+      const { scale, x, y } = fitView(camera.shot.view, PHONE.width, PHONE.height);
+      return [(gx - x) / scale, (gy - y) / scale];
+    };
+    const mid = (a: Point, b: Point): Point => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const before = under(mid(from, still));
+    const [, , w] = camera.shot.view;
+    camera.hold(0);
+    camera.twoFingers([from, still], [to, still], 16);
+    expect(camera.shot.view[2]).toBeGreaterThan(w);
+    const after = under(mid(to, still));
+    expect(after[0]).toBeCloseTo(before[0]);
+    expect(after[1]).toBeCloseTo(before[1]);
+  });
+
+  it('only pans when two touch points meet, as a zero spread has no scale', () => {
+    const camera = phoneCamera();
+    camera.frameNow(middle);
+    const [, , w, h] = camera.shot.view;
+    const other: Point = [PHONE.width * 0.5, PHONE.height * 0.5];
+    camera.hold(0);
+    expect(() => {
+      camera.twoFingers([[PHONE.width * 0.6, PHONE.height * 0.5], other], [other, other], 16);
+      camera.twoFingers([other, other], [[PHONE.width * 0.4, PHONE.height * 0.5], other], 32);
+    }).not.toThrow();
+    expect(camera.shot.view[2]).toBeCloseTo(w);
+    expect(camera.shot.view[3]).toBeCloseTo(h);
   });
 
   it('lets a drag take the view during a zoom while the fade still finishes', () => {

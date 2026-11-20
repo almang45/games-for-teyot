@@ -9,7 +9,8 @@ import {
   type LoggedEvent,
 } from './helpers';
 import type { Point } from '../../contracts/common';
-import { isPhone, MIN_TAP_DP } from '../../src/engine/camera/device';
+import { TOUCH_DP } from '../../contracts/screenLayout';
+import { isPhone } from '../../src/engine/camera/device';
 import { roomAt } from '../../src/engine/nav/hit';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
@@ -404,7 +405,7 @@ test('US-HOUSE-05 on the tablet and laptops the whole house fits on screen, ever
   if (!latest) throw new Error('No house.layout');
   expect(latest.phone).toBe(false);
   expect(latest.view).toEqual([0, 0, 1920, 1200]);
-  expect(latest.minTapDp).toBeGreaterThanOrEqual(MIN_TAP_DP);
+  expect(latest.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
   for (const [room, stand] of Object.entries(latest.stands)) {
     expect(onScreen(latest, [stand[0] ?? -1, stand[1] ?? -1]), room).toBe(true);
     expect(latest.taps[room], room).toEqual(stand);
@@ -428,7 +429,7 @@ test('US-HOUSE-05 on the phone the hub opens zoomed to her room, and a tap on a 
   expect(opening.theiaRoom).toBe(layout.start);
   expect(opening.zoomedTo).toBeNull();
   expect(opening.storeys).toEqual([1, 1, 1, 1]);
-  expect(opening.minTapDp).toBeGreaterThanOrEqual(MIN_TAP_DP);
+  expect(opening.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
   // Zoomed in: the bedroom two storeys up is off screen, and the kitchen is only partly on it.
   expect(opening.taps['kamar-tidur']).toBeNull();
   const corners = (latest: HouseLayoutLog): boolean[] =>
@@ -507,7 +508,7 @@ test('US-HOUSE-05 on the phone a pinch-out shows the whole house, every tap area
   ]);
   const whole = await pannedAfter(log, 0);
   expect(whole.view).toEqual([0, 0, 1920, 1200]);
-  expect(whole.minTapDp).toBeGreaterThanOrEqual(MIN_TAP_DP);
+  expect(whole.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
   for (const [room, stand] of Object.entries(whole.stands)) {
     expect(whole.taps[room], room).toEqual(stand);
   }

@@ -4,9 +4,6 @@ import { pointInPolygon } from '../../../contracts/geometry.ts';
 /** Android's tablet breakpoint (sw600dp): a screen whose shorter side is under it is a phone. */
 export const PHONE_MAX_SHORT_SIDE_DP = 600;
 
-/** No tap area may be smaller than this on any device (PRD US-HOUSE-05), in dp. */
-export const MIN_TAP_DP = 72;
-
 /**
  * Whether the hub runs as on the phone (PRD US-HOUSE-05): opened zoomed to her room, with drag
  * and pinch. Sizes are CSS px, which on Android are dp.

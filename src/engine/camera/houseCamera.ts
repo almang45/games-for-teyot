@@ -225,6 +225,21 @@ export class HouseCamera {
     this.#take([px - (px - x) * k, py - (py - y) * k, w * k, h * k]);
   }
 
+  /**
+   * Two fingers moved from `from` to `to`, in game px: the house follows their midpoint and
+   * scales with their spread, so what was under the fingers stays under them.
+   */
+  twoFingers(from: readonly [Point, Point], to: readonly [Point, Point], nowMs: number): void {
+    const before = midpoint(...from);
+    const after = midpoint(...to);
+    // Pan first: the zoom then turns about the spot that is already under the new midpoint.
+    this.drag(after[0] - before[0], after[1] - before[1], nowMs);
+    const spread = distance(...from);
+    const next = distance(...to);
+    // Touch points can coincide, and a zero spread has no scale: that move only pans.
+    if (spread > 0 && next > 0) this.pinch(next / spread, after);
+  }
+
   /** Moves `dtMs` further; returns where a move settled, once, on the step that ends it. */
   advance(dtMs: number): CameraSettled | undefined {
     const dt = Math.max(0, dtMs);
@@ -296,6 +311,14 @@ export class HouseCamera {
     const { scale, x, y } = this.#fit(view);
     return [(gx - x) / scale, (gy - y) / scale];
   }
+}
+
+function midpoint([ax, ay]: Point, [bx, by]: Point): Point {
+  return [(ax + bx) / 2, (ay + by) / 2];
+}
+
+function distance([ax, ay]: Point, [bx, by]: Point): number {
+  return Math.hypot(ax - bx, ay - by);
 }
 
 function mix(a: Shot, b: Shot, t: number): Shot {
