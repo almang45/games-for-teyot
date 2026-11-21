@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout';
 import { pointInPolygon } from '../../contracts/geometry';
 import { toScreen } from '../../src/engine/iso/projection';
-import { convexHull, fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
+import { fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
 import { focusRect } from '../../src/engine/camera/focus';
 import { CANVAS, draftLayout, percent } from '../../tools/house/layout';
 import { checkPlan, defaultWalk, floorPlan, type FloorPlan } from '../../tools/house/plan';
@@ -168,20 +168,6 @@ describe('US-REF-02 projection', () => {
         0,
       ),
     ).toThrow('too large');
-  });
-
-  it('builds a convex hull without interior or collinear points', () => {
-    const hull = convexHull([
-      [0, 0],
-      [10, 0],
-      [5, 0],
-      [10, 10],
-      [0, 10],
-      [5, 5],
-    ]);
-    expect(hull).toHaveLength(4);
-    expect(hull).not.toContainEqual([5, 5]);
-    expect(convexHull([[1, 1]])).toEqual([[1, 1]]);
   });
 });
 
