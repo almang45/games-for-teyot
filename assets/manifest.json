@@ -61,6 +61,52 @@
       "type": "image",
       "path": "house/props/kamar-tidur/kasur.png",
       "room": "kamar-tidur"
+    },
+    {
+      "key": "character.theia.default",
+      "type": "spritesheet",
+      "path": "character/theia/default.png",
+      "frame": [256, 256],
+      "animations": {
+        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
+        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
+        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
+        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
+        "stairs.fr": { "frames": [24, 31], "fps": 10, "loop": true },
+        "stairs.br": { "frames": [32, 39], "fps": 10, "loop": true },
+        "celebrate.fr": { "frames": [40, 45], "fps": 12, "loop": false },
+        "sleep.fr": { "frames": [46, 49], "fps": 4, "loop": true }
+      },
+      "room": "global"
+    },
+    {
+      "key": "companion.bubu.default",
+      "type": "spritesheet",
+      "path": "companion/bubu/default.png",
+      "frame": [192, 160],
+      "animations": {
+        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
+        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
+        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
+        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
+        "point.fr": { "frames": [24, 27], "fps": 8, "loop": false },
+        "demo.fr": { "frames": [28, 33], "fps": 10, "loop": true }
+      },
+      "room": "global"
+    },
+    {
+      "key": "companion.ocica.default",
+      "type": "spritesheet",
+      "path": "companion/ocica/default.png",
+      "frame": [192, 160],
+      "animations": {
+        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
+        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
+        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
+        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
+        "comfort.fr": { "frames": [24, 29], "fps": 10, "loop": false }
+      },
+      "room": "global"
     }
   ]
 }
