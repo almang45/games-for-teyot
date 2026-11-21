@@ -67,26 +67,3 @@ export function fitToCanvas(
     ],
   };
 }
-
-/** Andrew's monotone chain, counter-clockwise in screen space; drops collinear points. */
-export function convexHull(points: readonly Point[]): Point[] {
-  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  if (sorted.length < 3) return sorted;
-  const cross = (o: Point, a: Point, b: Point): number =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const half = (pts: readonly Point[]): Point[] => {
-    const out: Point[] = [];
-    for (const p of pts) {
-      while (out.length >= 2) {
-        const a = out[out.length - 2];
-        const b = out[out.length - 1];
-        if (!a || !b || cross(a, b, p) > 0) break;
-        out.pop();
-      }
-      out.push(p);
-    }
-    out.pop();
-    return out;
-  };
-  return [...half(sorted), ...half([...sorted].reverse())];
-}

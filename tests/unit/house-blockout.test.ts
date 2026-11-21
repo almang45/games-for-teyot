@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout } from '../../contracts/houseLayout';
+import { pointInPolygon } from '../../contracts/geometry';
 import { toScreen } from '../../src/engine/iso/projection';
-import { convexHull, fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
+import { fitToCanvas, gridStep, project, type Vec3 } from '../../tools/house/iso';
 import { focusRect } from '../../src/engine/camera/focus';
 import { CANVAS, draftLayout, percent } from '../../tools/house/layout';
 import { checkPlan, defaultWalk, floorPlan, type FloorPlan } from '../../tools/house/plan';
@@ -167,20 +168,6 @@ describe('US-REF-02 projection', () => {
         0,
       ),
     ).toThrow('too large');
-  });
-
-  it('builds a convex hull without interior or collinear points', () => {
-    const hull = convexHull([
-      [0, 0],
-      [10, 0],
-      [5, 0],
-      [10, 10],
-      [0, 10],
-      [5, 5],
-    ]);
-    expect(hull).toHaveLength(4);
-    expect(hull).not.toContainEqual([5, 5]);
-    expect(convexHull([[1, 1]])).toEqual([[1, 1]]);
   });
 });
 
@@ -559,6 +546,28 @@ describe('US-REF-02 draft layout', () => {
     const byId = new Map(draft.layout.waypoints.map((w) => [w.id, w.pos]));
     expect(byId.get('kebun')).toEqual(pos({ x: 5, y: 1, z: -0.2 }));
     expect(byId.get('luar')).toEqual(pos({ x: 20, y: 20, z: 0 }));
+  });
+
+  it.each([
+    { walls: ['y0'], open: { x: -0.3, y: 0.3 } },
+    { walls: ['x0'], open: { x: 0.3, y: -0.3 } },
+  ])('keeps the floor beside a lone $walls wall out of the tap polygon', ({ walls, open }) => {
+    const areas = (planInput().areas as Record<string, unknown>[]).map((a) =>
+      a.id === 'ruang-keluarga' ? { ...a, walls } : a,
+    );
+    const { fit, draft } = drafted(plan({ areas, doors: [] }));
+    const room = draft.layout.rooms[0];
+    if (!room) throw new Error('fixture lost ruang-keluarga');
+    const layoutAt = (p: Vec3): [number, number] => {
+      const [x, y] = project(p, fit);
+      return [Math.round(x / 2), Math.round(y / 2)];
+    };
+    expect(checkHouseLayout(houseLayout.parse(draft.layout))).toEqual([]);
+    // The floor's back corner stays a vertex: a hull would cut past it.
+    expect(room.polygon).toContainEqual(layoutAt({ x: 0, y: 0, z: 0 }));
+    for (const p of room.walk) expect(pointInPolygon(p, room.polygon)).toBe(true);
+    // Floor just past the open side belongs to whatever room sits there, not to this one.
+    expect(pointInPolygon(layoutAt({ ...open, z: 0 }), room.polygon)).toBe(false);
   });
 
   it('never rounds a sliver to 0 % or a near miss to 100 %', () => {
