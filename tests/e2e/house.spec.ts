@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import {
   GAME_URL,
   collectLog,
@@ -9,6 +9,8 @@ import {
   type LoggedEvent,
 } from './helpers';
 import type { Point } from '../../contracts/common';
+import { TOUCH_DP } from '../../contracts/screenLayout';
+import { isPhone } from '../../src/engine/camera/device';
 import { roomAt } from '../../src/engine/nav/hit';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
@@ -58,24 +60,41 @@ async function focused(log: readonly LoggedEvent[], count: number): Promise<Logg
   return events(log, 'house.room_focused');
 }
 
-/** Waits for the camera to settle back on the overview and log its layout. */
-async function overviewAfter(log: readonly LoggedEvent[], overviews: number): Promise<void> {
+/** Waits for a `settle` event after the first `seen` of them, and the layout it logs. */
+async function settledAfter(
+  log: readonly LoggedEvent[],
+  settle: string,
+  seen: number,
+): Promise<void> {
   await expect
-    .poll(
-      () => events(log, 'house.overview').length > overviews && layoutAfter(log, 'house.overview'),
-      { timeout: ARRIVAL_TIMEOUT },
-    )
+    .poll(() => events(log, settle).length > seen && layoutAfter(log, settle), {
+      timeout: ARRIVAL_TIMEOUT,
+    })
     .toBe(true);
 }
 
-/** Leaves the room she is zoomed into the placeholder way, a tap on the sky, and waits for the overview. */
+/** Waits for the camera to settle back on the overview and log its layout. */
+async function overviewAfter(log: readonly LoggedEvent[], overviews: number): Promise<void> {
+  await settledAfter(log, 'house.overview', overviews);
+}
+
+/**
+ * Leaves the room she is zoomed into the placeholder way, a tap on the sky, and waits for the
+ * camera: back on the overview, or on a phone on her room with every storey shown.
+ */
 async function leaveRoom(page: Page, touch: boolean, log: readonly LoggedEvent[]): Promise<void> {
-  const overviews = events(log, 'house.overview').length;
+  const settle = lastLayout(log)?.phone ? 'house.framed' : 'house.overview';
+  const seen = events(log, settle).length;
   await tapSky(page, touch);
-  await overviewAfter(log, overviews);
+  await settledAfter(log, settle, seen);
 }
 
 interface HouseLayoutLog {
+  readonly phone: boolean;
+  readonly theiaRoom: string;
+  readonly minTapDp: number;
+  readonly height: number;
+  readonly taps: Record<string, readonly number[] | null>;
   readonly scale: number;
   readonly zoomedTo: string | null;
   readonly view: readonly number[];
@@ -140,8 +159,9 @@ test('US-HOUSE-01 a tap on another room while walking re-routes from her current
 }) => {
   test.slow();
   const log = await openHouse(page, hasTouch);
-  await tapRoom(page, hasTouch, log, 'kamar-tidur');
-  // Halfway up the house, whatever the frame rate: she is well off the stand she started on. Polled
+  // kantor-papa, not a room further up: it shows on the phone's opening view too.
+  await tapRoom(page, hasTouch, log, 'kantor-papa');
+  // Halfway up the stairs, whatever the frame rate: she is well off the stand she started on. Polled
   // every frame or so, as the default back-off can sleep through the second half of a fast walk.
   await expect
     .poll(() => events(log, 'house.companions_following').length, {
@@ -152,12 +172,12 @@ test('US-HOUSE-01 a tap on another room while walking re-routes from her current
   await tapRoom(page, hasTouch, log, 'dapur');
 
   await expect.poll(() => events(log, 'house.walk').length).toBe(2);
-  // The second tap re-routed her before she reached kamar-tidur.
+  // The second tap re-routed her before she reached kantor-papa.
   expect(events(log, 'house.arrived')).toEqual([]);
   const [first, second] = events(log, 'house.walk');
   const via = second?.data.via as string[];
   expect(via.at(-1)).toBe('dapur');
-  expect(via).not.toContain('kamar-tidur');
+  expect(via).not.toContain('kantor-papa');
   // Logged after the re-route: still where she was, not back at the start.
   expect(second?.data.theia).not.toEqual(first?.data.theia);
   const [arrival] = await arrivals(log, 1);
@@ -262,6 +282,7 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
   page,
   hasTouch,
 }) => {
+  test.skip(onPhone(page), 'The phone opens on her room, not the whole house: US-HOUSE-05 below');
   test.slow();
   const { layout } = buildPlaceholderHouse();
   const dapur = layout.rooms.find((r) => r.id === 'dapur');
@@ -313,4 +334,227 @@ test('US-HOUSE-01 on arrival the camera zooms into the room and fades the storey
   expect(events(log, 'house.tap_outside')).toEqual([]);
   expect(events(log, 'house.bubu_tilt')).toEqual([]);
   expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+/** The game's own rule (src/engine/camera/device.ts) for the viewport this project runs. */
+function onPhone(page: Page): boolean {
+  const size = page.viewportSize();
+  return size !== null && isPhone(size.width, size.height);
+}
+
+/** A layout point in game px through the latest layout: scale and one stand fix the stage. */
+function toGame(latest: HouseLayoutLog, at: Point, anchor: { id: string; stand: Point }): Point {
+  const stand = latest.stands[anchor.id] ?? [];
+  return [
+    (stand[0] ?? 0) + (at[0] - anchor.stand[0]) * latest.scale,
+    (stand[1] ?? 0) + (at[1] - anchor.stand[1]) * latest.scale,
+  ];
+}
+
+const onScreen = (latest: HouseLayoutLog, [x, y]: Point): boolean =>
+  x >= 0 && y >= 0 && x <= latest.width && y <= latest.height;
+
+/**
+ * Real multi-touch through the Chromium DevTools protocol, which Playwright's touchscreen lacks:
+ * each finger moves from its `from` to its `to` in game px, over `steps` moves. The events are
+ * queued together, as a round trip per move can take longer than a flick on a loaded machine.
+ * `tapAfter` lands and lifts one more finger there in the same queue, before any frame can end a
+ * glide the gesture threw.
+ */
+async function touchGesture(
+  page: Page,
+  cdp: CDPSession,
+  latest: HouseLayoutLog,
+  fingers: readonly { from: Point; to: Point }[],
+  steps = 6,
+  tapAfter?: Point,
+): Promise<void> {
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('Game canvas has no layout box');
+  const k = box.width / latest.width;
+  const at = (t: number): { x: number; y: number; id: number }[] =>
+    fingers.map(({ from, to }, id) => ({
+      x: box.x + (from[0] + (to[0] - from[0]) * t) * k,
+      y: box.y + (from[1] + (to[1] - from[1]) * t) * k,
+      id,
+    }));
+  // CDP handles a session's commands in the order sent, so these make one gesture, start to end.
+  const sent = [cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) })];
+  for (let i = 1; i <= steps; i++) {
+    sent.push(
+      cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(i / steps) }),
+    );
+  }
+  sent.push(cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }));
+  if (tapAfter) {
+    const touchPoints = [{ x: box.x + tapAfter[0] * k, y: box.y + tapAfter[1] * k, id: 0 }];
+    sent.push(
+      cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints }),
+      cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }),
+    );
+  }
+  await Promise.all(sent);
+}
+
+/** Waits for the view to come to rest after a drag or pinch, and the layout it logs. */
+async function pannedAfter(log: readonly LoggedEvent[], seen: number): Promise<HouseLayoutLog> {
+  await settledAfter(log, 'house.panned', seen);
+  const latest = lastLayout(log);
+  if (!latest) throw new Error('No house.layout after house.panned');
+  return latest;
+}
+
+test('US-HOUSE-05 on the tablet and laptops the whole house fits on screen, every tap area at least 72 dp', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(onPhone(page), 'The phone opens on her room: the tests below');
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const latest = lastLayout(log);
+  if (!latest) throw new Error('No house.layout');
+  expect(latest.phone).toBe(false);
+  expect(latest.view).toEqual([0, 0, 1920, 1200]);
+  expect(latest.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
+  for (const [room, stand] of Object.entries(latest.stands)) {
+    expect(onScreen(latest, [stand[0] ?? -1, stand[1] ?? -1]), room).toBe(true);
+    expect(latest.taps[room], room).toEqual(stand);
+  }
+});
+
+test('US-HOUSE-05 on the phone the hub opens zoomed to her room, and a tap on a room partly on screen brings it into view', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!onPhone(page), 'Only the phone opens zoomed to her room');
+  test.slow();
+  const { layout } = buildPlaceholderHouse();
+  const kitchen = layout.rooms.find((r) => r.id === 'dapur');
+  if (!kitchen) throw new Error('placeholder house has no dapur');
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const opening = lastLayout(log);
+  if (!opening) throw new Error('No house.layout');
+  expect(opening.phone).toBe(true);
+  expect(opening.theiaRoom).toBe(layout.start);
+  expect(opening.zoomedTo).toBeNull();
+  expect(opening.storeys).toEqual([1, 1, 1, 1]);
+  expect(opening.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
+  // Zoomed in: the bedroom two storeys up is off screen, and the kitchen is only partly on it.
+  expect(opening.taps['kamar-tidur']).toBeNull();
+  const corners = (latest: HouseLayoutLog): boolean[] =>
+    kitchen.polygon.map((p) => onScreen(latest, toGame(latest, p, kitchen)));
+  expect(corners(opening)).toContain(false);
+  expect(corners(opening)).toContain(true);
+
+  const framings = events(log, 'house.framed').length;
+  await tapRoom(page, hasTouch, log, 'dapur');
+  await settledAfter(log, 'house.framed', framings);
+  expect(events(log, 'house.framed').at(-1)?.data).toEqual({ room: 'dapur' });
+  expect(corners(lastLayout(log) ?? opening)).toEqual([true, true, true, true]);
+
+  // On arrival the zoom fades the storeys above her as on the tablet, and leaving brings them back.
+  await arrivals(log, 1);
+  await focused(log, 1);
+  expect(lastLayout(log)?.zoomedTo).toBe('dapur');
+  expect(lastLayout(log)?.storeys).toEqual([1, 0, 0, 0]);
+  await leaveRoom(page, hasTouch, log);
+  expect(events(log, 'house.framed').at(-1)?.data).toEqual({ room: 'dapur' });
+  expect(lastLayout(log)?.zoomedTo).toBeNull();
+  expect(lastLayout(log)?.storeys).toEqual([1, 1, 1, 1]);
+  expect(events(log, 'house.overview')).toEqual([]);
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+test('US-HOUSE-05 on the phone a drag pans the house with inertia, and a room dragged into view takes a tap', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!onPhone(page), 'Drag to pan is the phone hub');
+  test.slow();
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const opening = lastLayout(log);
+  if (!opening) throw new Error('No house.layout');
+  const cdp = await page.context().newCDPSession(page);
+  const x = opening.width / 2;
+  const reach = opening.height * 0.4;
+  // A quick flick down, to see the storeys above her.
+  await touchGesture(page, cdp, opening, [
+    { from: [x, opening.height * 0.3], to: [x, opening.height * 0.3 + reach] },
+  ]);
+  const panned = await pannedAfter(log, 0);
+  // The house kept gliding after the finger let go: it moved further than the finger did.
+  const fingerMoved = reach / panned.scale;
+  expect(opening.view[1] ?? 0).toBeGreaterThan(panned.view[1] ?? 0);
+  expect((opening.view[1] ?? 0) - (panned.view[1] ?? 0)).toBeGreaterThan(fingerMoved + 10);
+  expect(panned.view[1]).toBeGreaterThanOrEqual(0);
+  // A drag is not a tap.
+  expect(events(log, 'house.room_tap')).toEqual([]);
+  expect(events(log, 'house.tap_outside')).toEqual([]);
+
+  expect(panned.taps['kamar-tidur']).not.toBeNull();
+  await tapRoom(page, hasTouch, log, 'kamar-tidur');
+  await expect.poll(() => events(log, 'house.walk').at(0)?.data.room).toBe('kamar-tidur');
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+test('US-HOUSE-05 on the phone a touch that catches a glide stops the house, and is not a tap', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!onPhone(page), 'Drag to pan is the phone hub');
+  test.slow();
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const opening = lastLayout(log);
+  if (!opening) throw new Error('No house.layout');
+  const cdp = await page.context().newCDPSession(page);
+  const x = opening.width / 2;
+  const still: Point = [x, opening.height / 2];
+  // A flick down, and a finger that lands on the gliding house and lifts without moving.
+  await touchGesture(
+    page,
+    cdp,
+    opening,
+    [{ from: [x, opening.height * 0.4], to: [x, opening.height * 0.6] }],
+    6,
+    still,
+  );
+  const stopped = await pannedAfter(log, 0);
+  // Long enough for the house to move on, or for a second log of the same stop.
+  await page.waitForTimeout(400);
+  expect(events(log, 'house.panned')).toHaveLength(1);
+  expect(lastLayout(log)?.view).toEqual(stopped.view);
+  expect(events(log, 'house.room_tap')).toEqual([]);
+  expect(events(log, 'house.tap_outside')).toEqual([]);
+  expect(events(log, 'house.walk')).toEqual([]);
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+test('US-HOUSE-05 on the phone a pinch-out shows the whole house, every tap area at least 72 dp', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!onPhone(page), 'Pinch is the phone hub');
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const opening = lastLayout(log);
+  if (!opening) throw new Error('No house.layout');
+  const cdp = await page.context().newCDPSession(page);
+  const [cx, cy] = [opening.width / 2, opening.height / 2];
+  const spread = opening.height * 0.4;
+  // Two fingers close in from far apart: a third of the spread zooms out past the whole house.
+  await touchGesture(page, cdp, opening, [
+    { from: [cx - spread, cy], to: [cx - spread / 3, cy] },
+    { from: [cx + spread, cy], to: [cx + spread / 3, cy] },
+  ]);
+  const whole = await pannedAfter(log, 0);
+  expect(whole.view).toEqual([0, 0, 1920, 1200]);
+  expect(whole.minTapDp).toBeGreaterThanOrEqual(TOUCH_DP.secondary);
+  for (const [room, stand] of Object.entries(whole.stands)) {
+    expect(whole.taps[room], room).toEqual(stand);
+  }
+  expect(events(log, 'house.room_tap')).toEqual([]);
+  expect(events(log, 'house.tap_outside')).toEqual([]);
 });

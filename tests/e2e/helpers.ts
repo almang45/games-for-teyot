@@ -79,9 +79,10 @@ export async function tapSky(page: Page, touch: boolean): Promise<void> {
 }
 
 /**
- * Taps (touch) or clicks (mouse) a room's stand. HouseScene logs every stand in game pixels on
- * each `house.layout`, so this works on any viewport and after a resize. The camera logs it again
- * once a zoom settles, so wait for `house.overview` or `house.room_focused` before tapping.
+ * Taps (touch) or clicks (mouse) a room where it shows: its stand, or on a phone the nearest spot
+ * of it on screen. HouseScene logs these in game pixels on each `house.layout`, so this works on
+ * any viewport and after a resize. The camera logs it again once a move settles, so wait for
+ * `house.overview`, `house.framed` or `house.room_focused` before tapping.
  */
 export async function tapRoom(
   page: Page,
@@ -91,13 +92,13 @@ export async function tapRoom(
 ): Promise<void> {
   await expect.poll(() => log.some((e) => e.event === 'house.layout')).toBe(true);
   const latest = log.filter((e) => e.event === 'house.layout').at(-1)?.data as
-    { width: number; height: number; stands: Record<string, [number, number]> } | undefined;
-  const stand = latest?.stands[room];
-  if (!latest || !stand) throw new Error(`house.layout logged no stand for ${room}`);
+    { width: number; height: number; taps: Record<string, [number, number] | null> } | undefined;
+  const at = latest?.taps[room];
+  if (!latest || !at) throw new Error(`${room} is not on screen in the latest house.layout`);
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('Game canvas has no layout box');
-  const x = box.x + (stand[0] * box.width) / latest.width;
-  const y = box.y + (stand[1] * box.height) / latest.height;
+  const x = box.x + (at[0] * box.width) / latest.width;
+  const y = box.y + (at[1] * box.height) / latest.height;
   if (touch) {
     await page.touchscreen.tap(x, y);
   } else {

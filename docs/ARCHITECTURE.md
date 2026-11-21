@@ -207,6 +207,18 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   - **Phone** (the main device): the overview opens zoomed to the current room. Drag to pan with
     inertia. Tapping a room that is partly on screen pans to it, so she never needs to pinch.
     Pinch-out shows the whole house.
+    - A screen counts as a phone when its shorter side is under 600 dp, Android's tablet
+      breakpoint (`src/engine/camera/device.ts`).
+    - The phone's hub view frames a room by its `focus` rect, with every storey shown. A tapped
+      room is framed while she walks there, and the zoom on arrival then only fades the storeys.
+      Leaving goes back to that framing, not to the whole house.
+    - Panning never runs off the house: the view is clamped so the screen stays on the 1920 × 1200
+      frame. A drag must pass the tap slop before it pans, so a tap stays a tap. A throw glides
+      to a stop (time constant 325 ms), and a finger going down stops the glide.
+    - A pinch zooms out no further than the whole house, and in no closer than the tightest room
+      framing. A drag or pinch takes the view over at once, while a fade in progress finishes.
+    - Every room keeps a tap area of at least 72 dp with the whole house shown on the phone.
+      `house.layout` logs the smallest as `minTapDp`, and the E2E checks it on every device.
 
 ## 7. Audio engine
 
