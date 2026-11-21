@@ -15,14 +15,27 @@ import {
   type Point,
   type Rect,
 } from './common.ts';
-import { pointInPolygon, polygonArea, sampleSegment, selfIntersects } from './geometry.ts';
+import {
+  distanceToBoundary,
+  pointInPolygon,
+  polygonArea,
+  samplePolygon,
+  sampleSegment,
+  selfIntersects,
+} from './geometry.ts';
 import { activity, roomId, storey, type Storey } from './rooms.ts';
 
 /** layout.json coordinates: the 1920 × 1200 house export space (ASSETS.md §4.2). */
 export const HOUSE_SIZE = [1920, 1200] as const;
 
-/** Edges are checked against the walkable floor every this many px. */
+/** Edges, walk outlines and floors are checked every this many px. */
 const EDGE_SAMPLE_PX = 8;
+
+/**
+ * A neighbour's tap area may reach this far onto a floor: rooms that share an edge meet on it,
+ * and whole-pixel coordinates put that edge a pixel either way.
+ */
+const SHARED_EDGE_PX = 2;
 
 export const houseRoom = z.strictObject({
   id: roomId,
@@ -41,6 +54,15 @@ export const houseRoom = z.strictObject({
   parking: z.strictObject({ bubu: point, ocica: point }),
 });
 export type HouseRoom = z.infer<typeof houseRoom>;
+
+/**
+ * Paint order of rooms: negative when `a` is drawn before (under) `b`. Higher storeys sit on top,
+ * then the room nearer the viewer. The hub draws with it and taps resolve with it, so a tap always
+ * lands on the room the child sees.
+ */
+export function paintOrder(a: HouseRoom, b: HouseRoom): number {
+  return a.storey - b.storey || a.stand[1] - b.stand[1];
+}
 
 export const houseSpot = z.strictObject({
   room: roomId,
@@ -127,18 +149,67 @@ function checkRoom(room: HouseRoom, i: number): Issue[] {
     ...checkPolygon(room.polygon, `${path}.polygon`),
     ...checkPolygon(room.walk, `${path}.walk`),
   ];
-  if (!pointInPolygon(room.stand, room.walk)) {
+  const outline = room.walk.flatMap((a, j) =>
+    sampleSegment(a, room.walk[(j + 1) % room.walk.length] ?? a, EDGE_SAMPLE_PX),
+  );
+  if (!outline.every((p) => pointInPolygon(p, room.polygon))) {
+    issues.push(error(`${path}.walk`, 'the walk polygon must lie inside the tap polygon'));
+  }
+  const standOnFloor = pointInPolygon(room.stand, room.walk);
+  if (!standOnFloor) {
     issues.push(error(`${path}.stand`, 'stand must lie inside the walk polygon'));
   }
   for (const who of ['bubu', 'ocica'] as const) {
-    if (!pointInPolygon(room.parking[who], room.walk)) {
+    const spot = room.parking[who];
+    if (!pointInPolygon(spot, room.walk)) {
       issues.push(error(`${path}.parking.${who}`, 'parking spot must lie inside the walk polygon'));
+    } else if (
+      // Bubu and Ocica walk straight there from the stand on arrival (#36).
+      standOnFloor &&
+      !sampleSegment(room.stand, spot, EDGE_SAMPLE_PX).every((p) => pointInPolygon(p, room.walk))
+    ) {
+      issues.push(
+        error(`${path}.parking.${who}`, 'the straight walk from the stand leaves the walk polygon'),
+      );
     }
   }
   if (!rectContains(FRAME_RECT, room.focus)) {
     issues.push(error(`${path}.focus`, 'focus rect leaves the canvas'));
   }
   return issues;
+}
+
+/**
+ * The room a tap at `p` reaches among `room`'s storey, by the engine's rule (`roomAt`): the last
+ * in paint order whose tap area holds it, the earlier in `rooms` on a tie. A neighbour counts only
+ * once `p` is past the shared edge.
+ */
+function tapWinner(p: Point, room: HouseRoom, layout: HouseLayout): HouseRoom | undefined {
+  let hit: HouseRoom | undefined;
+  for (const r of layout.rooms) {
+    if (r.storey !== room.storey || !pointInPolygon(p, r.polygon)) continue;
+    if (r !== room && distanceToBoundary(p, r.polygon) <= SHARED_EDGE_PX) continue;
+    if (!hit || paintOrder(r, hit) > 0) hit = r;
+  }
+  return hit;
+}
+
+/**
+ * A tap on a room's floor reaches that room, not a neighbour on its storey whose tap area reaches
+ * over it. Storeys above may cover it: the child sees them on top, and the zoom fades them out.
+ */
+function checkTapOverlap(layout: HouseLayout): Issue[] {
+  return layout.rooms.flatMap((room, i) => {
+    const floor = samplePolygon(room.walk, EDGE_SAMPLE_PX);
+    const lost = new Map<string, number>();
+    for (const p of floor) {
+      const winner = tapWinner(p, room, layout);
+      if (winner && winner !== room) lost.set(winner.id, (lost.get(winner.id) ?? 0) + 1);
+    }
+    return [...lost].map(([id, n]) =>
+      error(`rooms[${i}].walk`, `${n} of ${floor.length} points on this floor tap ${id}`),
+    );
+  });
 }
 
 function onFloor(p: Point, s: Storey, layout: HouseLayout): boolean {
@@ -238,6 +309,7 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
   const hasStart = layout.rooms.some((r) => r.id === layout.start);
   if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
   layout.rooms.forEach((r, i) => issues.push(...checkRoom(r, i)));
+  issues.push(...checkTapOverlap(layout));
   for (const [name, spot] of Object.entries(layout.spots)) {
     const room = layout.rooms.find((r) => r.id === spot.room);
     if (!room) issues.push(error(`spots.${name}.room`, `${spot.room} is not in rooms`));

@@ -1,19 +1,11 @@
 import type { Point } from '../../../contracts/common.ts';
-import type { HouseLayout, HouseRoom } from '../../../contracts/houseLayout.ts';
+import { paintOrder, type HouseLayout, type HouseRoom } from '../../../contracts/houseLayout.ts';
 import { pointInPolygon } from '../../../contracts/geometry.ts';
-
-/**
- * Paint order of rooms: negative when `a` is drawn before (under) `b`. Higher storeys sit on top,
- * then the room nearer the viewer. The hub draws with it and taps resolve with it, so a tap always
- * lands on the room the child sees.
- */
-export function paintOrder(a: HouseRoom, b: HouseRoom): number {
-  return a.storey - b.storey || a.stand[1] - b.stand[1];
-}
 
 /**
  * The room a tap in layout space lands on, or undefined outside every room (PRD US-HOUSE-01).
  * `shown` leaves out rooms the camera has faded away, so a tap reaches the room the child sees.
+ * `checkHouseLayout` applies the same rule to keep each floor's taps on its own room.
  */
 export function roomAt(
   layout: HouseLayout,

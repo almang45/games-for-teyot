@@ -301,7 +301,13 @@ Rules (`npm run validate:assets` checks all of them):
 - Every waypoint lies inside a walkable polygon of its storey, unless it is marked `stair`.
 - An edge within one storey stays on that storey's walkable floor. An edge between storeys joins
   two `stair` waypoints.
-- Every room's `stand` and both `parking` spots lie inside its `walk` polygon.
+- Every room's `stand` and both `parking` spots lie inside its `walk` polygon, and so does the
+  straight line from the `stand` to each `parking` spot: Bubu and Ocica walk it on arrival.
+- Every room's `walk` polygon lies inside its tap `polygon`.
+- A tap on a room's floor reaches that room. Another room on the same storey may meet it on a
+  shared edge, but its tap area must not reach over the floor. Where tap areas overlap, the tap
+  goes to the higher storey, then to the room whose `stand` is nearer the viewer (larger y). A
+  storey above may cover the floor.
 - Polygons have an area, don't cross themselves, and stay on the canvas. So do `focus` and `spots`.
 - Every occluder and prop key is registered in the manifest. Prop keys are unique.
 - A prop stays on the canvas, its footprint is a real polygon inside its `rect`, and its `room`

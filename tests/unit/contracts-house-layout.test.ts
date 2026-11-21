@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { checkHouseLayout, houseLayout, type HouseLayout } from '../../contracts/houseLayout';
 import {
+  distanceToBoundary,
   pointInPolygon,
   polygonArea,
+  samplePolygon,
   sampleSegment,
   selfIntersects,
 } from '../../contracts/geometry';
@@ -45,6 +47,32 @@ describe('geometry', () => {
       [0, 10],
     ];
     expect(selfIntersects(bowtie)).toBe(true);
+  });
+
+  it('measures the distance to the nearest edge from either side', () => {
+    expect(distanceToBoundary([5, 5], square)).toBe(5);
+    expect(distanceToBoundary([2, 5], square)).toBe(2);
+    expect(distanceToBoundary([13, 14], square)).toBe(5);
+  });
+
+  it('samples a polygon on a grid from its top-left corner, boundary included', () => {
+    expect(samplePolygon(square, 5)).toEqual([
+      [0, 0],
+      [5, 0],
+      [10, 0],
+      [0, 5],
+      [5, 5],
+      [10, 5],
+      [0, 10],
+      [5, 10],
+      [10, 10],
+    ]);
+    const triangle: [number, number][] = [
+      [0, 0],
+      [10, 0],
+      [0, 10],
+    ];
+    expect(samplePolygon(triangle, 5)).not.toContainEqual([10, 10]);
   });
 
   it('samples a segment with both endpoints, and a zero-length one once each end', () => {
@@ -178,6 +206,80 @@ describe('house layout', () => {
       'edges[1]: pintu-dapur → ruang-keluarga leaves the walkable floor',
       'edges[2]: ruang-keluarga → tangga-bawah leaves the walkable floor',
     ]);
+  });
+
+  it('keeps the straight walk from the stand to each parking spot on the floor (#36)', () => {
+    const l = houseFixture();
+    const room = l.rooms[0];
+    if (!room) throw new Error('fixture has rooms');
+    // A counter cut into the floor between the stand (1350) and Ocica's spot (1450).
+    room.walk = [
+      [1100, 820],
+      [1380, 820],
+      [1380, 940],
+      [1420, 940],
+      [1420, 820],
+      [1600, 820],
+      [1600, 980],
+      [1100, 980],
+    ];
+    expect(messages(l)).toEqual([
+      'rooms[0].parking.ocica: the straight walk from the stand leaves the walk polygon',
+      // The stair edge runs over the counter as well.
+      'edges[2]: ruang-keluarga → tangga-bawah leaves the walkable floor',
+    ]);
+  });
+
+  it('keeps the walk polygon inside the tap polygon', () => {
+    const l = houseFixture();
+    const room = l.rooms[0];
+    if (!room) throw new Error('fixture has rooms');
+    room.polygon = [
+      [1100, 780],
+      [1550, 780],
+      [1550, 1020],
+      [1100, 1020],
+    ];
+    expect(messages(l)).toEqual([
+      'rooms[0].walk: the walk polygon must lie inside the tap polygon',
+    ]);
+  });
+
+  it('keeps taps on a floor from landing on a neighbour on the same storey', () => {
+    const l = houseFixture();
+    const [living, kitchen, bedroom] = l.rooms;
+    if (!living || !kitchen || !bedroom) throw new Error('fixture has three rooms');
+    // Rooms that only meet on a shared edge are fine: dapur's floor ends on ruang-keluarga's.
+    expect(messages(l)).toEqual([]);
+
+    // ruang-keluarga's tap area reaching 200 px over dapur's floor takes those taps: on the
+    // tie in paint order, the earlier room in `rooms` wins, as in the engine's roomAt.
+    living.polygon = [
+      [900, 780],
+      [1650, 780],
+      [1650, 1020],
+      [900, 1020],
+    ];
+    const [overlap, ...rest] = messages(l);
+    expect(rest).toEqual([]);
+    expect(overlap).toMatch(
+      /^rooms\[1\]\.walk: \d+ of \d+ points on this floor tap ruang-keluarga$/,
+    );
+
+    // A storey above may cover it: the child sees that storey on top, and the zoom fades it out.
+    living.polygon = [
+      [1100, 780],
+      [1650, 780],
+      [1650, 1020],
+      [1100, 1020],
+    ];
+    bedroom.polygon = [
+      [400, 280],
+      [1650, 280],
+      [1650, 1000],
+      [400, 1000],
+    ];
+    expect(messages(l)).toEqual([]);
   });
 
   it('checks spots point at real rooms and stay on the canvas', () => {

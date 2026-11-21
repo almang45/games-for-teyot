@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../contracts/common';
-import { checkHouseLayout, houseLayout, type HouseLayout } from '../../contracts/houseLayout';
+import {
+  checkHouseLayout,
+  houseLayout,
+  paintOrder,
+  type HouseLayout,
+} from '../../contracts/houseLayout';
 import {
   buildNavGraph,
   lerp,
@@ -11,7 +16,7 @@ import {
   type NavGraph,
   type NavNode,
 } from '../../src/engine/nav/graph';
-import { paintOrder, roomAt } from '../../src/engine/nav/hit';
+import { roomAt } from '../../src/engine/nav/hit';
 import { facingAlong, NavWalker, type Facing } from '../../src/engine/nav/walker';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 

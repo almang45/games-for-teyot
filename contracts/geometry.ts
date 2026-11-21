@@ -15,6 +15,11 @@ function distanceToSegment([px, py]: Point, [ax, ay]: Point, [bx, by]: Point): n
 const edges = (poly: Polygon): [Point, Point][] =>
   poly.map((p, i) => [p, poly[(i + 1) % poly.length] ?? p]);
 
+/** Distance from `p` to the nearest edge, whether `p` is inside or out. */
+export function distanceToBoundary(p: Point, poly: Polygon): number {
+  return Math.min(...edges(poly).map(([a, b]) => distanceToSegment(p, a, b)));
+}
+
 /** Inside or on the boundary (even-odd rule). */
 export function pointInPolygon(p: Point, poly: Polygon): boolean {
   const pairs = edges(poly);
@@ -57,6 +62,21 @@ function segmentsCross(a: Point, b: Point, c: Point, d: Point): boolean {
   const o3 = orientation(c, d, a);
   const o4 = orientation(c, d, b);
   return o1 !== o2 && o3 !== o4 && o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0;
+}
+
+/** The points of a `step` px grid, aligned to the polygon's top-left corner, that lie in it. */
+export function samplePolygon(poly: Polygon, step: number): Point[] {
+  const xs = poly.map(([x]) => x);
+  const ys = poly.map(([, y]) => y);
+  const [left, right] = [Math.min(...xs), Math.max(...xs)];
+  const [top, bottom] = [Math.min(...ys), Math.max(...ys)];
+  const samples: Point[] = [];
+  for (let y = top; y <= bottom; y += step) {
+    for (let x = left; x <= right; x += step) {
+      if (pointInPolygon([x, y], poly)) samples.push([x, y]);
+    }
+  }
+  return samples;
 }
 
 /** Samples a segment every `step` px, endpoints included. */
