@@ -358,6 +358,8 @@ const onScreen = (latest: HouseLayoutLog, [x, y]: Point): boolean =>
  * Real multi-touch through the Chromium DevTools protocol, which Playwright's touchscreen lacks:
  * each finger moves from its `from` to its `to` in game px, over `steps` moves. The events are
  * queued together, as a round trip per move can take longer than a flick on a loaded machine.
+ * `tapAfter` lands and lifts one more finger there in the same queue, before any frame can end a
+ * glide the gesture threw.
  */
 async function touchGesture(
   page: Page,
@@ -365,6 +367,7 @@ async function touchGesture(
   latest: HouseLayoutLog,
   fingers: readonly { from: Point; to: Point }[],
   steps = 6,
+  tapAfter?: Point,
 ): Promise<void> {
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('Game canvas has no layout box');
@@ -383,6 +386,13 @@ async function touchGesture(
     );
   }
   sent.push(cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }));
+  if (tapAfter) {
+    const touchPoints = [{ x: box.x + tapAfter[0] * k, y: box.y + tapAfter[1] * k, id: 0 }];
+    sent.push(
+      cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints }),
+      cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }),
+    );
+  }
   await Promise.all(sent);
 }
 
@@ -486,6 +496,39 @@ test('US-HOUSE-05 on the phone a drag pans the house with inertia, and a room dr
   expect(panned.taps['kamar-tidur']).not.toBeNull();
   await tapRoom(page, hasTouch, log, 'kamar-tidur');
   await expect.poll(() => events(log, 'house.walk').at(0)?.data.room).toBe('kamar-tidur');
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+test('US-HOUSE-05 on the phone a touch that catches a glide stops the house, and is not a tap', async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!onPhone(page), 'Drag to pan is the phone hub');
+  test.slow();
+  const log = await openHouse(page, hasTouch);
+  await expect.poll(() => lastLayout(log)).toBeDefined();
+  const opening = lastLayout(log);
+  if (!opening) throw new Error('No house.layout');
+  const cdp = await page.context().newCDPSession(page);
+  const x = opening.width / 2;
+  const still: Point = [x, opening.height / 2];
+  // A flick down, and a finger that lands on the gliding house and lifts without moving.
+  await touchGesture(
+    page,
+    cdp,
+    opening,
+    [{ from: [x, opening.height * 0.4], to: [x, opening.height * 0.6] }],
+    6,
+    still,
+  );
+  const stopped = await pannedAfter(log, 0);
+  // Long enough for the house to move on, or for a second log of the same stop.
+  await page.waitForTimeout(400);
+  expect(events(log, 'house.panned')).toHaveLength(1);
+  expect(lastLayout(log)?.view).toEqual(stopped.view);
+  expect(events(log, 'house.room_tap')).toEqual([]);
+  expect(events(log, 'house.tap_outside')).toEqual([]);
+  expect(events(log, 'house.walk')).toEqual([]);
   expect(log.filter((e) => e.level === 'error')).toEqual([]);
 });
 

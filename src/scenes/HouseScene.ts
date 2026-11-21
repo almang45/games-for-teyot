@@ -243,7 +243,11 @@ export class HouseScene extends Phaser.Scene {
   private onFingerDown(p: Phaser.Input.Pointer): void {
     if (!this.phone || p.button !== 0) return;
     // A touch that catches a glide only stops the house: letting go is not a tap.
-    if (this.fingers.size === 0) this.gestured = this.camera.gliding;
+    if (this.fingers.size === 0) {
+      this.gestured = this.camera.gliding;
+      // Its release logs where the house stopped, so the glide's own end must not log it too.
+      this.wasGliding = false;
+    }
     this.fingers.set(p.id, [p.x, p.y]);
     this.camera.hold(p.downTime);
   }
