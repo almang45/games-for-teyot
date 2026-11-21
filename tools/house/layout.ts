@@ -6,7 +6,7 @@ import {
   type HouseRoom,
 } from '../../contracts/houseLayout.ts';
 import { boundsOf, focusRect } from '../../src/engine/camera/focus.ts';
-import { convexHull, project, type Fit, type Vec3 } from './iso.ts';
+import { project, type Fit, type Vec3 } from './iso.ts';
 import {
   ffl,
   floorZ,
@@ -35,15 +35,38 @@ const toLayout = (p: Vec3, fit: Fit): Point => {
 
 const at = (p: PlanPoint, z: number): Vec3 => ({ x: p[0], y: p[1], z });
 
-/** Floor plus the tops of its back walls: what a tap on the room should hit. */
+/**
+ * Floor plus the faces of its back walls: what a tap on the room should hit. It walks the outline
+ * front → left → back → right, so a room with a single back wall keeps the notch beside it: a hull
+ * would close that notch over the next room's floor.
+ */
 function tapPolygon(plan: FloorPlan, a: PlanArea, fit: Fit): Point[] {
   const z = floorZ(a);
   const [x, y, w, d] = a.rect;
   const top = z + wallHeightOf(plan, a);
-  const corners: Vec3[] = [...quadZ(z, a.rect)];
-  if (a.walls.includes('x0')) corners.push({ x, y, z: top }, { x, y: y + d, z: top });
-  if (a.walls.includes('y0')) corners.push({ x, y, z: top }, { x: x + w, y, z: top });
-  return convexHull(corners.map((p) => toLayout(p, fit)));
+  const left = a.walls.includes('x0');
+  const back = a.walls.includes('y0');
+  const floorBack: Vec3 = { x, y, z };
+  const topBack: Vec3 = { x, y, z: top };
+  let corner = [floorBack];
+  if (left && back) corner = [topBack];
+  else if (left) corner = [topBack, floorBack];
+  else if (back) corner = [floorBack, topBack];
+  const outline: Vec3[] = [
+    { x: x + w, y: y + d, z },
+    { x, y: y + d, z },
+    ...(left ? [{ x, y: y + d, z: top }] : []),
+    ...corner,
+    ...(back ? [{ x: x + w, y, z: top }] : []),
+    { x: x + w, y, z },
+  ];
+  // Whole-pixel rounding can land two corners on one point; a repeated vertex is not an edge.
+  return outline
+    .map((p) => toLayout(p, fit))
+    .filter((p, i, all) => {
+      const prev = all[(i + all.length - 1) % all.length];
+      return prev?.[0] !== p[0] || prev[1] !== p[1];
+    });
 }
 
 function spotFace(spot: PlanSpot, a: PlanArea): Vec3[] {
