@@ -144,7 +144,7 @@ All distances are relative to glyph height `H`.
 | Start | Distance from first touch to stroke start | ≤ 0.15 H |
 | Coverage | Fraction of path samples within corridor `w` of any user point | ≥ 0.70 |
 | Off-path | Fraction of user points farther than `w` from the path | ≤ 0.35 |
-| Direction | Projected arc-length progress is mostly monotonic (backtrack ≤ 0.1 of length) | Enforced from T2 on. Matters most for the c family (c o a d g q all start counterclockwise). |
+| Direction | Projected arc-length progress is mostly monotonic: its largest drop (backtrack) is ≤ 0.1 of length. Progress is tracked locally, so a closed or self-crossing stroke (o, 8) doesn't jump. | Enforced from T2 on. Matters most for the c family (c o a d g q all start counterclockwise). |
 | Corridor `w` | Tolerance band | 0.12 H (adaptive range 0.08–0.18) |
 
 When a stroke passes, the drawn line **morphs onto the ideal path** and sparkles. A failed stroke
@@ -155,6 +155,7 @@ fades out, and the guide replays the demo for that stroke only.
 For each level, keep a rolling window of the last 10 stroke results:
 - Success rate above 85% → tighten `w` by 0.01.
 - Success rate below 50% → loosen `w` by 0.01.
+- After a change the window starts over, so each step is judged on 10 strokes at the new width.
 - `w` stays within the range above, and the parent setting can override it.
 
 Tolerance changes are logged so the dashboard can show the trend.
@@ -165,6 +166,8 @@ Tolerance changes are logged so the dashboard can show the trend.
   sloppy, reversed, and scribble.
 - Each fixture is labelled with the expected verdict. The scorer must reproduce the verdicts, which
   guards against regressions when thresholds are tuned.
+- Until real attempts are recorded, `tools/strokes/synthesize.ts` writes synthetic ones
+  (`"source": "synthetic"`), labelled by how they were built rather than by the scorer.
 
 ## 5. Scheduler (spaced repetition)
 

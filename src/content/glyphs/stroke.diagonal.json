@@ -1,0 +1,9 @@
+{
+  "id": "stroke.diagonal",
+  "metrics": "stroke",
+  "strokes": [
+    {
+      "path": "M 0.1 0 L 0.9 1"
+    }
+  ]
+}
