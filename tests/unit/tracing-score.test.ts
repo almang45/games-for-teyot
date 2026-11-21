@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { fixturesFor, serialize, TARGETS } from '../../tools/strokes/fixtures';
 import { TRACING } from '../../src/content/tracing';
 import { directionEnforced, digitsUnlocked } from '../../src/engine/tracing/curriculum';
 import { CORRIDOR_RANGE } from '../../src/engine/tracing/follow';
@@ -149,6 +150,22 @@ describe('recorded attempts keep their verdicts (ARCHITECTURE.md §4.5)', () => 
       files.map((f) => (JSON.parse(readFileSync(join(FIXTURES, f), 'utf8')) as StrokeFixture).kind),
     );
     expect([...kinds].sort()).toEqual(['good', 'reversed', 'scribble', 'sloppy']);
+  });
+
+  it('matches what tools/strokes/synthesize.ts writes, so the synthetic ones never drift', () => {
+    const synthetic = files.filter((f) =>
+      readFileSync(join(FIXTURES, f), 'utf8').includes('"source":"synthetic"'),
+    );
+    const built = new Map<string, string>();
+    for (const { glyph, stroke } of TARGETS) {
+      const path = glyphs.get(glyph)?.strokes[stroke];
+      if (!path) throw new Error(`${glyph} has no stroke ${stroke}`);
+      for (const [name, fixture] of fixturesFor(glyph, stroke, path))
+        built.set(name, serialize(fixture));
+    }
+    expect(synthetic.sort()).toEqual([...built.keys()].sort());
+    for (const [name, text] of built)
+      expect(readFileSync(join(FIXTURES, name), 'utf8'), name).toBe(text);
   });
 
   it.each(files)('%s', (file) => {
