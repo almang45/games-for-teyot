@@ -19,6 +19,7 @@ import {
 
 const rec = (box: Box, lastSeenSession: number, extra: Partial<ItemRecord> = {}): ItemRecord => ({
   box,
+  waitFromSession: lastSeenSession,
   lastSeenSession,
   attempts: 1,
   successes: 1,
@@ -46,11 +47,25 @@ describe('Leitner boxes in sessions (ARCHITECTURE.md §5)', () => {
 
   it('enters a new item in box 1, and a first success promotes it', () => {
     expect(applyOutcome(undefined, 'miss', 0)).toEqual({
-      record: { box: 1, lastSeenSession: 0, attempts: 1, successes: 0, sessionMisses: 1 },
+      record: {
+        box: 1,
+        waitFromSession: 0,
+        lastSeenSession: 0,
+        attempts: 1,
+        successes: 0,
+        sessionMisses: 1,
+      },
       change: undefined,
     });
     expect(applyOutcome(undefined, 'success', 0)).toEqual({
-      record: { box: 2, lastSeenSession: 0, attempts: 1, successes: 1, sessionMisses: 0 },
+      record: {
+        box: 2,
+        waitFromSession: 0,
+        lastSeenSession: 0,
+        attempts: 1,
+        successes: 1,
+        sessionMisses: 0,
+      },
       change: { from: 1, to: 2 },
     });
   });
@@ -64,12 +79,18 @@ describe('Leitner boxes in sessions (ARCHITECTURE.md §5)', () => {
       [30, 'success'],
     ]);
     expect(r).toMatchObject({ box: 5, attempts: 5, successes: 5, lastSeenSession: 30 });
+    // Box 5 stays box 5, but a passed review still waits 16 sessions for the next one.
+    const again = applyOutcome(r, 'success', 46).record;
+    expect(again).toMatchObject({ box: 5, waitFromSession: 46 });
+    expect(again && isDue(again, 47)).toBe(false);
   });
 
   it('does not promote a success that was not due: easy wins and second goes', () => {
     const { record, change } = applyOutcome(rec(3, 10), 'success', 11);
     expect(change).toBeUndefined();
     expect(record).toMatchObject({ box: 3, attempts: 2, successes: 2, lastSeenSession: 11 });
+    // The easy win doesn't push the review away: still due 4 sessions after box 3 began.
+    expect(record && isDue(record, 14)).toBe(true);
     // A new item done twice in its first session climbs once.
     expect(
       play([
@@ -96,6 +117,31 @@ describe('Leitner boxes in sessions (ARCHITECTURE.md §5)', () => {
         [0, 'miss'],
       ]),
     ).toMatchObject({ box: 1 });
+  });
+
+  it('keeps a missed due item due, so a retry or the next session can still review it', () => {
+    const r = rec(4, 0); // due at 8
+    const missed = applyOutcome(r, 'miss', 8).record;
+    expect(missed).toMatchObject({ box: 4, waitFromSession: 0, lastSeenSession: 8 });
+    // Left after one miss: due again next session, not 8 sessions later, and never an easy win.
+    expect(missed && isDue(missed, 9)).toBe(true);
+    expect(pickRound(['vertical'], new Map(missed ? [['vertical', missed]] : []), 9)).toEqual([
+      { id: 'vertical', slot: 'due' },
+    ]);
+    // A retry in the same session promotes, and that starts box 5's wait.
+    const retry = applyOutcome(missed, 'success', 8);
+    expect(retry.change).toEqual({ from: 4, to: 5 });
+    expect(retry.record).toMatchObject({ box: 5, waitFromSession: 8 });
+  });
+
+  it('restarts the wait when a demotion changes the box', () => {
+    const r = play([
+      [0, 'success'],
+      [5, 'miss'],
+      [5, 'miss'],
+      [5, 'miss'],
+    ]);
+    expect(r).toMatchObject({ box: 1, waitFromSession: 5, lastSeenSession: 5 });
   });
 
   it('counts misses per session, so misses spread over sessions never demote', () => {
@@ -211,6 +257,10 @@ describe('a round of 3 (US-TRACE-04, ARCHITECTURE.md §5)', () => {
     expect(() => pickRound(T0, new Map(), 0, 0)).toThrow(/≥ 1 item/);
     expect(() => pickRound(['vertical', 'vertical'], new Map(), 0)).toThrow(/twice/);
     expect(pickRound(T0, new Map(), 0, 1)).toEqual([{ id: 'vertical', slot: 'new' }]);
+    // One slot and one due item: the due item has it, with no new item squeezed in too.
+    expect(pickRound(T0, records({ circle: rec(1, 0) }), 10, 1)).toEqual([
+      { id: 'circle', slot: 'due' },
+    ]);
   });
 });
 

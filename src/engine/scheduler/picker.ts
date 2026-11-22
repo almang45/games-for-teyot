@@ -83,7 +83,8 @@ export function pickRound(
   };
 
   const maxDue = size === 1 ? 1 : Math.floor(size * DUE_SHARE);
-  const head = [...take(due, 'due', maxDue), ...take(fresh, 'new', 1)];
+  const dueTaken = take(due, 'due', maxDue);
+  const head = [...dueTaken, ...take(fresh, 'new', Math.min(1, size - dueTaken.length))];
   // The easy win is kept for last, but only if there is room once the head is in.
   const easyWin = head.length < size ? take(easy, 'easy', 1) : [];
   const room = size - head.length - easyWin.length;

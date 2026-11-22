@@ -17,6 +17,11 @@ export const MISSES_TO_DEMOTE = 3;
 /** What is stored per learnable item (`stroke.circle`, `digit.4`, `count.5`). */
 export interface ItemRecord {
   readonly box: Box;
+  /**
+   * Session the current box's wait counts from: its last passed review or demotion. Attempts that change nothing (an easy win, a miss short of demotion) leave it, so
+   * they never push a review further away.
+   */
+  readonly waitFromSession: number;
   /** Session number of the last scored attempt. */
   readonly lastSeenSession: number;
   readonly attempts: number;
@@ -37,12 +42,12 @@ export interface BoxChange {
 }
 
 export function isDue(record: ItemRecord, session: number): boolean {
-  return session - record.lastSeenSession >= BOX_INTERVALS[record.box];
+  return session - record.waitFromSession >= BOX_INTERVALS[record.box];
 }
 
 /** Sessions past due: 0 when due right now, negative when not due yet. */
 export function overdue(record: ItemRecord, session: number): number {
-  return session - record.lastSeenSession - BOX_INTERVALS[record.box];
+  return session - record.waitFromSession - BOX_INTERVALS[record.box];
 }
 
 export function isMastered(record: ItemRecord | undefined): boolean {
@@ -52,8 +57,10 @@ export function isMastered(record: ItemRecord | undefined): boolean {
 /**
  * Applies one attempt. A new item enters box 1. A success promotes one box, but only when the
  * item was new or due: an easy win on a mastered item, or a second go in the same session, must
- * not climb the boxes without the wait that makes them mean something. The third miss in a
- * session demotes one box, once per session, and never below box 1.
+ * not climb the boxes without the wait that makes them mean something. A due item that is missed
+ * stays due, so a retry in the same session can still promote it and, if the session ends first,
+ * it comes back next time. The third miss in a session demotes one box, once per session, and
+ * never below box 1. Only a passed review or a demotion restarts the wait.
  */
 export function applyOutcome(
   record: ItemRecord | undefined,
@@ -72,23 +79,27 @@ export function applyOutcome(
 
   const base: ItemRecord = record ?? {
     box: 1,
+    waitFromSession: session,
     lastSeenSession: session,
     attempts: 0,
     successes: 0,
     sessionMisses: 0,
   };
   const reviewable = record === undefined || isDue(record, session);
+  const passedReview = outcome === 'success' && reviewable;
   const misses = record?.lastSeenSession === session ? base.sessionMisses : 0;
   let box = base.box;
   let sessionMisses = misses;
   if (outcome === 'success') {
-    if (reviewable) box = promote(box);
+    if (passedReview) box = promote(box);
   } else {
     sessionMisses = misses + 1;
     if (sessionMisses === MISSES_TO_DEMOTE) box = demote(box);
   }
   const next: ItemRecord = {
     box,
+    // Box 5 can't climb, so its reviewed success restarts the wait without a box change.
+    waitFromSession: passedReview || box !== base.box ? session : base.waitFromSession,
     lastSeenSession: session,
     attempts: base.attempts + 1,
     successes: base.successes + (outcome === 'success' ? 1 : 0),
