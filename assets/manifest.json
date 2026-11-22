@@ -183,6 +183,18 @@
       "type": "image",
       "path": "tracing/themes/wave.png",
       "room": "kamar-tidur"
+    },
+    {
+      "key": "font.andika-regular",
+      "type": "font",
+      "path": "fonts/andika-regular.woff2",
+      "room": "global"
+    },
+    {
+      "key": "font.andika-bold",
+      "type": "font",
+      "path": "fonts/andika-bold.woff2",
+      "room": "global"
     }
   ]
 }
