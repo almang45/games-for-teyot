@@ -107,6 +107,32 @@
         "comfort.fr": { "frames": [24, 29], "fps": 10, "loop": false }
       },
       "room": "global"
+    },
+    {
+      "key": "parent.mama.portrait",
+      "type": "spritesheet",
+      "path": "parent/mama/portrait.png",
+      "frame": [384, 384],
+      "animations": {
+        "idle": { "frames": [0, 3], "fps": 6, "loop": true },
+        "talk": { "frames": [4, 6], "fps": 8, "loop": false },
+        "smile": { "frames": [7, 8], "fps": 6, "loop": false },
+        "encourage": { "frames": [9, 12], "fps": 8, "loop": false }
+      },
+      "room": "global"
+    },
+    {
+      "key": "parent.papa.portrait",
+      "type": "spritesheet",
+      "path": "parent/papa/portrait.png",
+      "frame": [384, 384],
+      "animations": {
+        "idle": { "frames": [0, 3], "fps": 6, "loop": true },
+        "talk": { "frames": [4, 6], "fps": 8, "loop": false },
+        "smile": { "frames": [7, 8], "fps": 6, "loop": false },
+        "encourage": { "frames": [9, 12], "fps": 8, "loop": false }
+      },
+      "room": "global"
     }
   ]
 }
