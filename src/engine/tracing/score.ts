@@ -117,6 +117,8 @@ const TRACK_WINDOW = 0.25;
  * The largest drop in progress along the path, counting only points near it. Progress is tracked
  * locally from point to point, so a stroke that crosses itself (8) or turns sharply (zigzag)
  * doesn't jump between its parts. A drop, not total backward travel, so jitter doesn't add up.
+ * After an excursion off the path the finger may come back beyond the window, so the tracker
+ * picks the path up again wherever the finger rejoins it.
  */
 function backwardTravel(path: Polyline, user: readonly Point[], w: number): number {
   const first = user[0];
@@ -128,7 +130,8 @@ function backwardTravel(path: Polyline, user: readonly Point[], w: number): numb
   let best = progress;
   let drop = 0;
   for (const p of user.slice(1)) {
-    const next = track(path, p, here, closed);
+    const near = track(path, p, here, closed);
+    const next = near.distance <= w ? near : relock(path, p, here, closed);
     if (next.distance > w) continue;
     progress += next.delta;
     here = next.s;
@@ -136,6 +139,22 @@ function backwardTravel(path: Polyline, user: readonly Point[], w: number): numb
     drop = Math.max(drop, best - progress);
   }
   return drop;
+}
+
+/**
+ * The nearest point on the whole path, for when the window lost it. On a closed stroke the
+ * progress goes the short way round the seam, so a backwards circle still counts as backwards.
+ */
+function relock(
+  path: Polyline,
+  p: Point,
+  here: number,
+  closed: boolean,
+): { s: number; delta: number; distance: number } {
+  const { s, distance } = project(path, p, 0, path.length);
+  let delta = s - here;
+  if (closed && Math.abs(delta) > path.length / 2) delta -= Math.sign(delta) * path.length;
+  return { s, delta, distance };
 }
 
 /** The nearest point within the window around `here`, wrapping round a closed stroke. */

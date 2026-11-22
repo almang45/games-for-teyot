@@ -127,6 +127,24 @@ describe('scoring a stroke (US-TRACE-03, ARCHITECTURE.md §4.3)', () => {
       const drawn = Array.from({ length: 120 }, (_, i) => pointAt(ring, (ring.length * i) / 119));
       expect(scoreStroke(ring, drawn, strict), id).toMatchObject({ passed: true, backtrack: 0 });
     }
+    // A bulge off the path, back on it further down, to the end and back up: the tracker picks
+    // the path up again where the finger rejoins it, so the way back still counts.
+    const bulge = [
+      ...along('M 0.5 0 L 0.65 0.05 L 0.65 0.4 L 0.5 0.45', 20),
+      ...along('M 0.5 0.45 L 0.5 1', 20),
+      ...along('M 0.5 1 L 0.5 0.45', 20),
+    ];
+    expect(scoreStroke(path, bulge, strict).failed).toEqual(['direction']);
+    // The same on a closed stroke: a bulge, then round the circle the wrong way.
+    const circle = glyphs.get('stroke.circle')?.strokes[0];
+    if (!circle) throw new Error('stroke.circle has no stroke');
+    const start = pointAt(circle, 0);
+    const wrongWay = Array.from({ length: 80 }, (_, i) =>
+      pointAt(circle, circle.length * (1 - (0.15 + (0.85 * i) / 79))),
+    );
+    const outward = { x: start.x + 0.2, y: start.y + 0.05 };
+    const backwards = scoreStroke(circle, [start, outward, ...wrongWay], strict);
+    expect(backwards.failed).toEqual(['direction']);
     expect(directionEnforced('T0')).toBe(false);
     expect(directionEnforced('T1')).toBe(false);
     expect(directionEnforced('T2')).toBe(true);
@@ -228,6 +246,7 @@ describe('tolerance adapts (US-TRACE-06, ARCHITECTURE.md §4.4)', () => {
     expect(effectiveCorridor(t.corridor, undefined)).toBe(0.15);
     expect(effectiveCorridor(t.corridor, 0.1)).toBe(0.1);
     expect(effectiveCorridor(t.corridor, 0.4)).toBe(CORRIDOR_RANGE.max);
+    expect(() => effectiveCorridor(t.corridor, Number.NaN)).toThrow(/not a number/);
   });
 
   it('never lets the corridor get thinner on screen than the floor', () => {
@@ -235,6 +254,7 @@ describe('tolerance adapts (US-TRACE-06, ARCHITECTURE.md §4.4)', () => {
     expect(withScreenFloor(0.08, 300, 36)).toBeCloseTo(0.12, 9);
     expect(withScreenFloor(0.12, 800, 36)).toBe(0.12);
     expect(() => withScreenFloor(0.12, 0, 36)).toThrow(/positive/);
+    expect(() => withScreenFloor(0.12, 300, Number.NaN)).toThrow(/≥ 0/);
   });
 });
 

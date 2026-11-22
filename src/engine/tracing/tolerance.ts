@@ -73,7 +73,12 @@ export class AdaptiveTolerance {
 
 /** A parent's setting replaces the adaptive value (US-TRACE-06), inside the same range. */
 export function effectiveCorridor(adaptive: number, parentOverride: number | undefined): number {
-  return parentOverride === undefined ? adaptive : clamp(parentOverride);
+  if (parentOverride === undefined) return adaptive;
+  // A corrupt stored setting must fail loudly: a NaN corridor would fail every stroke silently.
+  if (!Number.isFinite(parentOverride)) {
+    throw new Error(`parent corridor ${parentOverride} is not a number`);
+  }
+  return clamp(parentOverride);
 }
 
 /**
@@ -82,6 +87,7 @@ export function effectiveCorridor(adaptive: number, parentOverride: number | und
  */
 export function withScreenFloor(corridor: number, glyphHeightPx: number, floorPx: number): number {
   if (!(glyphHeightPx > 0)) throw new Error(`glyph height ${glyphHeightPx} px must be positive`);
+  if (!(floorPx >= 0)) throw new Error(`corridor floor ${floorPx} px must be ≥ 0`);
   return Math.max(corridor, floorPx / glyphHeightPx);
 }
 
