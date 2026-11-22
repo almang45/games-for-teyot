@@ -1,0 +1,125 @@
+{
+  "$schema": "../../contracts/schema/screenLayout.schema.json",
+  "version": 1,
+  "screen": "SCR-TRACE",
+  "devices": {
+    "tablet": [
+      {
+        "key": "surface",
+        "bounds": [0, 0, 1920, 1200],
+        "depth": 0,
+        "asset": "tracing.surface"
+      },
+      {
+        "key": "theme-decor",
+        "bounds": [0, 0, 1920, 1200],
+        "depth": 10
+      },
+      {
+        "key": "trace-area",
+        "bounds": [540, 180, 840, 840],
+        "anchor": [0.5, 0.5],
+        "depth": 20,
+        "interactive": "primary"
+      },
+      {
+        "key": "bubu-demo",
+        "bounds": [280, 520, 224, 186],
+        "anchor": [0.5, 0.94],
+        "depth": 40
+      },
+      {
+        "key": "ocica-side",
+        "bounds": [1460, 740, 240, 200],
+        "anchor": [0.5, 0.94],
+        "depth": 40
+      },
+      {
+        "key": "progress-dots",
+        "bounds": [810, 68, 300, 68],
+        "anchor": [0.5, 0.5],
+        "depth": 100
+      },
+      {
+        "key": "hud-speaker",
+        "bounds": [96, 72, 136, 136],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "secondary"
+      },
+      {
+        "key": "hud-home",
+        "bounds": [96, 972, 140, 140],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "primary"
+      },
+      {
+        "key": "parent-gate",
+        "bounds": [1712, 72, 112, 112],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "secondary"
+      }
+    ],
+    "phone": [
+      {
+        "key": "surface",
+        "bounds": [0, 0, 1920, 1200],
+        "depth": 0,
+        "asset": "tracing.surface"
+      },
+      {
+        "key": "theme-decor",
+        "bounds": [0, 0, 1920, 1200],
+        "depth": 10
+      },
+      {
+        "key": "trace-area",
+        "bounds": [510, 150, 900, 900],
+        "anchor": [0.5, 0.5],
+        "depth": 20,
+        "interactive": "primary"
+      },
+      {
+        "key": "bubu-demo",
+        "bounds": [230, 500, 240, 200],
+        "anchor": [0.5, 0.94],
+        "depth": 40
+      },
+      {
+        "key": "ocica-side",
+        "bounds": [1480, 740, 260, 216],
+        "anchor": [0.5, 0.94],
+        "depth": 40
+      },
+      {
+        "key": "progress-dots",
+        "bounds": [800, 60, 320, 72],
+        "anchor": [0.5, 0.5],
+        "depth": 100
+      },
+      {
+        "key": "hud-speaker",
+        "bounds": [100, 76, 216, 216],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "secondary"
+      },
+      {
+        "key": "hud-home",
+        "bounds": [100, 844, 280, 280],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "primary"
+      },
+      {
+        "key": "parent-gate",
+        "bounds": [1616, 76, 216, 216],
+        "anchor": [0.5, 0.5],
+        "depth": 100,
+        "interactive": "secondary"
+      }
+    ]
+  }
+}
