@@ -24,13 +24,13 @@
       },
       {
         "key": "bubu-demo",
-        "bounds": [280, 520, 224, 186],
+        "bounds": [128, 490, 224, 186],
         "anchor": [0.5, 0.94],
         "depth": 40
       },
       {
         "key": "ocica-side",
-        "bounds": [1460, 740, 240, 200],
+        "bounds": [1568, 760, 240, 200],
         "anchor": [0.5, 0.94],
         "depth": 40
       },
@@ -42,14 +42,14 @@
       },
       {
         "key": "hud-speaker",
-        "bounds": [96, 72, 136, 136],
+        "bounds": [96, 72, 148, 148],
         "anchor": [0.5, 0.5],
         "depth": 100,
         "interactive": "secondary"
       },
       {
         "key": "hud-home",
-        "bounds": [96, 972, 140, 140],
+        "bounds": [96, 972, 148, 148],
         "anchor": [0.5, 0.5],
         "depth": 100,
         "interactive": "primary"
@@ -83,13 +83,13 @@
       },
       {
         "key": "bubu-demo",
-        "bounds": [230, 500, 240, 200],
+        "bounds": [108, 460, 240, 200],
         "anchor": [0.5, 0.94],
         "depth": 40
       },
       {
         "key": "ocica-side",
-        "bounds": [1480, 740, 260, 216],
+        "bounds": [1564, 760, 260, 216],
         "anchor": [0.5, 0.94],
         "depth": 40
       },
@@ -101,21 +101,21 @@
       },
       {
         "key": "hud-speaker",
-        "bounds": [100, 76, 216, 216],
+        "bounds": [88, 72, 216, 216],
         "anchor": [0.5, 0.5],
         "depth": 100,
         "interactive": "secondary"
       },
       {
         "key": "hud-home",
-        "bounds": [100, 844, 280, 280],
+        "bounds": [88, 844, 280, 280],
         "anchor": [0.5, 0.5],
         "depth": 100,
         "interactive": "primary"
       },
       {
         "key": "parent-gate",
-        "bounds": [1616, 76, 216, 216],
+        "bounds": [1612, 72, 216, 216],
         "anchor": [0.5, 0.5],
         "depth": 100,
         "interactive": "secondary"
