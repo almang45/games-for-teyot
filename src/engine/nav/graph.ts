@@ -1,5 +1,5 @@
 import type { Point } from '../../../contracts/common.ts';
-import { checkHouseLayout, type HouseLayout } from '../../../contracts/houseLayout.ts';
+import { checkNavGraph, type HouseLayout } from '../../../contracts/houseLayout.ts';
 import type { RoomId, Storey } from '../../../contracts/rooms.ts';
 
 /** A room's stand or a waypoint (door, stair end) of `layout.json` (ARCHITECTURE §6). */
@@ -18,7 +18,7 @@ export interface NavGraph {
   readonly adjacency: ReadonlyMap<string, readonly string[]>;
 }
 
-/** The layout breaks a `checkHouseLayout` rule, or a node is unknown: the hub can't route on it. */
+/** The layout breaks a `checkNavGraph` rule, or a node is unknown: the hub can't route on it. */
 export class NavGraphError extends Error {
   override readonly name = 'NavGraphError';
 }
@@ -41,11 +41,12 @@ export function pathLength(points: readonly Point[]): number {
 }
 
 /**
- * The graph `checkHouseLayout` validates, so routing never runs on a layout the validator would
- * reject (a cross-storey edge walked flat, a room nobody can reach).
+ * The graph `checkNavGraph` validates, so routing never runs on a graph the validator would
+ * reject (a cross-storey edge walked flat, a room nobody can reach). The area checks of
+ * `checkHouseLayout` are too slow for every house open; CI runs them on the shipped layout.
  */
 export function buildNavGraph(layout: HouseLayout): NavGraph {
-  const errors = checkHouseLayout(layout).filter((i) => i.severity === 'error');
+  const errors = checkNavGraph(layout).filter((i) => i.severity === 'error');
   if (errors.length > 0) {
     throw new NavGraphError(errors.map((i) => `${i.path}: ${i.message}`).join('; '));
   }

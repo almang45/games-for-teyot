@@ -64,6 +64,23 @@ export function paintOrder(a: HouseRoom, b: HouseRoom): number {
   return a.storey - b.storey || a.stand[1] - b.stand[1];
 }
 
+/**
+ * The room a tap reaches among those `reaches` lets through: the last in paint order, the earlier
+ * in `rooms` on a tie. The engine's tap (`roomAt`) and `checkHouseLayout` share it, so the
+ * validator checks the rule the game actually plays by.
+ */
+export function topRoom(
+  rooms: readonly HouseRoom[],
+  reaches: (room: HouseRoom) => boolean,
+): HouseRoom | undefined {
+  let hit: HouseRoom | undefined;
+  for (const room of rooms) {
+    if (!reaches(room)) continue;
+    if (!hit || paintOrder(room, hit) > 0) hit = room;
+  }
+  return hit;
+}
+
 export const houseSpot = z.strictObject({
   room: roomId,
   /** Where the game places the content: finished pages, the sticker. */
@@ -180,18 +197,17 @@ function checkRoom(room: HouseRoom, i: number): Issue[] {
 }
 
 /**
- * The room a tap at `p` reaches among `room`'s storey, by the engine's rule (`roomAt`): the last
- * in paint order whose tap area holds it, the earlier in `rooms` on a tie. A neighbour counts only
- * once `p` is past the shared edge.
+ * The room a tap at `p` reaches among `room`'s storey, by the engine's rule (`topRoom`). A
+ * neighbour counts only once `p` is past the shared edge.
  */
 function tapWinner(p: Point, room: HouseRoom, layout: HouseLayout): HouseRoom | undefined {
-  let hit: HouseRoom | undefined;
-  for (const r of layout.rooms) {
-    if (r.storey !== room.storey || !pointInPolygon(p, r.polygon)) continue;
-    if (r !== room && distanceToBoundary(p, r.polygon) <= SHARED_EDGE_PX) continue;
-    if (!hit || paintOrder(r, hit) > 0) hit = r;
-  }
-  return hit;
+  return topRoom(
+    layout.rooms,
+    (r) =>
+      r.storey === room.storey &&
+      pointInPolygon(p, r.polygon) &&
+      (r === room || distanceToBoundary(p, r.polygon) > SHARED_EDGE_PX),
+  );
 }
 
 /**
@@ -200,6 +216,8 @@ function tapWinner(p: Point, room: HouseRoom, layout: HouseLayout): HouseRoom | 
  */
 function checkTapOverlap(layout: HouseLayout): Issue[] {
   return layout.rooms.flatMap((room, i) => {
+    // checkPolygon reports a floor off the canvas; a grid over a typo'd 100000 px bbox would hang.
+    if (!room.walk.every((p) => rectContainsPoint(FRAME_RECT, p))) return [];
     const floor = samplePolygon(room.walk, EDGE_SAMPLE_PX);
     const lost = new Map<string, number>();
     for (const p of floor) {
@@ -289,12 +307,26 @@ function checkProp(prop: HouseProp, i: number, layout: HouseLayout): Issue[] {
   return issues;
 }
 
-/** ASSETS.md §4.2 rules the schema can't express. */
-export function checkHouseLayout(layout: HouseLayout): Issue[] {
+/**
+ * The rules routing depends on: unique node ids, a start room, and a graph that stays on the
+ * floors and reaches every room. Cheap enough to run on the device each time the house opens;
+ * `checkHouseLayout` runs it along with the area checks that CI validates once.
+ */
+export function checkNavGraph(layout: HouseLayout): Issue[] {
   const issues: Issue[] = [];
   const ids = [...layout.rooms.map((r) => r.id), ...layout.waypoints.map((w) => w.id)];
   const dupeIds = duplicates(ids);
   for (const dupe of dupeIds) issues.push(error('rooms', `duplicate node id ${dupe}`));
+  const hasStart = layout.rooms.some((r) => r.id === layout.start);
+  if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
+  // The graph walk needs unambiguous nodes and a start to walk from.
+  if (dupeIds.length === 0 && hasStart) issues.push(...checkGraph(layout));
+  return issues;
+}
+
+/** ASSETS.md §4.2 rules the schema can't express. */
+export function checkHouseLayout(layout: HouseLayout): Issue[] {
+  const issues: Issue[] = [];
   const activities = layout.rooms.flatMap((r) => r.activities);
   for (const dupe of duplicates(activities)) {
     issues.push(error('rooms', `${dupe} is hosted by more than one room`));
@@ -306,8 +338,6 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
     issues.push(error('props', `duplicate prop ${dupe}`));
   }
   layout.props.forEach((p, i) => issues.push(...checkProp(p, i, layout)));
-  const hasStart = layout.rooms.some((r) => r.id === layout.start);
-  if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
   layout.rooms.forEach((r, i) => issues.push(...checkRoom(r, i)));
   issues.push(...checkTapOverlap(layout));
   for (const [name, spot] of Object.entries(layout.spots)) {
@@ -317,7 +347,6 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
       issues.push(error(`spots.${name}.rect`, 'spot leaves the canvas'));
     }
   }
-  // The graph walk needs unambiguous nodes and a start to walk from.
-  if (dupeIds.length === 0 && hasStart) issues.push(...checkGraph(layout));
+  issues.push(...checkNavGraph(layout));
   return issues;
 }

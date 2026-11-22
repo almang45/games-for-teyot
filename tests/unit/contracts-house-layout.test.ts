@@ -266,6 +266,13 @@ describe('house layout', () => {
       /^rooms\[1\]\.walk: \d+ of \d+ points on this floor tap ruang-keluarga$/,
     );
 
+    // Off the tie, paint order decides: with dapur nearer the viewer (drawn on top), its floor
+    // keeps its taps although ruang-keluarga's tap area still reaches over it.
+    const standY = kitchen.stand[1];
+    kitchen.stand = [kitchen.stand[0], 950];
+    expect(messages(l)).toEqual([]);
+    kitchen.stand = [kitchen.stand[0], standY];
+
     // A storey above may cover it: the child sees that storey on top, and the zoom fades it out.
     living.polygon = [
       [1100, 780],
@@ -280,6 +287,20 @@ describe('house layout', () => {
       [400, 1000],
     ];
     expect(messages(l)).toEqual([]);
+  });
+
+  it('reports a floor typed far off the canvas instead of sampling it', () => {
+    const l = houseFixture();
+    const [living] = l.rooms;
+    if (!living) throw new Error('fixture has rooms');
+    // 100000 for 1000: a grid over that box would be 1.5e8 points.
+    living.walk = [
+      [1100, 820],
+      [100000, 820],
+      [100000, 980],
+      [1100, 980],
+    ];
+    expect(messages(l)).toContain('rooms[0].walk: polygon leaves the 1920 × 1200 canvas');
   });
 
   it('checks spots point at real rooms and stay on the canvas', () => {
