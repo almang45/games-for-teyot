@@ -261,8 +261,8 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'spritesheet',
     frame: [192, 160],
     animations: OCICA_ANIMATIONS,
-    // 43% of Theia: round and wide rather than tall.
-    stance: { baseline: 150, standHeight: 92 },
+    // Standing upright, never sitting: 0.93 × Bubu, as in companions-sheet.png's side views.
+    stance: { baseline: 150, standHeight: 97 },
   },
   {
     id: 'parent.portrait',

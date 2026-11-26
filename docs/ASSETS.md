@@ -141,14 +141,16 @@ traits (colour, ear shape, any stitching or accessories).
   relative scale. Each about 40–50% of her height.
 - **Silhouettes must be distinct at a glance**:
   - **Bubu**: pink, slim, tall ears
-  - **Ocica**: white, round, wide body
+  - **Ocica**: white, round, wide body. She **stands upright on her hind legs** in every pose
+    except `sleep`, as in the three-quarter and side views of `companions-sheet.png`. The seated
+    doll pose (soles facing the viewer) is for the doll photo only, never for a sprite.
   - Ocica's white needs a warm off-white fill plus the standard outline so she doesn't vanish on
     light walls.
 - Same rules as §3.2: `walk` and `idle` in `fr` + `br`, everything else *fr only*, transparent
   PNG. Frame size **192 × 160** (width × height), feet on baseline y = 150. The extra width gives
   Ocica's round body room for her `walk` sway, `comfort` hug and `eat`; Bubu uses the same frame.
-- Standing heights at rest (`idle` frame 0): **Bubu 104 px** (48% of her, ear tips included),
-  **Ocica 92 px** (43%).
+- Standing heights at rest (`idle` frame 0): **Bubu 104 px** (48% of her), **Ocica 97 px**
+  (0.93 × Bubu, as on the companions sheet), ear tips included.
 
 | Animation key | Bubu | Ocica | Frames | Loop | Notes |
 |---|---|---|---|---|---|

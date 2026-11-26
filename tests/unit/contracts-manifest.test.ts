@@ -97,7 +97,8 @@ describe('key families', () => {
     const height = (id: string): number =>
       KEY_FAMILIES.find((f) => f.id === id)?.stance?.standHeight ?? Number.NaN;
     expect(height('companion.bubu') / height('character')).toBeCloseTo(0.48, 2);
-    expect(height('companion.ocica') / height('character')).toBeCloseTo(0.43, 2);
+    expect(height('companion.ocica') / height('character')).toBeCloseTo(0.45, 2);
+    expect(height('companion.ocica') / height('companion.bubu')).toBeCloseTo(0.93, 2);
   });
 
   it('matches and describes size rules', () => {
