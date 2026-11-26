@@ -25,6 +25,7 @@
     "house:blockout": "node tools/house/blockout.ts",
     "reference:check": "node tools/inputs/check.ts",
     "reference:frames": "node tools/inputs/frames.ts",
+    "sprites:pack": "node tools/sprites/cli.ts",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
