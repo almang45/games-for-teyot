@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { encodePng } from '../../tools/build/png';
+import { sheetPng, THEIA_STANDING } from './fixtures/sprites';
 import { loadManifest, validateAssets } from '../../tools/validate/assets';
 import { validateDesign } from '../../tools/validate/design';
 import { printReport, type Report } from '../../tools/validate/lane';
@@ -47,7 +48,7 @@ const blank = (w: number, h: number): Buffer => encodePng(w, h, () => [255, 255,
 /** The manifest fixture with every file it registers. */
 function deliverAssets(): void {
   putJson('assets/manifest.json', manifestFixture());
-  put('assets/character/theia/default.png', blank(1024, 256));
+  put('assets/character/theia/default.png', sheetPng(1024, 256, [256, 256], [THEIA_STANDING]));
   put('assets/counting/objects/apel.png', blank(192, 192));
   put('assets/counting/containers/mangkuk.png', blank(512, 384));
   // Occluder and prop art isn't delivered here; their keys are tested separately.

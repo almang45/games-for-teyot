@@ -13,6 +13,7 @@ import {
 import { resolveWithoutLinks } from '../build/no-links.ts';
 import { decodePng, readPngHeader } from '../build/png.ts';
 import { checkColoringPage } from './coloring.ts';
+import { checkSheetPixels } from './sprites.ts';
 import {
   inFile,
   laneFiles,
@@ -109,6 +110,15 @@ function checkEntryFile(root: string, entry: ManifestEntry, at: string, m: Manif
         const png = decodePng(readFileSync(full));
         const sized = checkImageSize(entry, [png.width, png.height], at).map(inFile(MANIFEST_FILE));
         return [...sized, ...checkColoringPage(png, '').issues.map(inFile(file))];
+      }
+      case 'spritesheet': {
+        const png = decodePng(readFileSync(full));
+        const sized = checkImageSize(entry, [png.width, png.height], at);
+        // A broken grid makes frame positions meaningless, so pixels wait for a whole grid.
+        const pixels = sized.some((i) => i.severity === 'error')
+          ? []
+          : checkSheetPixels(entry, png, at);
+        return [...sized, ...pixels].map(inFile(MANIFEST_FILE));
       }
       default: {
         const { width, height } = readPngHeader(readFileSync(full));

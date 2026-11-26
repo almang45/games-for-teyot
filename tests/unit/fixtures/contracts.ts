@@ -1,6 +1,6 @@
 import type { HouseLayout } from '../../../contracts/houseLayout';
 import type { Manifest } from '../../../contracts/manifest';
-import { REQUIRED_MOMENTS, type Motion } from '../../../contracts/motion';
+import { REQUIRED_MOMENTS, SPRITE_MOMENTS, type Motion } from '../../../contracts/motion';
 import type { LayoutElement, ScreenLayout } from '../../../contracts/screenLayout';
 import type { LayoutScreen } from '../../../contracts/screens';
 import type { Tokens } from '../../../contracts/tokens';
@@ -189,10 +189,10 @@ const TOKENS: Tokens = {
 
 export const tokensFixture = (): Tokens => clone(TOKENS);
 
-/** Every required moment at its kind's typical length, inside the brief's caps. */
+/** Every required and sprite moment at its kind's typical length, inside the brief's caps. */
 export function motionFixture(): Motion {
   const moments: Motion['moments'] = {};
-  for (const [name, rule] of Object.entries(REQUIRED_MOMENTS)) {
+  for (const [name, rule] of Object.entries({ ...REQUIRED_MOMENTS, ...SPRITE_MOMENTS })) {
     const duration = 'min' in rule ? rule.min : 'max' in rule ? rule.max : 400;
     moments[name] = { kind: rule.kind, duration, easing: 'Sine.easeInOut' };
   }
@@ -214,7 +214,7 @@ export const manifestFixture = (): Manifest => ({
       type: 'spritesheet',
       path: 'character/theia/default.png',
       frame: [256, 256],
-      animations: { 'idle.fr': { frames: [0, 3], fps: 6, loop: true } },
+      animations: { 'idle.fr': { frames: [0, 1], fps: 6, loop: false } },
       room: 'global',
     },
     {

@@ -114,13 +114,13 @@ export interface AnimationSpec {
 
 type AnimationSet = Readonly<Record<string, AnimationSpec>>;
 
-const both = (frames: number, loop: boolean, fps: number | null = null): AnimationSpec => ({
+const both = (frames: number, loop: boolean | null, fps: number | null = null): AnimationSpec => ({
   frames,
   loop,
   fps,
   facings: 'both',
 });
-const fr = (frames: number, loop: boolean, fps: number | null = null): AnimationSpec => ({
+const fr = (frames: number, loop: boolean | null, fps: number | null = null): AnimationSpec => ({
   frames,
   loop,
   fps,
@@ -133,50 +133,68 @@ const plain = (frames: number, loop: boolean | null): AnimationSpec => ({
   facings: 'none',
 });
 
+/*
+ * Few drawn frames, motion from tweens (#55): a pose is drawn, the movement between poses
+ * (breathing, a jump's height, Ocica's sway, a nod) is a `motion.json` tween. Fewer frames keep a
+ * character the same from frame to frame, which generated art struggles with over long cycles.
+ * `loop: null` animations are poses the game picks: `idle` holds frame 0 and blinks with frame 1.
+ */
+
 /** ASSETS.md §3.2. */
 export const THEIA_ANIMATIONS: AnimationSet = {
-  idle: both(4, true, 6),
-  walk: both(8, true, 12),
-  stairs: both(8, true, 10),
-  celebrate: fr(6, false, 12),
-  point: fr(4, false, 8),
-  think: fr(4, true, 6),
-  sleep: fr(4, true, 4),
+  idle: both(2, null),
+  walk: both(4, true, 8),
+  stairs: both(4, true, 8),
+  celebrate: fr(3, false, 8),
+  point: fr(2, false, 6),
+  think: fr(2, null),
+  sleep: fr(2, true, 1),
 };
 
 /** ASSETS.md §3.3. */
 export const BUBU_ANIMATIONS: AnimationSet = {
-  idle: both(4, true),
-  walk: both(8, true),
-  point: fr(4, false),
-  demo: fr(6, true),
-  celebrate: fr(6, false),
-  sleep: fr(4, true),
+  idle: both(2, null),
+  walk: both(4, true),
+  point: fr(2, false),
+  demo: fr(4, true),
+  celebrate: fr(3, false),
+  sleep: fr(2, true),
 };
 
 export const OCICA_ANIMATIONS: AnimationSet = {
-  idle: both(4, true),
-  walk: both(8, true),
-  comfort: fr(6, false),
-  celebrate: fr(6, false),
-  eat: fr(4, false),
-  sleep: fr(4, true),
+  idle: both(2, null),
+  walk: both(4, true),
+  comfort: fr(3, false),
+  celebrate: fr(3, false),
+  eat: fr(3, false),
+  sleep: fr(2, true),
 };
 
 /** ASSETS.md §3.4. */
 export const PORTRAIT_ANIMATIONS: AnimationSet = {
-  idle: plain(4, true),
+  idle: plain(2, null),
   talk: plain(3, null),
-  smile: plain(2, false),
-  encourage: plain(4, false),
+  smile: plain(1, false),
+  encourage: plain(2, false),
 };
 
 export const BODY_ANIMATIONS: AnimationSet = {
-  idle: fr(4, true),
-  wave: fr(6, false),
-  clap: fr(6, false),
-  'tuck-in': fr(8, false),
+  idle: fr(2, null),
+  wave: fr(3, false),
+  clap: fr(3, false),
+  'tuck-in': fr(4, false),
 };
+
+/**
+ * Where a standing figure's feet are and how tall it stands, in frame px (ASSETS.md §3). One
+ * height per figure keeps the family's relative scale (bunnies 40–50% of Theia) on every frame.
+ */
+export interface Stance {
+  /** Feet rest on this row: every frame's lowest opaque row is within 1 px of it. */
+  readonly baseline: number;
+  /** Height of the rest pose (`idle` frame 0), soles to the top of hair or ears. */
+  readonly standHeight: number;
+}
 
 export type SizeRule = { readonly exact: Size } | { readonly min: Size; readonly max: Size };
 
@@ -189,6 +207,8 @@ export interface KeyFamily {
   /** Frame size and animation set for spritesheets. */
   readonly frame?: Size;
   readonly animations?: AnimationSet;
+  /** Standing figures; portraits have none. */
+  readonly stance?: Stance;
   readonly dropZone?: 'required';
   readonly hotspot?: 'required';
 }
@@ -224,6 +244,7 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'spritesheet',
     frame: [256, 256],
     animations: THEIA_ANIMATIONS,
+    stance: { baseline: 240, standHeight: 216 },
   },
   {
     id: 'companion.bubu',
@@ -231,6 +252,8 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'spritesheet',
     frame: [192, 160],
     animations: BUBU_ANIMATIONS,
+    // 48% of Theia: the tall ears make Bubu the taller bunny.
+    stance: { baseline: 150, standHeight: 104 },
   },
   {
     id: 'companion.ocica',
@@ -238,6 +261,8 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'spritesheet',
     frame: [192, 160],
     animations: OCICA_ANIMATIONS,
+    // Standing upright, never sitting: 0.93 × Bubu, as in companions-sheet.png's side views.
+    stance: { baseline: 150, standHeight: 97 },
   },
   {
     id: 'parent.portrait',
@@ -252,6 +277,8 @@ export const KEY_FAMILIES: readonly KeyFamily[] = [
     type: 'spritesheet',
     frame: [320, 320],
     animations: BODY_ANIMATIONS,
+    // M2: 1.3× Theia; revisit against parents-sheet.png when the bodies are drawn.
+    stance: { baseline: 300, standHeight: 280 },
   },
   { id: 'house.layout', pattern: key('house\\.layout'), type: 'layout' },
   {
