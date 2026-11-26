@@ -74,6 +74,32 @@ describe('key families', () => {
     }
   });
 
+  it('gives every standing figure a stance that fits its frame, and portraits none', () => {
+    const stances = KEY_FAMILIES.filter((f) => f.type === 'spritesheet').map((f) => [
+      f.id,
+      f.stance !== undefined,
+    ]);
+    expect(stances).toEqual([
+      ['character', true],
+      ['companion.bubu', true],
+      ['companion.ocica', true],
+      ['parent.portrait', false],
+      ['parent.body', true],
+    ]);
+    for (const f of KEY_FAMILIES) {
+      if (!f.stance || !f.frame) continue;
+      expect(f.stance.baseline, f.id).toBeLessThan(f.frame[1]);
+      expect(f.stance.standHeight, f.id).toBeLessThanOrEqual(f.stance.baseline + 1);
+    }
+  });
+
+  it('keeps the companions to their share of Theia', () => {
+    const height = (id: string): number =>
+      KEY_FAMILIES.find((f) => f.id === id)?.stance?.standHeight ?? Number.NaN;
+    expect(height('companion.bubu') / height('character')).toBeCloseTo(0.48, 2);
+    expect(height('companion.ocica') / height('character')).toBeCloseTo(0.43, 2);
+  });
+
   it('matches and describes size rules', () => {
     expect(sizeMatches({ exact: [192, 192] }, [192, 192])).toBe(true);
     expect(sizeMatches({ exact: [192, 192] }, [192, 191])).toBe(false);
@@ -138,16 +164,16 @@ describe('checkManifest', () => {
     sheet.animations = {
       'idle.fr': { frames: [0, 2], fps: 6, loop: true },
       'idle.br': { frames: [8, 4], fps: 6, loop: true },
-      'walk.fr': { frames: [10, 17], fps: 30, loop: true },
-      'celebrate.fr': { frames: [4, 9], fps: 12, loop: true },
-      'celebrate.br': { frames: [4, 9], fps: 12, loop: false },
-      wave: { frames: [0, 5], fps: 8, loop: false },
+      'walk.fr': { frames: [10, 13], fps: 30, loop: true },
+      'celebrate.fr': { frames: [4, 6], fps: 8, loop: true },
+      'celebrate.br': { frames: [4, 6], fps: 8, loop: false },
+      wave: { frames: [0, 2], fps: 8, loop: false },
     };
     expect(messages(checkManifest(m)).filter((s) => s.startsWith('error'))).toEqual([
       'error assets[0].frame: character frames are 256 × 256',
-      'error assets[0].animations.idle.fr.frames: idle.fr has 4 frames, got 3',
+      'error assets[0].animations.idle.fr.frames: idle.fr has 2 frames, got 3',
       'error assets[0].animations.idle.br.frames: last frame comes before the first',
-      'error assets[0].animations.walk.fr.fps: walk.fr plays at 12 fps, got 30',
+      'error assets[0].animations.walk.fr.fps: walk.fr plays at 8 fps, got 30',
       'error assets[0].animations.celebrate.fr.loop: celebrate.fr must not loop',
       expect.stringMatching(
         /^error assets\[0\]\.animations\.celebrate\.br: not an animation of character: use idle\.fr, idle\.br/,
@@ -168,10 +194,10 @@ describe('checkManifest', () => {
           path: 'parent/mama/portrait.png',
           frame: [384, 384],
           animations: {
-            idle: { frames: [0, 3], fps: 6, loop: true },
-            talk: { frames: [4, 6], fps: 12, loop: true },
-            smile: { frames: [7, 8], fps: 6, loop: false },
-            encourage: { frames: [9, 12], fps: 6, loop: false },
+            idle: { frames: [0, 1], fps: 6, loop: true },
+            talk: { frames: [2, 4], fps: 12, loop: true },
+            smile: { frames: [5, 5], fps: 6, loop: false },
+            encourage: { frames: [6, 7], fps: 6, loop: false },
           },
           room: 'global',
         },
@@ -237,12 +263,12 @@ describe('checkImageSize', () => {
 
   it('checks the sheet grid and the frames it holds', () => {
     const sheet = entry(manifestFixture(), 'character.theia.default');
-    expect(checkImageSize(sheet, [1024, 256], 'a')).toEqual([]);
-    expect(messages(checkImageSize(sheet, [1000, 256], 'a'))).toEqual([
-      'error a: 1000 × 256 is not a whole grid of 256 × 256 frames',
+    expect(checkImageSize(sheet, [512, 256], 'a')).toEqual([]);
+    expect(messages(checkImageSize(sheet, [500, 256], 'a'))).toEqual([
+      'error a: 500 × 256 is not a whole grid of 256 × 256 frames',
     ]);
-    expect(messages(checkImageSize(sheet, [768, 256], 'a'))).toEqual([
-      "error a.animations.idle.fr: frame 3 is past the sheet's 3 frames",
+    expect(messages(checkImageSize(sheet, [256, 256], 'a'))).toEqual([
+      "error a.animations.idle.fr: frame 1 is past the sheet's 1 frames",
     ]);
   });
 

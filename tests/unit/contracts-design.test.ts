@@ -267,6 +267,23 @@ describe('motion', () => {
   });
 });
 
+describe('sprite motion moments', () => {
+  it('warns until the sprite tweens arrive, then holds them to their kind and cap', () => {
+    const m = motionFixture();
+    delete m.moments['sprite.breathe'];
+    m.moments['sprite.ocica-sway'] = { kind: 'feedback', duration: 400, easing: 'Linear' };
+    m.moments['sprite.portrait-nod'] = { kind: 'ambient', duration: 500, easing: 'Linear' };
+    const issues = checkMotion(m);
+    expect(issues.filter((i) => i.severity === 'warning').map((i) => i.message)).toEqual([
+      'not delivered yet: sprite.breathe',
+    ]);
+    expect(messages(issues.filter((i) => i.severity === 'error'))).toEqual([
+      'moments.sprite.ocica-sway.kind: sprite.ocica-sway is an ambient',
+      'moments.sprite.portrait-nod.kind: sprite.portrait-nod is a feedback',
+    ]);
+  });
+});
+
 describe('JSON Schema', () => {
   it.each(Object.keys(CONTRACT_SCHEMAS) as ContractName[])('generates %s', (name) => {
     const schema = jsonSchema(name);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { error, schemaRef, version, type Issue } from './common.ts';
+import { error, schemaRef, version, warning, type Issue } from './common.ts';
 
 const FAMILIES = [
   'Quad',
@@ -65,6 +65,16 @@ export const REQUIRED_MOMENTS = {
   bedtime: { kind: 'sequence', min: 2000, max: 3000 },
 } as const satisfies Record<string, { kind: MotionKind; min?: number; max?: number }>;
 
+/**
+ * Tweens that carry sprite motion between drawn poses (#55). A missing one is a warning until the
+ * sprites that use it land (#48).
+ */
+export const SPRITE_MOMENTS = {
+  'sprite.breathe': { kind: 'ambient' },
+  'sprite.ocica-sway': { kind: 'ambient' },
+  'sprite.portrait-nod': { kind: 'feedback' },
+} as const satisfies Record<string, { kind: MotionKind; max?: number }>;
+
 const MOMENT_KEY = /^[a-z]+(?:-[a-z]+)*(?:\.[a-z]+(?:-[a-z]+)*)*$/;
 
 /** `design/motion.json`: one entry per movement (brief §1, "every movement gets an entry"). */
@@ -75,6 +85,14 @@ export const motion = z.strictObject({
 });
 export type Motion = z.infer<typeof motion>;
 
+interface MomentRule {
+  readonly kind: MotionKind;
+  readonly min?: number;
+  readonly max?: number;
+}
+
+const article = (word: string): string => (/^[aeiou]/.test(word) ? 'an' : 'a');
+
 export function checkMotion(m: Motion): Issue[] {
   const issues: Issue[] = [];
   for (const [name, entry] of Object.entries(m.moments)) {
@@ -84,18 +102,31 @@ export function checkMotion(m: Motion): Issue[] {
       issues.push(error(`${path}.duration`, `${entry.kind} lasts at most ${cap} ms`));
     }
   }
-  for (const [name, rule] of Object.entries(REQUIRED_MOMENTS)) {
+  const rules: [string, MomentRule, boolean][] = [
+    ...Object.entries(REQUIRED_MOMENTS).map(([n, r]): [string, MomentRule, boolean] => [
+      n,
+      r,
+      true,
+    ]),
+    ...Object.entries(SPRITE_MOMENTS).map(([n, r]): [string, MomentRule, boolean] => [n, r, false]),
+  ];
+  for (const [name, rule, required] of rules) {
     const path = `moments.${name}`;
     const entry = m.moments[name];
     if (!entry) {
-      issues.push(error('moments', `missing ${name}`));
+      issues.push(
+        required
+          ? error('moments', `missing ${name}`)
+          : warning('moments', `not delivered yet: ${name}`),
+      );
       continue;
     }
-    if (entry.kind !== rule.kind) issues.push(error(`${path}.kind`, `${name} is a ${rule.kind}`));
-    if ('max' in rule && entry.duration > rule.max) {
+    if (entry.kind !== rule.kind)
+      issues.push(error(`${path}.kind`, `${name} is ${article(rule.kind)} ${rule.kind}`));
+    if (rule.max !== undefined && entry.duration > rule.max) {
       issues.push(error(`${path}.duration`, `${name} lasts at most ${rule.max} ms`));
     }
-    if ('min' in rule && entry.duration < rule.min) {
+    if (rule.min !== undefined && entry.duration < rule.min) {
       issues.push(error(`${path}.duration`, `${name} lasts at least ${rule.min} ms`));
     }
   }

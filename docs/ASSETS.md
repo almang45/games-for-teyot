@@ -109,20 +109,25 @@ Every later character asset must match this sheet.
   The game flips each horizontally to get front-left and back-left, which gives all 4 isometric
   directions. Animations marked *fr only* are drawn just facing front-right.
 - Frame size **256 × 256 px**. Feet on a fixed baseline at y = 240, with her body centred
-  horizontally.
+  horizontally. Standing at rest (`idle` frame 0) she is **216 px** tall, soles to the top of her
+  hair.
 - Frames sit in a grid, read left to right, top to bottom. The manifest names each animation
   `<animation>.<facing>` (`walk.br`) with its first and last frame (§7).
 - Transparent background, PNG, premultiplied alpha off.
+- **Few drawn frames, motion from tweens.** Each frame is a key pose. The movement between poses
+  (breathing, a jump's height, a sway, a nod) is a `design/motion.json` tween, not more frames
+  (§3.5). Loop *game* means the game picks the frame: it holds frame 0 and shows frame 1 for a
+  blink every few seconds.
 
 | Animation key | Frames | FPS | Loop | Notes |
 |---|---|---|---|---|
-| `idle` | 4 | 6 | yes | `fr` + `br`. Subtle breathing or blink. |
-| `walk` | 8 | 12 | yes | `fr` + `br`. In-place walk cycle, no drift. |
-| `stairs` | 8 | 10 | yes | `fr` (down) + `br` (up), climbing along the stair axis |
-| `celebrate` | 6 | 12 | no | *fr only*. Jump with arms up. |
-| `point` | 4 | 8 | no | *fr only*. Points, ends holding the pose. |
-| `think` | 4 | 6 | yes | *fr only*. Hand on chin, used while waiting for her answer. |
-| `sleep` | 4 | 4 | yes | *fr only*. In bed. Used by BedtimeScene. |
+| `idle` | 2 | — | game | `fr` + `br`. Rest pose, then blink. Breathing is `sprite.breathe`. |
+| `walk` | 4 | 8 | yes | `fr` + `br`. Contact / pass / contact / pass, in place, no drift. |
+| `stairs` | 4 | 8 | yes | `fr` (down) + `br` (up), climbing along the stair axis |
+| `celebrate` | 3 | 8 | no | *fr only*. Crouch / arms up / land. The jump height is the `celebrate` tween. |
+| `point` | 2 | 6 | no | *fr only*. Reach, then hold. |
+| `think` | 2 | — | game | *fr only*. Hand on chin, then blink. Used while waiting for her answer. |
+| `sleep` | 2 | 1 | yes | *fr only*. In bed, breathing in / out. Used by BedtimeScene. |
 
 **Outfits** (unlockable rewards) are full re-renders of all animations using the same frame
 grid, not overlays. That keeps the art simple and the rendering cheap.
@@ -142,17 +147,19 @@ traits (colour, ear shape, any stitching or accessories).
 - Same rules as §3.2: `walk` and `idle` in `fr` + `br`, everything else *fr only*, transparent
   PNG. Frame size **192 × 160** (width × height), feet on baseline y = 150. The extra width gives
   Ocica's round body room for her `walk` sway, `comfort` hug and `eat`; Bubu uses the same frame.
+- Standing heights at rest (`idle` frame 0): **Bubu 104 px** (48% of her, ear tips included),
+  **Ocica 92 px** (43%).
 
 | Animation key | Bubu | Ocica | Frames | Loop | Notes |
 |---|---|---|---|---|---|
-| `idle` | ✓ | ✓ | 4 | yes | Bubu twitches its ears, Ocica sways |
-| `walk` | ✓ hop | ✓ waddle | 8 | yes | In place |
-| `point` | ✓ | — | 4 | no | Paw toward a room or item, holds the pose |
-| `demo` | ✓ | — | 6 | yes | Paw "drawing" motion for the Lihat step |
-| `comfort` | — | ✓ | 6 | no | Hug or pat, after a miss |
-| `celebrate` | ✓ | ✓ | 6 | no | Jump. Ocica's jump is a small bounce. |
-| `eat` | — | ✓ | 4 | no | Munches a counted cookie (counting scene) |
-| `sleep` | ✓ | ✓ | 4 | yes | Curled up beside her in bed |
+| `idle` | ✓ | ✓ | 2 | game | Rest pose, then Bubu's ear twitch / Ocica's blink. Ocica's sway is `sprite.ocica-sway`. |
+| `walk` | ✓ hop | ✓ waddle | 4 | yes | In place |
+| `point` | ✓ | — | 2 | no | Paw toward a room or item: reach, then hold |
+| `demo` | ✓ | — | 4 | yes | Paw "drawing" motion for the Lihat step |
+| `comfort` | — | ✓ | 3 | no | Hug or pat, after a miss |
+| `celebrate` | ✓ | ✓ | 3 | no | Crouch / up / land. The height is the `celebrate` tween; Ocica's is a small bounce. |
+| `eat` | — | ✓ | 3 | no | Munches a counted cookie (counting scene) |
+| `sleep` | ✓ | ✓ | 2 | yes | Curled up beside her in bed, breathing in / out |
 
 Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optional, for later.
 
@@ -171,21 +178,39 @@ Keys: `companion.bubu.<outfit>`, `companion.ocica.<outfit>`. Outfits are optiona
 
 | Animation | Frames | Loop | Notes |
 |---|---|---|---|
-| `idle` | 4 | yes | Blink |
-| `talk` | 3 | — | Mouth closed / half / open. The game picks the frame from the clip's live loudness, so no lip-sync authoring is needed. |
-| `smile` | 2 | no | After praise |
-| `encourage` | 4 | no | Nod, for hint clips |
+| `idle` | 2 | game | Rest, then blink |
+| `talk` | 3 | game | Mouth closed / half / open. The game picks the frame from the clip's live loudness, so no lip-sync authoring is needed. |
+| `smile` | 1 | no | After praise |
+| `encourage` | 2 | no | Warm look, for hint clips. The nod is `sprite.portrait-nod`. |
 
 **Full body** (M2, house hub and bedtime ending):
-- **320 × 320** per frame, feet on baseline y = 300. Same rules as §3.2.
+- **320 × 320** per frame, feet on baseline y = 300, **280 px** tall at rest (about 1.3× her;
+  to be checked against `parents-sheet.png` before the bodies are drawn). Same rules as §3.2.
 - Keys: `parent.mama.body`, `parent.papa.body`.
 
 | Animation | Frames | Loop | Notes |
 |---|---|---|---|
-| `idle` | 4 | yes | |
-| `wave` | 6 | no | When she enters their room |
-| `clap` | 6 | no | At level mastery |
-| `tuck-in` | 8 | no | Bedtime ending. Bends over the bed. |
+| `idle` | 2 | game | Rest, then blink |
+| `wave` | 3 | no | When she enters their room |
+| `clap` | 3 | no | At level mastery |
+| `tuck-in` | 4 | no | Bedtime ending. Bends over the bed. |
+
+### 3.5 Sprite motion and stance checks
+
+Tweens in `design/motion.json` that carry the movement between drawn poses. Each is a warning in
+`validate:design` until it is delivered.
+
+| Moment | Kind | Used for |
+|---|---|---|
+| `sprite.breathe` | ambient | A slow vertical scale on every standing figure at rest |
+| `sprite.ocica-sway` | ambient | Ocica's side-to-side rock while idle |
+| `sprite.portrait-nod` | feedback | The portrait's nod on `encourage` |
+
+`validate:assets` decodes each sheet and checks, for every frame an animation references:
+- the frame is not empty;
+- for standing figures, the lowest opaque row (alpha ≥ 128) is within 1 px of the baseline, so a
+  soft shadow under the feet is fine but a figure floating or sunk by 2 px is not;
+- `idle.fr` frame 0 is the stand height above, ± 4%. That keeps the family's relative scale.
 
 ## 4. House
 
