@@ -108,6 +108,21 @@
       "kind": "ambient",
       "duration": 3600,
       "easing": "Sine.easeInOut"
+    },
+    "sprite.breathe": {
+      "kind": "ambient",
+      "duration": 2800,
+      "easing": "Sine.easeInOut"
+    },
+    "sprite.ocica-sway": {
+      "kind": "ambient",
+      "duration": 2600,
+      "easing": "Sine.easeInOut"
+    },
+    "sprite.portrait-nod": {
+      "kind": "feedback",
+      "duration": 420,
+      "easing": "Sine.easeInOut"
     }
   }
 }
