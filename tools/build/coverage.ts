@@ -24,4 +24,5 @@ export const COVERAGE_EXCLUDE = [
   'tools/house/blockout.ts',
   'tools/inputs/check.ts',
   'tools/inputs/frames.ts',
+  'tools/sprites/cli.ts',
 ] as const;
