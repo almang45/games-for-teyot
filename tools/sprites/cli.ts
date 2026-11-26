@@ -3,11 +3,13 @@
 // Packs pose strips (<dir>/<animation>.png, e.g. walk.fr.png) into assets/<key path>.png
 // (ASSETS.md §3.6). Strips stay outside the repo: they are generated working files.
 import { lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { format, resolveConfig } from 'prettier';
 import { manifest } from '../../contracts/manifest.ts';
 import { decodePng, encodePng } from '../build/png.ts';
+import { inside, parseRates, stripName } from './args.ts';
 import { packSheet, upsertEntry } from './pack.ts';
 import type { Raster } from './raster.ts';
 
@@ -17,28 +19,17 @@ const log = (level: 'info' | 'warn' | 'error', event: string, fields: object): v
   else console.log(line);
 };
 
-function parseRates(pairs: readonly string[]): Record<string, number> {
-  const rates: Record<string, number> = {};
-  for (const pair of pairs) {
-    const [name, value] = pair.split('=');
-    const fps = Number(value);
-    if (!name || !Number.isInteger(fps) || fps < 1 || fps > 30) {
-      throw new Error(`--fps takes <animation>=<1–30>, got ${pair}`);
-    }
-    rates[name] = fps;
-  }
-  return rates;
-}
-
 function readStrips(dir: string): Map<string, Raster> {
   const strips = new Map<string, Raster>();
   const files = readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.png'));
   for (const file of files.sort((a, b) => a.localeCompare(b))) {
-    const full = join(dir, file);
+    const name = stripName(file);
+    if (!name) throw new Error(`${file} is not named <animation>.png, e.g. walk.fr.png`);
+    const full = inside(dir, file);
     if (lstatSync(full).isSymbolicLink()) {
       throw new Error(`${file} is a symlink; copy the strip in`);
     }
-    strips.set(file.slice(0, -'.png'.length), decodePng(readFileSync(full)));
+    strips.set(name, decodePng(readFileSync(full)));
   }
   if (strips.size === 0) throw new Error(`no .png strips in ${dir}`);
   return strips;
@@ -67,7 +58,8 @@ try {
   });
   if (!values.key || !values.src) throw new Error('usage: sprites:pack -- --key <key> --src <dir>');
   const root = process.cwd();
-  const packed = packSheet(values.key, readStrips(resolve(values.src)), {
+  // Strips are working files in the user's home, never elsewhere on the machine.
+  const packed = packSheet(values.key, readStrips(inside(homedir(), resolve(values.src))), {
     fps: parseRates(values.fps),
   });
   for (const issue of packed.issues) {
@@ -78,7 +70,7 @@ try {
     log('error', 'sprites.pack.failed', { key: values.key, errors });
     process.exitCode = 1;
   } else {
-    const out = join(root, 'assets', packed.entry.path);
+    const out = inside(join(root, 'assets'), packed.entry.path);
     mkdirSync(dirname(out), { recursive: true });
     const { width, height, rgba } = packed.sheet;
     writeFileSync(

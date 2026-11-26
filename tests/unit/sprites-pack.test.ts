@@ -194,7 +194,7 @@ describe('packSheet', () => {
 
   it('packs strips into a sheet that meets the contract', () => {
     const packed = packSheet('character.theia.default', theiaStrips(['walk.fr', 'idle.fr']), {
-      fps: { idle: 5 },
+      fps: new Map([['idle', 5]]),
     });
     expect(messages(packed.issues)).toEqual([
       expect.stringMatching(/^warning strips: no strip yet for idle\.br, walk\.br/) as string,

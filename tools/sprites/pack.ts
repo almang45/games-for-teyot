@@ -41,7 +41,7 @@ const HEIGHT_DRIFT = 0.3;
 
 export interface PackOptions {
   /** Rates for animations whose rate the contract leaves open, by name (`idle.fr`) or base (`idle`). */
-  readonly fps?: Readonly<Record<string, number>>;
+  readonly fps?: ReadonlyMap<string, number>;
   /** Bundle for a new manifest entry; an existing entry keeps its own. */
   readonly room?: SheetEntry['room'];
 }
@@ -217,7 +217,7 @@ function layout(tiles: readonly Raster[], size: readonly [number, number]): Rast
 }
 
 function rateFor(name: string, spec: AnimationSpec, fps: PackOptions['fps']): number {
-  return spec.fps ?? fps?.[name] ?? fps?.[name.split('.')[0] ?? name] ?? DEFAULT_FPS;
+  return spec.fps ?? fps?.get(name) ?? fps?.get(name.split('.')[0] ?? name) ?? DEFAULT_FPS;
 }
 
 /**

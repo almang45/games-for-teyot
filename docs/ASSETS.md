@@ -244,7 +244,8 @@ writes `assets/<key as path>.png` and prints the manifest entry, or updates
 and writes nothing if any fail: an upscaled or clipped pose, a wrong figure count, an unknown
 animation name.
 
-Keep the strips **outside the repo**: they are working files, and only the packed sheet ships.
+Keep the strips **outside the repo**, in a folder under your home directory (the tool reads
+nothing else): they are working files, and only the packed sheet ships.
 
 ## 4. House
 
