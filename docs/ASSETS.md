@@ -227,6 +227,8 @@ turns the strips into a sheet that meets this section.
   packed. Poses 1…n are the frames, so a 4-frame `walk.fr` strip holds 5 figures.
 - One flat background colour that appears nowhere in the figure (saturated blue or green), or a
   transparent background. The tool samples the corners and refuses a background that isn't flat.
+  Background showing through a gap in the pose (between an arm and the body) is removed too; a
+  tiny enclosed speck of that colour inside the figure is kept, so it never becomes a hole.
 - Large: the rest pose at least twice its stand height (§3.2, §3.3), so the art is only ever
   scaled down.
 - All poses at one scale, on one floor line. The tool warns when a pose is more than 30% taller
@@ -237,12 +239,13 @@ npm run sprites:pack -- --key companion.bubu.default --src ~/sprites/bubu [--fps
 ```
 
 The tool removes the background (unmixing it out of soft edges), drops stray specks, scales each
-strip so pose 0 is the stand height, puts the soles on the baseline, centres each frame on the
-head, and lays frames out in contract order, `fr` before `br`, in rows of at most 2048 px. It
+strip so pose 0 is the stand height, puts the soles on the baseline (portraits: one vertical
+offset for the whole strip, set by pose 0), centres each frame on the head, and lays frames out in contract order, `fr` before `br`, in rows of at most 2048 px. It
 writes `assets/<key as path>.png` and prints the manifest entry, or updates
 `assets/manifest.json` with `--write-manifest`. It runs the same checks as `validate:assets`
 and writes nothing if any fail: an upscaled or clipped pose, a wrong figure count, an unknown
-animation name.
+animation name. An `--fps` that matches no animation, or one whose rate the contract fixes, is
+a warning.
 
 Keep the strips **outside the repo**, in a folder under your home directory (the tool reads
 nothing else): they are working files, and only the packed sheet ships.

@@ -62,10 +62,10 @@ function meanRgb(r: Raster, pixels: readonly number[]): Rgb {
 }
 
 /**
- * Removes a flat background sampled from the four corners. Pixels well inside the figure stay
- * fully opaque, even where their colour is near the key; only the one-pixel edge gets a soft
- * alpha, with the key unmixed out of it so no coloured fringe remains. A strip that is already
- * transparent passes through untouched.
+ * Removes a flat background sampled from the four corners. Pixels inside the figure stay fully
+ * opaque, even a pinhole whose colour is near the key (see figureMask); only the one-pixel edge
+ * gets a soft alpha, with the key unmixed out of it so no coloured fringe remains. A strip that
+ * is already transparent passes through untouched.
  */
 export function removeBackground(r: Raster): Keyed {
   const corners = cornerPixels(r);
@@ -91,11 +91,12 @@ export function removeBackground(r: Raster): Keyed {
   const { width, height } = r;
   const src = r.rgba;
   const far = new Float64Array(width * height);
-  const figure = new Uint8Array(width * height);
+  const near = new Uint8Array(width * height);
   for (let i = 0; i < far.length; i++) {
     far[i] = distance(src[i * 4] ?? 0, src[i * 4 + 1] ?? 0, src[i * 4 + 2] ?? 0, key);
-    figure[i] = (far[i] ?? 0) > floor && (src[i * 4 + 3] ?? 0) > 0 ? 1 : 0;
+    near[i] = (far[i] ?? 0) <= floor || (src[i * 4 + 3] ?? 0) === 0 ? 1 : 0;
   }
+  const figure = figureMask(near, width, height);
   const solid = erode(figure, width, height);
   const out = new Uint8Array(src.length);
   for (let i = 0; i < far.length; i++) {
@@ -120,6 +121,29 @@ export function removeBackground(r: Raster): Keyed {
     out[o + 3] = Math.round(a * 255);
   }
   return { raster: { width, height, rgba: out }, key };
+}
+
+/** Enclosed key-coloured areas smaller than this share of the strip are figure detail. */
+const PINHOLE_SHARE = 0.0002;
+const MIN_PINHOLE = 64;
+
+/**
+ * What is figure, by connectivity rather than colour alone. Key-coloured pixels joined to the
+ * border are background. An enclosed key-coloured area is a gap in the pose (between an arm and
+ * the body) when it is large, and figure detail when it is a pinhole: punching that out would
+ * leave a see-through hole in the body.
+ */
+function figureMask(near: Uint8Array, width: number, height: number): Uint8Array {
+  // 4-connected, so background never leaks through a diagonal gap in an outline.
+  const { labels, sizes, edge } = label(near, width, height, false);
+  const pinhole = Math.max(MIN_PINHOLE, width * height * PINHOLE_SHARE);
+  const figure = new Uint8Array(near.length);
+  for (let i = 0; i < near.length; i++) {
+    const group = labels[i] ?? 0;
+    const background = near[i] === 1 && (edge[group] === true || (sizes[group] ?? 0) >= pinhole);
+    figure[i] = background ? 0 : 1;
+  }
+  return figure;
 }
 
 /**
@@ -185,37 +209,58 @@ function nearestSolid(
   return best;
 }
 
-/** 8-connected groups of opaque pixels, as a label per pixel (0 = none) and each group's size. */
-function components(r: Raster): { labels: Int32Array; sizes: number[] } {
-  const labels = new Int32Array(r.width * r.height);
+interface Labelled {
+  /** A group number per pixel, 0 outside the mask. */
+  readonly labels: Int32Array;
+  /** Pixels per group, indexed by group number. */
+  readonly sizes: number[];
+  /** Whether each group touches the image border. */
+  readonly edge: boolean[];
+}
+
+/** Connected groups of mask pixels, 8-connected or, with `diagonal` off, 4-connected. */
+function label(mask: Uint8Array, width: number, height: number, diagonal: boolean): Labelled {
+  const labels = new Int32Array(mask.length);
   const sizes = [0];
+  const edge = [false];
   const stack: number[] = [];
-  for (let start = 0; start < labels.length; start++) {
-    if (labels[start] !== 0 || (r.rgba[start * 4 + 3] ?? 0) < OPAQUE) continue;
-    const label = sizes.length;
+  for (let start = 0; start < mask.length; start++) {
+    if (labels[start] !== 0 || mask[start] === 0) continue;
+    const group = sizes.length;
     let size = 0;
-    labels[start] = label;
+    let touches = false;
+    labels[start] = group;
     stack.push(start);
     while (stack.length > 0) {
       const i = stack.pop() ?? 0;
       size++;
-      const x = i % r.width;
-      const y = (i - x) / r.width;
+      const x = i % width;
+      const y = (i - x) / width;
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) touches = true;
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = x + dx;
           const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= r.width || ny >= r.height) continue;
-          const n = ny * r.width + nx;
-          if (labels[n] !== 0 || (r.rgba[n * 4 + 3] ?? 0) < OPAQUE) continue;
-          labels[n] = label;
+          if (!diagonal && dx !== 0 && dy !== 0) continue;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const n = ny * width + nx;
+          if (labels[n] !== 0 || mask[n] === 0) continue;
+          labels[n] = group;
           stack.push(n);
         }
       }
     }
     sizes.push(size);
+    edge.push(touches);
   }
-  return { labels, sizes };
+  return { labels, sizes, edge };
+}
+
+/** 8-connected groups of opaque pixels. */
+function components(r: Raster): Labelled {
+  const mask = new Uint8Array(r.width * r.height);
+  for (let i = 0; i < mask.length; i++) mask[i] = (r.rgba[i * 4 + 3] ?? 0) >= OPAQUE ? 1 : 0;
+  return label(mask, r.width, r.height, true);
 }
 
 /** Grows a mask by `radius` pixels in every direction (a square neighbourhood). */

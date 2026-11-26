@@ -96,6 +96,21 @@ describe('removeBackground', () => {
     expect(Math.abs((green ?? 0) - OUTLINE[1])).toBeLessThan(15);
   });
 
+  it('keeps a key-coloured pinhole inside the figure, but opens a real gap in the pose', () => {
+    const r = strip(poses, { background: KEY_BLUE });
+    const paint = (x0: number, y0: number, size: number): void => {
+      for (let y = y0; y < y0 + size; y++) {
+        for (let x = x0; x < x0 + size; x++) r.rgba.set([...KEY_BLUE, 255], (y * r.width + x) * 4);
+      }
+    };
+    paint(55, 100, 3); // a button the colour of the backdrop
+    paint(44, 75, 10); // the space between an arm and the body
+    const { raster } = removeBackground(r);
+    expect(pixel(raster, 56, 101)).toEqual([...KEY_BLUE, 255]);
+    expect(pixel(raster, 48, 80)[3]).toBe(0);
+    expect(pixel(raster, 55, 110)).toEqual([...SKIN, 255]);
+  });
+
   it('refuses a background that is not one flat colour', () => {
     expect(() => removeBackground(strip(poses, { background: KEY_BLUE, noise: 60 }))).toThrow(
       /not one flat colour/,
@@ -257,6 +272,38 @@ describe('packSheet', () => {
     const packed = packSheet('parent.mama.portrait', strips);
     expect(packed.issues.filter((i) => i.severity === 'error')).toEqual([]);
     expect(frameExtent(packed.sheet, 0, [384, 384])).toEqual({ top: 4, bottom: 379 });
+  });
+
+  it('keeps a portrait’s face still when one pose reaches above the others', () => {
+    const r = strip(poses(2, { height: 300, width: 400 }), { background: KEY_BLUE });
+    // A raised hand on the second frame, touching the top of its head.
+    for (let y = 10; y < 40; y++) {
+      for (let x = 1050; x < 1100; x++) r.rgba.set([...OUTLINE, 255], (y * r.width + x) * 4);
+    }
+    const packed = packSheet('parent.mama.portrait', new Map([['idle', r]]));
+    expect(packed.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const still = frameExtent(packed.sheet, 0, [384, 384]);
+    const reaching = frameExtent(packed.sheet, 1, [384, 384]);
+    expect(Math.abs((reaching?.bottom ?? 0) - (still?.bottom ?? 0))).toBeLessThanOrEqual(1);
+    expect((still?.top ?? 0) - (reaching?.top ?? 0)).toBeGreaterThan(20);
+  });
+
+  it('warns about --fps rates that change nothing', () => {
+    const packed = packSheet('character.theia.default', theiaStrips(['idle.fr', 'walk.fr']), {
+      fps: new Map([
+        ['wave', 6],
+        ['walk', 10],
+        ['idle.fr', 4],
+      ]),
+    });
+    expect(messages(packed.issues)).toEqual(
+      expect.arrayContaining([
+        'warning fps.wave: no animation is called wave; --fps wave=6 does nothing',
+        "warning fps.walk: walk plays at the contract's 8 fps; --fps walk=10 does nothing",
+      ]),
+    );
+    expect(messages(packed.issues).filter((m) => m.includes('fps.idle'))).toEqual([]);
+    expect(packed.entry.animations['idle.fr']?.fps).toBe(4);
   });
 
   it('refuses to upscale, to clip a pose, or to take an unknown strip', () => {

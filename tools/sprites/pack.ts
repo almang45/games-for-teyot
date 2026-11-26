@@ -67,6 +67,8 @@ interface Frame {
   readonly art: Raster;
   /** Opaque bounds of `art`. */
   readonly box: Box;
+  /** Where `art`'s first row sits in the strip, so poses keep their height relative to each other. */
+  readonly top: number;
 }
 
 /** Each pose cropped to its own pixels, keeping a margin for soft edges. */
@@ -74,15 +76,16 @@ function figures(panels: readonly Raster[], margin: number): Frame[] {
   return panels.map((panel, i) => {
     const box = opaqueBox(panel);
     if (!box) throw new Error(`pose ${i} is empty`);
+    const top = Math.max(0, box.top - margin);
     const art = crop(panel, {
       left: box.left - margin,
-      top: box.top - margin,
+      top,
       right: box.right + margin,
       bottom: box.bottom + margin,
     });
     const at = opaqueBox(art);
     if (!at) throw new Error(`pose ${i} is empty`);
-    return { art, box: at };
+    return { art, box: at, top };
   });
 }
 
@@ -94,7 +97,7 @@ function scaled(frame: Frame, scale: number): Frame {
   );
   const box = opaqueBox(art) ?? opaqueBox(art, 1);
   if (!box) throw new Error('a pose vanished when scaled down');
-  return { art, box };
+  return { art, box, top: frame.top * scale };
 }
 
 /** Mean x of the opaque pixels in the top of the figure. */
@@ -124,10 +127,19 @@ function placeStanding(frame: Frame, size: readonly [number, number], stance: St
   return { tile, clipped: blit(tile, frame.art, x, y) };
 }
 
-function placeCentred(frame: Frame, size: readonly [number, number]): Placed {
+/** How far to move a scaled strip down so its reference bust sits centred in the frame. */
+function portraitOffset(reference: Frame, size: readonly [number, number]): number {
+  return size[1] / 2 - (reference.top + (reference.box.top + reference.box.bottom + 1) / 2);
+}
+
+/**
+ * Portraits move by one offset for the whole strip, so a pose that is a little taller or wider
+ * than the reference doesn't shift the face; across, each frame centres on the head.
+ */
+function placePortrait(frame: Frame, size: readonly [number, number], offset: number): Placed {
   const tile = blank(size[0], size[1]);
-  const x = Math.round(size[0] / 2 - (frame.box.left + frame.box.right + 1) / 2);
-  const y = Math.round(size[1] / 2 - (frame.box.top + frame.box.bottom + 1) / 2);
+  const x = Math.round(size[0] / 2 - headCentre(frame));
+  const y = Math.round(offset + frame.top);
   return { tile, clipped: blit(tile, frame.art, x, y) };
 }
 
@@ -179,6 +191,7 @@ function packStrip(
     );
     return { tiles: [], issues };
   }
+  const offset = family.stance ? 0 : portraitOffset(scaled(reference, scale), family.frame);
   const tiles = poses.map((pose, i) => {
     const drift = boxHeight(pose.box) / boxHeight(reference.box) - 1;
     if (Math.abs(drift) > HEIGHT_DRIFT) {
@@ -192,7 +205,7 @@ function packStrip(
     const small = scaled(pose, scale);
     const placed = family.stance
       ? placeStanding(small, family.frame, family.stance)
-      : placeCentred(small, family.frame);
+      : placePortrait(small, family.frame, offset);
     if (placed.clipped > 0) {
       issues.push(
         error(
@@ -214,6 +227,31 @@ function layout(tiles: readonly Raster[], size: readonly [number, number]): Rast
     blit(sheet, tile, (i % columns) * size[0], Math.floor(i / columns) * size[1]);
   });
   return sheet;
+}
+
+/** A warning for each --fps entry that changes nothing: no such animation, or a fixed rate. */
+function unusedRates(names: readonly [string, AnimationSpec][], fps: PackOptions['fps']): Issue[] {
+  const issues: Issue[] = [];
+  for (const [name, rate] of fps ?? []) {
+    const matching = names.filter(([n]) => n === name || n.split('.')[0] === name);
+    if (matching.length === 0) {
+      issues.push(
+        warning(
+          `fps.${name}`,
+          `no animation is called ${name}; --fps ${name}=${rate} does nothing`,
+        ),
+      );
+    } else if (matching.every(([, spec]) => spec.fps !== null)) {
+      const fixed = matching[0]?.[1].fps;
+      issues.push(
+        warning(
+          `fps.${name}`,
+          `${name} plays at the contract's ${fixed} fps; --fps ${name}=${rate} does nothing`,
+        ),
+      );
+    }
+  }
+  return issues;
 }
 
 function rateFor(name: string, spec: AnimationSpec, fps: PackOptions['fps']): number {
@@ -247,6 +285,7 @@ export function packSheet(
       );
     }
   }
+  issues.push(...unusedRates(names, options.fps));
   const tiles: Raster[] = [];
   const animations: Animations = {};
   const missing: string[] = [];
