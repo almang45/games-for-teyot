@@ -360,7 +360,13 @@ Secrets:
   failure that comes back waits on the icon retry button. Once rooms exist, a scene error returns
   her to the House hub through OVL-RECOVER instead.
 
-## 12. Data model (sketch)
+## 12. Data model
+
+Implemented in `src/storage/` (zod schemas in `schema.ts`, IndexedDB `rumah-cici-theia` v1 in
+`db.ts`). A browser that refuses IndexedDB gets `MemoryProgressStore`: she can play, nothing is
+saved, and `storage.open_failed` is logged. Import is all or nothing: a file is parsed and checked
+before one transaction replaces everything. Reset clears progress, attempts and the session
+counter, and keeps the parent's settings.
 
 ```ts
 type ItemId = `${'upper' | 'lower' | 'num' | 'stroke' | 'syl' | 'word' | 'count'}.${string}`;
@@ -391,11 +397,14 @@ interface Settings {
   narrator: 'papa' | 'mama' | 'alternate';  // default 'mama'
   caseOrder: 'lower-first' | 'upper-first';  // default 'lower-first'
   corridorOverride?: number;
+  bedtimeCooldown: boolean;        // default true; off lets "Mulai" start again straight away
+  digitsUnlocked: boolean;         // default false; a parent's manual T1 unlock
 }
 
 interface ProgressExport {
   schemaVersion: number;
   exportedAt: string;
+  session: number;                 // last session started, so waits carry over to a new device
   settings: Settings;
   items: ItemProgress[];
   attempts: StrokeAttempt[];

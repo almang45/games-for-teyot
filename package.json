@@ -41,6 +41,7 @@
     "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10.14.0",
     "eslint-plugin-svelte": "^3.24.1",
+    "fake-indexeddb": "^6.2.8",
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
     "prettier": "^3.10.1",

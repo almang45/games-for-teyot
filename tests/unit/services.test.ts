@@ -3,6 +3,7 @@ import type * as Phaser from 'phaser';
 import { describe, expect, it } from 'vitest';
 import { markActiveScene, provideServices, servicesOf } from '../../src/game/services';
 import { createAppLog } from '../../src/log';
+import { MemoryProgressStore } from '../../src/storage';
 
 function fakeRegistry() {
   const store = new Map<string, unknown>();
@@ -12,7 +13,11 @@ function fakeRegistry() {
 describe('game services', () => {
   it('round-trips through the registry', () => {
     const registry = fakeRegistry();
-    const services = { logger: createAppLog('s', false).logger, audio: {} as AudioContext };
+    const services = {
+      logger: createAppLog('s', false).logger,
+      audio: {} as AudioContext,
+      progress: new MemoryProgressStore(),
+    };
     provideServices({ registry } as unknown as Phaser.Game, services);
     const scene = { registry, scene: { key: 'Boot' } } as unknown as Phaser.Scene;
     expect(servicesOf(scene)).toBe(services);
