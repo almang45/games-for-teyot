@@ -98,6 +98,21 @@ describe('validateAssets', () => {
     ]);
   });
 
+  it('takes a font licence beside the fonts without registering it', () => {
+    deliverAssets();
+    put('assets/fonts/OFL.txt', 'SIL OPEN FONT LICENSE Version 1.1');
+    put('assets/fonts/LICENSE-andika.txt', 'Copyright SIL International');
+    expect(errors(validateAssets(root))).toEqual([]);
+    put('assets/fonts/OFL.txt', '');
+    put('assets/fonts/notes.txt', 'not a licence');
+    put('assets/ui/OFL.txt', 'SIL OPEN FONT LICENSE Version 1.1');
+    expect(errors(validateAssets(root))).toEqual([
+      'assets/fonts/OFL.txt : a font licence is plain text (ASSETS.md §5)',
+      'assets/fonts/notes.txt : not registered in assets/manifest.json',
+      'assets/ui/OFL.txt : not registered in assets/manifest.json',
+    ]);
+  });
+
   it('accepts a complete delivery, warning only about staged art', () => {
     deliverAssets();
     put('assets/style/reference-sheet.png', blank(10, 10));

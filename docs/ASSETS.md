@@ -407,7 +407,7 @@ it with a soft vignette.
 | UI | `ui/*.png` | Back (home) button, parent-gate corner icon, swatch frame, keypad, tiles. 144–1024 px per side. |
 | Cursor | `ui/cursor-<state>.png` | `ui.cursor.normal` and `ui.cursor.pressed`, 64 × 64 with a `hotspot` in the manifest. The build makes the 32 × 32 version. |
 | App icons | `icons/` | `icons.app.192`, `icons.app.512`, `icons.app.maskable-512` (safe zone respected), `icons.app.apple-touch-180` |
-| Fonts | `fonts/<id>.woff2` | `font.<id>`, bundled locally (no remote fonts). Referenced from `design/tokens.json`. |
+| Fonts | `fonts/<id>.woff2` | `font.<id>`, bundled locally (no remote fonts). Referenced from `design/tokens.json`. The licence text sits beside them as `fonts/OFL.txt` (or `LICENSE-<id>.txt`), unregistered. |
 
 ## 6. Coloring pages (strict)
 
