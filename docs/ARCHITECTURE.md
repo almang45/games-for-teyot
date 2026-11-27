@@ -17,6 +17,7 @@ Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`AS
 | Storage | IndexedDB via `idb` | Structured progress and stroke replays. Larger quota than localStorage. |
 | Validation | `zod` | Asset manifest, content files, and imported progress JSON are validated at load time |
 | Unit tests | Vitest | Tracing scorer, scheduler, nav graph, schema |
+| Component tests | Vitest (happy-dom) + Svelte Testing Library | `ui/*.test.ts`, every state and event (Vitest project `ui`, next to `unit`) |
 | E2E | Playwright, Android phone and tablet viewport emulation, touch enabled | Smoke tests per room |
 | Lint/format | ESLint (`typescript-eslint` strict), Prettier | |
 | Hosting | Cloudflare Workers, static assets | Free tier, global edge, preview versions per PR |
@@ -319,8 +320,8 @@ lint ─▶ test ─▶ build ─▶ validate + e2e ─▶ SAST ─▶ quality-g
 
 | Stage | Contents |
 |---|---|
-| lint | `tsc --noEmit`, ESLint, Prettier check |
-| test | Vitest with coverage. |
+| lint | `svelte-check` on `src/` + `ui/` (browser types, runes only), `tsc --noEmit` on tools, tests and configs, ESLint (Svelte compiler warnings are errors), Prettier check |
+| test | Vitest with coverage: `tests/unit/` on Node, `ui/*.test.ts` on happy-dom. |
 | build | `vite build`. Fails if the size budget (§10) is exceeded. Uploads `dist` for the next stages. |
 | validate | `npm run validate` = `validate:design` + `validate:assets` (`tools/validate/`), against `contracts/`. Design: `tokens.json` (schema, contrast), `motion.json` (required moments, duration caps), `layouts/<screen-id>.json` (tap sizes per device, safe area, fixed HUD), keys cross-checked with the manifest, and the `ui/` lane rules. Assets: manifest schema and key families, image and frame sizes, drop zones, `layout.json` geometry and reachability, coloring-page closure, nothing unregistered. Unknown files and symlinks fail. Later: all audio keys referenced in content are present. |
 | e2e | Playwright against the built `dist` (`vite preview`): tablet and phone (touch) and laptop (mouse) viewports, Chromium + WebKit. Runs next to validate. |

@@ -6,6 +6,7 @@ export const COVERAGE_INCLUDE = [
   'src/**/*.ts',
   'tools/**/*.{ts,mjs}',
   'contracts/**/*.ts',
+  'ui/**/*.svelte',
 ] as const;
 
 export const COVERAGE_EXCLUDE = [
@@ -21,6 +22,7 @@ export const COVERAGE_EXCLUDE = [
   'tools/validate/validate-*.ts',
   'tools/validate/write-schemas.ts',
   'tools/dev/**',
+  'tools/proto/**',
   'tools/house/blockout.ts',
   'tools/inputs/check.ts',
   'tools/inputs/frames.ts',

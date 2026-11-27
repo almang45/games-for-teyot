@@ -33,7 +33,8 @@ Requires Node 26 (see `.nvmrc`).
 ```sh
 npm ci
 npm run dev          # http://localhost:5173/?browser=1 skips SCR-INSTALL in a plain tab
-npm run check        # typecheck + lint + unit tests with coverage
+npm run check        # typecheck + lint + unit and ui/ component tests with coverage
+npm run proto        # prototype/ gallery at http://localhost:5174/ (add -- --host for a phone on the LAN)
 npm run build        # production build + size budget + privacy check
 npx playwright install chromium webkit   # once
 npm run test:e2e     # tablet / phone (touch) + laptop (mouse), Chromium + WebKit
@@ -48,6 +49,7 @@ npm run contracts:schema   # JSON Schemas for editors, into contracts/schema/ (g
 | `contracts/` | zod schemas both agents build against: manifest, layouts, tokens, motion, `ui/` props |
 | `tools/build/` | Placeholder icons, `_headers` parsing, budget and privacy checks |
 | `tools/validate/` | `validate:design` and `validate:assets` |
+| `tools/proto/` | Vite config for `npm run proto` (serves Antigravity's `prototype/`, never built) |
 | `tests/unit/`, `tests/e2e/` | Vitest and Playwright. E2E tests are named after PRD story IDs. |
 | `public/` | `_headers` (CSP, caching), `robots.txt` |
 | `.github/workflows/ci.yml` | lint → test → build → validate + e2e → Semgrep + osv-scanner → SonarQube Cloud gate → deploy |

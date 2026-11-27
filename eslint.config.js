@@ -3,6 +3,7 @@ import { defineConfig } from 'eslint/config';
 import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import svelteConfig from './svelte.config.js';
 
 export default defineConfig(
   {
@@ -39,7 +40,16 @@ export default defineConfig(
   },
   {
     files: ['**/*.svelte'],
-    languageOptions: { parserOptions: { parser: tseslint.parser } },
+    languageOptions: {
+      // Only the compiler options: ESLint can't serialize the Vite plugin's callback.
+      parserOptions: {
+        parser: tseslint.parser,
+        svelteConfig: { compilerOptions: svelteConfig.compilerOptions },
+      },
+    },
+    // Compiler warnings (a11y, unused CSS, rune/store clashes) fail lint; svelte-check reports
+    // them too but can't fail on them while ui/ is empty.
+    rules: { 'svelte/valid-compile': 'error' },
   },
   {
     files: ['tools/**', '*.config.{js,ts}', 'tests/**'],

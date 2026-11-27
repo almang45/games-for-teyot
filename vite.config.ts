@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -113,8 +114,18 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['tests/unit/**/*.test.ts'],
-    environment: 'node',
+    projects: [
+      {
+        extends: true,
+        test: { name: 'unit', include: ['tests/unit/**/*.test.ts'], environment: 'node' },
+      },
+      {
+        extends: true,
+        // Browser condition and per-test DOM cleanup, so components mount as they do on the tablet.
+        plugins: [svelteTesting()],
+        test: { name: 'ui', include: ['ui/**/*.test.ts'], environment: 'happy-dom' },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
