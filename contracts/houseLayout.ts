@@ -15,14 +15,27 @@ import {
   type Point,
   type Rect,
 } from './common.ts';
-import { pointInPolygon, polygonArea, sampleSegment, selfIntersects } from './geometry.ts';
+import {
+  distanceToBoundary,
+  pointInPolygon,
+  polygonArea,
+  samplePolygon,
+  sampleSegment,
+  selfIntersects,
+} from './geometry.ts';
 import { activity, roomId, storey, type Storey } from './rooms.ts';
 
 /** layout.json coordinates: the 1920 × 1200 house export space (ASSETS.md §4.2). */
 export const HOUSE_SIZE = [1920, 1200] as const;
 
-/** Edges are checked against the walkable floor every this many px. */
+/** Edges, walk outlines and floors are checked every this many px. */
 const EDGE_SAMPLE_PX = 8;
+
+/**
+ * A neighbour's tap area may reach this far onto a floor: rooms that share an edge meet on it,
+ * and whole-pixel coordinates put that edge a pixel either way.
+ */
+const SHARED_EDGE_PX = 2;
 
 export const houseRoom = z.strictObject({
   id: roomId,
@@ -41,6 +54,32 @@ export const houseRoom = z.strictObject({
   parking: z.strictObject({ bubu: point, ocica: point }),
 });
 export type HouseRoom = z.infer<typeof houseRoom>;
+
+/**
+ * Paint order of rooms: negative when `a` is drawn before (under) `b`. Higher storeys sit on top,
+ * then the room nearer the viewer. The hub draws with it and taps resolve with it, so a tap always
+ * lands on the room the child sees.
+ */
+export function paintOrder(a: HouseRoom, b: HouseRoom): number {
+  return a.storey - b.storey || a.stand[1] - b.stand[1];
+}
+
+/**
+ * The room a tap reaches among those `reaches` lets through: the last in paint order, the earlier
+ * in `rooms` on a tie. The engine's tap (`roomAt`) and `checkHouseLayout` share it, so the
+ * validator checks the rule the game actually plays by.
+ */
+export function topRoom(
+  rooms: readonly HouseRoom[],
+  reaches: (room: HouseRoom) => boolean,
+): HouseRoom | undefined {
+  let hit: HouseRoom | undefined;
+  for (const room of rooms) {
+    if (!reaches(room)) continue;
+    if (!hit || paintOrder(room, hit) > 0) hit = room;
+  }
+  return hit;
+}
 
 export const houseSpot = z.strictObject({
   room: roomId,
@@ -127,18 +166,68 @@ function checkRoom(room: HouseRoom, i: number): Issue[] {
     ...checkPolygon(room.polygon, `${path}.polygon`),
     ...checkPolygon(room.walk, `${path}.walk`),
   ];
-  if (!pointInPolygon(room.stand, room.walk)) {
+  const outline = room.walk.flatMap((a, j) =>
+    sampleSegment(a, room.walk[(j + 1) % room.walk.length] ?? a, EDGE_SAMPLE_PX),
+  );
+  if (!outline.every((p) => pointInPolygon(p, room.polygon))) {
+    issues.push(error(`${path}.walk`, 'the walk polygon must lie inside the tap polygon'));
+  }
+  const standOnFloor = pointInPolygon(room.stand, room.walk);
+  if (!standOnFloor) {
     issues.push(error(`${path}.stand`, 'stand must lie inside the walk polygon'));
   }
   for (const who of ['bubu', 'ocica'] as const) {
-    if (!pointInPolygon(room.parking[who], room.walk)) {
+    const spot = room.parking[who];
+    if (!pointInPolygon(spot, room.walk)) {
       issues.push(error(`${path}.parking.${who}`, 'parking spot must lie inside the walk polygon'));
+    } else if (
+      // Bubu and Ocica walk straight there from the stand on arrival (#36).
+      standOnFloor &&
+      !sampleSegment(room.stand, spot, EDGE_SAMPLE_PX).every((p) => pointInPolygon(p, room.walk))
+    ) {
+      issues.push(
+        error(`${path}.parking.${who}`, 'the straight walk from the stand leaves the walk polygon'),
+      );
     }
   }
   if (!rectContains(FRAME_RECT, room.focus)) {
     issues.push(error(`${path}.focus`, 'focus rect leaves the canvas'));
   }
   return issues;
+}
+
+/**
+ * The room a tap at `p` reaches among `room`'s storey, by the engine's rule (`topRoom`). A
+ * neighbour counts only once `p` is past the shared edge.
+ */
+function tapWinner(p: Point, room: HouseRoom, layout: HouseLayout): HouseRoom | undefined {
+  return topRoom(
+    layout.rooms,
+    (r) =>
+      r.storey === room.storey &&
+      pointInPolygon(p, r.polygon) &&
+      (r === room || distanceToBoundary(p, r.polygon) > SHARED_EDGE_PX),
+  );
+}
+
+/**
+ * A tap on a room's floor reaches that room, not a neighbour on its storey whose tap area reaches
+ * over it. Storeys above may cover it: the child sees them on top, and the zoom fades them out.
+ */
+function checkTapOverlap(layout: HouseLayout): Issue[] {
+  return layout.rooms.flatMap((room, i) => {
+    // checkPolygon reports a floor off the canvas; a grid over a typo'd 100000 px bbox would hang.
+    if (!room.walk.every((p) => rectContainsPoint(FRAME_RECT, p))) return [];
+    const floor = samplePolygon(room.walk, EDGE_SAMPLE_PX);
+    const lost = new Map<string, number>();
+    for (const p of floor) {
+      const winner = tapWinner(p, room, layout);
+      if (winner && winner !== room) lost.set(winner.id, (lost.get(winner.id) ?? 0) + 1);
+    }
+    return [...lost].map(([id, n]) =>
+      error(`rooms[${i}].walk`, `${n} of ${floor.length} points on this floor tap ${id}`),
+    );
+  });
 }
 
 function onFloor(p: Point, s: Storey, layout: HouseLayout): boolean {
@@ -218,12 +307,26 @@ function checkProp(prop: HouseProp, i: number, layout: HouseLayout): Issue[] {
   return issues;
 }
 
-/** ASSETS.md §4.2 rules the schema can't express. */
-export function checkHouseLayout(layout: HouseLayout): Issue[] {
+/**
+ * The rules routing depends on: unique node ids, a start room, and a graph that stays on the
+ * floors and reaches every room. Cheap enough to run on the device each time the house opens;
+ * `checkHouseLayout` runs it along with the area checks that CI validates once.
+ */
+export function checkNavGraph(layout: HouseLayout): Issue[] {
   const issues: Issue[] = [];
   const ids = [...layout.rooms.map((r) => r.id), ...layout.waypoints.map((w) => w.id)];
   const dupeIds = duplicates(ids);
   for (const dupe of dupeIds) issues.push(error('rooms', `duplicate node id ${dupe}`));
+  const hasStart = layout.rooms.some((r) => r.id === layout.start);
+  if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
+  // The graph walk needs unambiguous nodes and a start to walk from.
+  if (dupeIds.length === 0 && hasStart) issues.push(...checkGraph(layout));
+  return issues;
+}
+
+/** ASSETS.md §4.2 rules the schema can't express. */
+export function checkHouseLayout(layout: HouseLayout): Issue[] {
+  const issues: Issue[] = [];
   const activities = layout.rooms.flatMap((r) => r.activities);
   for (const dupe of duplicates(activities)) {
     issues.push(error('rooms', `${dupe} is hosted by more than one room`));
@@ -235,9 +338,8 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
     issues.push(error('props', `duplicate prop ${dupe}`));
   }
   layout.props.forEach((p, i) => issues.push(...checkProp(p, i, layout)));
-  const hasStart = layout.rooms.some((r) => r.id === layout.start);
-  if (!hasStart) issues.push(error('start', `start room ${layout.start} is not in rooms`));
   layout.rooms.forEach((r, i) => issues.push(...checkRoom(r, i)));
+  issues.push(...checkTapOverlap(layout));
   for (const [name, spot] of Object.entries(layout.spots)) {
     const room = layout.rooms.find((r) => r.id === spot.room);
     if (!room) issues.push(error(`spots.${name}.room`, `${spot.room} is not in rooms`));
@@ -245,7 +347,6 @@ export function checkHouseLayout(layout: HouseLayout): Issue[] {
       issues.push(error(`spots.${name}.rect`, 'spot leaves the canvas'));
     }
   }
-  // The graph walk needs unambiguous nodes and a start to walk from.
-  if (dupeIds.length === 0 && hasStart) issues.push(...checkGraph(layout));
+  issues.push(...checkNavGraph(layout));
   return issues;
 }

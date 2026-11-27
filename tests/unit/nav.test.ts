@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../contracts/common';
-import { checkHouseLayout, houseLayout, type HouseLayout } from '../../contracts/houseLayout';
+import {
+  checkHouseLayout,
+  houseLayout,
+  paintOrder,
+  type HouseLayout,
+} from '../../contracts/houseLayout';
 import {
   buildNavGraph,
   lerp,
@@ -11,7 +16,7 @@ import {
   type NavGraph,
   type NavNode,
 } from '../../src/engine/nav/graph';
-import { paintOrder, roomAt } from '../../src/engine/nav/hit';
+import { roomAt } from '../../src/engine/nav/hit';
 import { facingAlong, NavWalker, type Facing } from '../../src/engine/nav/walker';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
@@ -104,7 +109,7 @@ describe('nav graph', () => {
     expect(() => shortestPath(graph, 'dapur', 'loteng')).toThrow(NavGraphError);
   });
 
-  it('rejects any layout checkHouseLayout rejects', () => {
+  it('rejects any layout checkNavGraph rejects', () => {
     const dupe = {
       ...layout,
       waypoints: [{ id: 'dapur', pos: [0, 0] as Point, storey: 0 as const }],
@@ -114,6 +119,20 @@ describe('nav graph', () => {
     expect(() => buildNavGraph(dangling)).toThrow(/unknown node loteng/);
     expect(() => buildNavGraph({ ...layout, edges: [] })).toThrow(NavGraphError);
     expect(() => buildNavGraph({ ...layout, edges: [] })).toThrow(/not reachable/);
+    expect(() => buildNavGraph({ ...layout, start: 'loteng' as HouseLayout['start'] })).toThrow(
+      /start room loteng/,
+    );
+  });
+
+  it('leaves the area checks to CI, so opening the house stays cheap', () => {
+    const [first] = layout.rooms;
+    if (!first) throw new Error('placeholder has rooms');
+    const spotOff: HouseLayout = {
+      ...layout,
+      spots: { ...layout.spots, fridge: { room: first.id, rect: [1900, 10, 100, 100] } },
+    };
+    expect(checkHouseLayout(spotOff)).not.toEqual([]);
+    expect(() => buildNavGraph(spotOff)).not.toThrow();
   });
 
   it('measures polylines', () => {

@@ -1,13 +1,18 @@
 import * as Phaser from 'phaser';
 import type { Point } from '../../contracts/common.ts';
-import { HOUSE_SIZE, type HouseLayout, type HouseRoom } from '../../contracts/houseLayout.ts';
+import {
+  HOUSE_SIZE,
+  paintOrder,
+  type HouseLayout,
+  type HouseRoom,
+} from '../../contracts/houseLayout.ts';
 import { STOREYS, type RoomId, type Storey } from '../../contracts/rooms.ts';
 import { isPhone, tapSize } from '../engine/camera/device';
 import { boundsOf } from '../engine/camera/focus';
 import { fitView, HouseCamera, type Ease } from '../engine/camera/houseCamera';
 import { Companions } from '../engine/nav/companions';
 import { buildNavGraph, samePoint } from '../engine/nav/graph';
-import { paintOrder, roomAt } from '../engine/nav/hit';
+import { roomAt } from '../engine/nav/hit';
 import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
 import type { Logger } from '../log';
