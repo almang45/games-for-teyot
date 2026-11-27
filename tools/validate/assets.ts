@@ -45,6 +45,20 @@ function checkReferenceSheet(root: string, file: string): FileIssue[] {
   }
 }
 
+/**
+ * A font's licence text (the SIL OFL for Andika) lives beside the font it covers, as the licence
+ * asks. It is plain text, never registered: the game doesn't load it.
+ */
+const FONT_LICENCE = /^assets\/fonts\/(?:OFL|LICENSE)(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?\.txt$/;
+
+function checkFontLicence(root: string, file: string): FileIssue[] {
+  const text = readFileSync(join(root, file));
+  if (text.length === 0 || text.includes(0)) {
+    return [{ ...error('', 'a font licence is plain text (ASSETS.md §5)'), file }];
+  }
+  return [];
+}
+
 const isLink = (root: string, path: string): boolean =>
   lstatSync(join(root, path), { throwIfNoEntry: false })?.isSymbolicLink() === true;
 
@@ -159,6 +173,7 @@ export function validateAssets(root: string): Report {
   for (const f of files) {
     if (f.symlink) continue;
     if (f.path.startsWith(REFERENCE_SHEETS)) issues.push(...checkReferenceSheet(root, f.path));
+    else if (FONT_LICENCE.test(f.path)) issues.push(...checkFontLicence(root, f.path));
     else if (!registered.has(f.path)) {
       issues.push({ ...error('', 'not registered in assets/manifest.json'), file: f.path });
     }
