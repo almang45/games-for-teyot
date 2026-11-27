@@ -118,7 +118,9 @@ const TRACK_WINDOW = 0.25;
  * locally from point to point, so a stroke that crosses itself (8) or turns sharply (zigzag)
  * doesn't jump between its parts. A drop, not total backward travel, so jitter doesn't add up.
  * After an excursion off the path the finger may come back beyond the window, so the tracker
- * picks the path up again wherever the finger rejoins it.
+ * picks the path up again wherever the finger rejoins it. Only after it really left the path:
+ * a finger that runs on past a stroke's end onto an earlier part of it (the 6 closing onto its
+ * own stem) never left the corridor, and jumping back there would count as going backwards.
  */
 function backwardTravel(path: Polyline, user: readonly Point[], w: number): number {
   const first = user[0];
@@ -129,10 +131,17 @@ function backwardTravel(path: Polyline, user: readonly Point[], w: number): numb
   let progress = here;
   let best = progress;
   let drop = 0;
+  let lost = false;
   for (const p of user.slice(1)) {
     const near = track(path, p, here, closed);
-    const next = near.distance <= w ? near : relock(path, p, here, closed);
-    if (next.distance > w) continue;
+    let next = near;
+    if (near.distance > w) {
+      const anywhere = relock(path, p, here, closed);
+      if (anywhere.distance > w) lost = true;
+      if (anywhere.distance > w || !lost) continue;
+      next = anywhere;
+    }
+    lost = false;
     progress += next.delta;
     here = next.s;
     best = Math.max(best, progress);

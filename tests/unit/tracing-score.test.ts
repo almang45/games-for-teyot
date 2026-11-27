@@ -145,6 +145,20 @@ describe('scoring a stroke (US-TRACE-03, ARCHITECTURE.md §4.3)', () => {
     const outward = { x: start.x + 0.2, y: start.y + 0.05 };
     const backwards = scoreStroke(circle, [start, outward, ...wrongWay], strict);
     expect(backwards.failed).toEqual(['direction']);
+    // Running on past the end onto an earlier part of the stroke, without leaving the corridor,
+    // is not going back: the 6 closes its loop and the finger slides on up its own stem.
+    const six = glyphs.get('digit.6')?.strokes[0];
+    if (!six) throw new Error('digit.6 has no stroke');
+    const end = pointAt(six, six.length);
+    const onTo = { x: 0.12, y: 0.75 };
+    const overshoot = [
+      ...Array.from({ length: 120 }, (_, i) => pointAt(six, (six.length * i) / 119)),
+      ...Array.from({ length: 12 }, (_, i) => ({
+        x: end.x + ((onTo.x - end.x) * (i + 1)) / 12,
+        y: end.y + ((onTo.y - end.y) * (i + 1)) / 12,
+      })),
+    ];
+    expect(scoreStroke(six, overshoot, strict)).toMatchObject({ passed: true, backtrack: 0 });
     expect(directionEnforced('T0')).toBe(false);
     expect(directionEnforced('T1')).toBe(false);
     expect(directionEnforced('T2')).toBe(true);
