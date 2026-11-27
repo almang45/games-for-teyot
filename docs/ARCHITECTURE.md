@@ -171,13 +171,22 @@ Tolerance changes are logged so the dashboard can show the trend.
 A 3-year-old plays irregularly, so intervals count **sessions, not days**.
 
 - Every learnable item (`upper.A`, `num.4`, `syl.ma`, `count.5`) has a record:
-  `{ box: 1..5, lastSeenSession, attempts, successes }`.
+  `{ box: 1..5, waitFromSession, lastSeenSession, attempts, successes, sessionMisses }`.
 - Box intervals in sessions: `1, 2, 4, 8, 16`. Success promotes one box. Three misses in one
   session demote one box. They never reset to box 1.
+- A new item enters box 1. A success promotes only when the item was new or due, so an easy
+  win or a second go in the same session doesn't skip the wait. The demotion happens once per
+  session. Practice attempts (mouse) leave the record unchanged.
+- The wait counts from `waitFromSession`, which only a passed review or a demotion moves. An easy win or a miss
+  short of demotion doesn't push the next review away, and a due item that is missed stays due:
+  a retry in the same session can still promote it, and otherwise it comes back next session.
 - Picker order for each activity:
   1. Items due for review, at most 2 of every 3 slots.
   2. The next new item in curriculum order (her name's letters first).
-  3. One **already-mastered** item as an easy win.
+  3. One **already-mastered** item as an easy win, played last so the round ends on a success.
+  - Due items: most overdue first, then the lower box. Easy win: the one unseen for longest.
+  - When a kind runs short, the round fills from the others, so it always has 3 items once 3
+    are unlocked, and never the same one twice.
 - A level unlocks when 80% of the previous level's items reach box ≥ 3.
 - The House hub asks the scheduler which rooms have due items, and **Bubu** points at those.
 
@@ -357,7 +366,9 @@ interface ItemProgress {
   box: 1 | 2 | 3 | 4 | 5;
   attempts: number;
   successes: number;
+  waitFromSession: number;         // the box's wait counts from here: last passed review or demotion
   lastSeenSession: number;
+  sessionMisses: number;           // misses in lastSeenSession, for the demotion rule
 }
 
 interface StrokeAttempt {          // kept for the newest 20 per item, for replay + fixtures
