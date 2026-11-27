@@ -18,8 +18,9 @@ export const MISSES_TO_DEMOTE = 3;
 export interface ItemRecord {
   readonly box: Box;
   /**
-   * Session the current box's wait counts from: its last passed review or demotion. Attempts that change nothing (an easy win, a miss short of demotion) leave it, so
-   * they never push a review further away.
+   * Session the current box's wait counts from: its last passed review or demotion. Attempts
+   * that change nothing (an easy win, a miss short of demotion) leave it, so they never push a
+   * review further away.
    */
   readonly waitFromSession: number;
   /** Session number of the last scored attempt. */
@@ -60,7 +61,8 @@ export function isMastered(record: ItemRecord | undefined): boolean {
  * not climb the boxes without the wait that makes them mean something. A due item that is missed
  * stays due, so a retry in the same session can still promote it and, if the session ends first,
  * it comes back next time. The third miss in a session demotes one box, once per session, and
- * never below box 1. Only a passed review or a demotion restarts the wait.
+ * never below box 1. Only a passed review or a demotion restarts the wait, and a demotion
+ * restarts it even in box 1, so a 4th try in the same session can't climb straight back.
  */
 export function applyOutcome(
   record: ItemRecord | undefined,
@@ -89,17 +91,14 @@ export function applyOutcome(
   const passedReview = outcome === 'success' && reviewable;
   const misses = record?.lastSeenSession === session ? base.sessionMisses : 0;
   let box = base.box;
-  let sessionMisses = misses;
-  if (outcome === 'success') {
-    if (passedReview) box = promote(box);
-  } else {
-    sessionMisses = misses + 1;
-    if (sessionMisses === MISSES_TO_DEMOTE) box = demote(box);
-  }
+  const sessionMisses = outcome === 'miss' ? misses + 1 : misses;
+  const demoted = outcome === 'miss' && sessionMisses === MISSES_TO_DEMOTE;
+  if (passedReview) box = promote(box);
+  if (demoted) box = demote(box);
   const next: ItemRecord = {
     box,
     // Box 5 can't climb, so its reviewed success restarts the wait without a box change.
-    waitFromSession: passedReview || box !== base.box ? session : base.waitFromSession,
+    waitFromSession: passedReview || demoted ? session : base.waitFromSession,
     lastSeenSession: session,
     attempts: base.attempts + 1,
     successes: base.successes + (outcome === 'success' ? 1 : 0),

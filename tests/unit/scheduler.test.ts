@@ -144,6 +144,15 @@ describe('Leitner boxes in sessions (ARCHITECTURE.md §5)', () => {
     expect(r).toMatchObject({ box: 1, waitFromSession: 5, lastSeenSession: 5 });
   });
 
+  it('restarts the wait on a demotion in box 1 too, so a 4th try that session can’t promote', () => {
+    let r: ItemRecord | undefined = rec(1, 0); // due at 1
+    for (let i = 0; i < MISSES_TO_DEMOTE; i++) r = applyOutcome(r, 'miss', 1).record;
+    expect(r).toMatchObject({ box: 1, waitFromSession: 1 });
+    const fourth = applyOutcome(r, 'success', 1);
+    expect(fourth.change).toBeUndefined();
+    expect(applyOutcome(fourth.record, 'success', 2).change).toEqual({ from: 1, to: 2 });
+  });
+
   it('counts misses per session, so misses spread over sessions never demote', () => {
     const r = play([
       [0, 'success'],
