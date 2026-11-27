@@ -25,4 +25,5 @@ export const COVERAGE_EXCLUDE = [
   'tools/inputs/check.ts',
   'tools/inputs/frames.ts',
   'tools/sprites/cli.ts',
+  'tools/strokes/synthesize.ts',
 ] as const;
