@@ -106,3 +106,8 @@ export function shortestPath(graph: NavGraph, from: string, to: string): string[
   for (let id = previous.get(to); id !== undefined; id = previous.get(id)) path.push(id);
   return path.reverse();
 }
+
+/** The stand-to-stand walk between two rooms as points, or undefined when `to` is unreachable. */
+export function roomRoute(graph: NavGraph, from: string, to: string): Point[] | undefined {
+  return shortestPath(graph, from, to)?.map((id) => nodeOf(graph, id).pos);
+}

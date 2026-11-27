@@ -4,6 +4,7 @@ import { expect, type ConsoleMessage, type Page } from '@playwright/test';
 export const GAME_URL = '/?browser=1';
 
 export interface LoggedEvent {
+  readonly ts: string;
   readonly event: string;
   readonly level: string;
   readonly scene: string | null;

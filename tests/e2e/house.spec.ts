@@ -11,6 +11,7 @@ import {
 import type { Point } from '../../contracts/common';
 import { TOUCH_DP } from '../../contracts/screenLayout';
 import { isPhone } from '../../src/engine/camera/device';
+import { NUDGE_IDLE_MS } from '../../src/engine/nav/nudge';
 import { roomAt } from '../../src/engine/nav/hit';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
 
@@ -275,6 +276,42 @@ test('US-HOUSE-02 Bubu and Ocica follow Theia up the stairs and settle by her in
   await expect
     .poll(() => events(log, 'house.companions_parked').at(0)?.data, { timeout: ARRIVAL_TIMEOUT })
     .toEqual({ room: 'kantor-papa' });
+  expect(log.filter((e) => e.level === 'error')).toEqual([]);
+});
+
+test('US-HOUSE-02 after 5 s without a tap Bubu goes and points at the room with something new', async ({
+  page,
+  hasTouch,
+}) => {
+  test.slow();
+  const log = await openHouse(page, hasTouch);
+  // Fresh storage: every tracing stroke is new, and tracing lives in the bedroom.
+  await expect
+    .poll(() => events(log, 'house.visits').at(0)?.data)
+    .toEqual({ rooms: ['kamar-tidur'] });
+  await expect
+    .poll(() => events(log, 'house.bubu_points').at(0)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'kamar-tidur' });
+
+  const at = (name: string): number => Date.parse(events(log, name).at(0)?.ts ?? '');
+  expect(at('house.bubu_nudge') - at('scene.ready')).toBeGreaterThanOrEqual(NUDGE_IDLE_MS);
+  // He went by himself: she is still in the room she started in.
+  expect(events(log, 'house.arrived')).toEqual([]);
+
+  // On a phone the view followed him, so the room he points at takes her tap.
+  if (onPhone(page)) {
+    await expect
+      .poll(() => layoutAfter(log, 'house.framed') && lastLayout(log)?.taps['kamar-tidur'], {
+        timeout: ARRIVAL_TIMEOUT,
+      })
+      .toBeTruthy();
+  }
+  await tapRoom(page, hasTouch, log, 'kamar-tidur');
+  const [arrival] = await arrivals(log, 1);
+  expect(arrival?.data.room).toBe('kamar-tidur');
+  await expect
+    .poll(() => events(log, 'house.companions_parked').at(-1)?.data, { timeout: ARRIVAL_TIMEOUT })
+    .toEqual({ room: 'kamar-tidur' });
   expect(log.filter((e) => e.level === 'error')).toEqual([]);
 });
 

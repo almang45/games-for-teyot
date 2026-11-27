@@ -151,6 +151,26 @@ export class Companions {
     return true;
   }
 
+  /**
+   * Bubu alone hops along `route`, to show Theia a room (PRD US-HOUSE-02); she and Ocica stay put.
+   * Only while she stands still. His path keeps the way back to her, so the next follow() brings
+   * him back along the way he went, never through a wall.
+   */
+  visit(route: readonly Point[]): void {
+    if (route.length === 0) return;
+    const toBubu = this.#bubuPath.between(this.#theiaArc, this.#bubuS);
+    this.#bubuPath = new Polyline([...toBubu, ...route]);
+    this.#bubuS = pathLength(toBubu);
+    this.#routeStart = 0;
+    this.#routeLength = 0;
+    this.#theiaArc = 0;
+  }
+
+  /** Bubu stands at the end of his path: on his parking spot, or where a visit took him. */
+  get bubuArrived(): boolean {
+    return this.#bubuS >= this.#bubuPath.length;
+  }
+
   update(dtMs: number, theia: TheiaState): void {
     const dt = Math.max(0, dtMs) / 1000;
     const walked = Math.max(0, this.#routeLength - (theia.walking ? theia.remaining : 0));

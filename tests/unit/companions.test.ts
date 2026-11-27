@@ -4,7 +4,7 @@ import { pointInPolygon } from '../../contracts/geometry';
 import type { HouseRoom } from '../../contracts/houseLayout';
 import type { RoomId } from '../../contracts/rooms';
 import { Companions, type CompanionTuning } from '../../src/engine/nav/companions';
-import { buildNavGraph, distance, nodeOf } from '../../src/engine/nav/graph';
+import { buildNavGraph, distance, nodeOf, roomRoute, samePoint } from '../../src/engine/nav/graph';
 import { Polyline } from '../../src/engine/nav/polyline';
 import { NavWalker } from '../../src/engine/nav/walker';
 import { buildPlaceholderHouse } from '../../src/placeholder/house';
@@ -245,6 +245,76 @@ describe('Companions', () => {
     const r = start('ruang-keluarga');
     walkTo(r, 'dapur');
     r.companions.update(-100, { pos: r.walker.position, remaining: 0, walking: true });
+    expect(r.companions.bubu.travelled).toBe(0);
+  });
+});
+
+describe('Bubu showing her a room (US-HOUSE-02)', () => {
+  /** Sends Bubu from the room he last stood in to `to`'s parking spot, the way HouseScene does. */
+  function show({ companions }: Run, from: RoomId, to: RoomId): void {
+    const route = roomRoute(graph, from, to);
+    if (!route) throw new Error(`no route ${from} → ${to}`);
+    companions.visit([...route, room(to).parking.bubu]);
+  }
+
+  const onFloor =
+    (r: Run) =>
+    (f: number): void => {
+      expect(walkable(r.companions.bubu.pos), `Bubu off the floor at frame ${f}`).toBe(true);
+      expect(walkable(r.companions.ocica.pos), `Ocica off the floor at frame ${f}`).toBe(true);
+    };
+
+  const parkedIn = ({ companions }: Run, id: RoomId): boolean =>
+    samePoint(companions.bubu.pos, room(id).parking.bubu) &&
+    samePoint(companions.ocica.pos, room(id).parking.ocica);
+
+  it('hops alone up to the bedroom and stops on its spot; Theia and Ocica stay', () => {
+    const r = start('ruang-keluarga');
+    const ocica = r.companions.ocica.pos;
+    show(r, 'ruang-keluarga', 'kamar-tidur');
+    expect(r.companions.bubuArrived).toBe(false);
+    run(r, 600, onFloor(r));
+    expect(r.companions.bubuArrived).toBe(true);
+    expect(samePoint(r.companions.bubu.pos, room('kamar-tidur').parking.bubu)).toBe(true);
+    expect(r.companions.ocica.pos).toEqual(ocica);
+    expect(r.walker.position).toEqual(room('ruang-keluarga').stand);
+  });
+
+  it('comes back the way he went when she walks somewhere else', () => {
+    const r = start('ruang-keluarga');
+    show(r, 'ruang-keluarga', 'kamar-tidur');
+    run(r, 600);
+    expect(walkTo(r, 'dapur')).toBe(true);
+    run(r, 900, onFloor(r));
+    expect(parkedIn(r, 'dapur')).toBe(true);
+  });
+
+  it('comes back to her when she taps the room she is in', () => {
+    const r = start('ruang-keluarga');
+    show(r, 'ruang-keluarga', 'dapur');
+    run(r, 300);
+    expect(walkTo(r, 'ruang-keluarga')).toBe(true);
+    run(r, 300, onFloor(r));
+    expect(parkedIn(r, 'ruang-keluarga')).toBe(true);
+  });
+
+  it('goes on from the room he showed to the next one, even before he got there', () => {
+    const r = start('ruang-keluarga');
+    show(r, 'ruang-keluarga', 'dapur');
+    run(r, 20, onFloor(r));
+    show(r, 'dapur', 'kamar-tidur');
+    run(r, 900, onFloor(r));
+    expect(samePoint(r.companions.bubu.pos, room('kamar-tidur').parking.bubu)).toBe(true);
+    walkTo(r, 'kamar-tidur');
+    run(r, 900, onFloor(r));
+    expect(parkedIn(r, 'kamar-tidur')).toBe(true);
+  });
+
+  it('ignores an empty route', () => {
+    const r = start('ruang-keluarga');
+    r.companions.visit([]);
+    expect(r.companions.bubuArrived).toBe(true);
+    run(r, 10);
     expect(r.companions.bubu.travelled).toBe(0);
   });
 });
