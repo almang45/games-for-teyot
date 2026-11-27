@@ -2,65 +2,60 @@
   "$schema": "../contracts/schema/manifest.schema.json",
   "version": 1,
   "assets": [
-    {
-      "key": "house.layout",
-      "type": "layout",
-      "path": "house/layout.json",
-      "room": "global"
-    },
+    { "key": "house.layout", "room": "global", "type": "layout", "path": "house/layout.json" },
     {
       "key": "house.structure.lt-dasar",
+      "room": "global",
       "type": "image",
-      "path": "house/structure/lt-dasar.png",
-      "room": "global"
+      "path": "house/structure/lt-dasar.png"
     },
     {
       "key": "house.structure.mezzanine-1",
+      "room": "global",
       "type": "image",
-      "path": "house/structure/mezzanine-1.png",
-      "room": "global"
+      "path": "house/structure/mezzanine-1.png"
     },
     {
       "key": "house.structure.lt-atas",
+      "room": "global",
       "type": "image",
-      "path": "house/structure/lt-atas.png",
-      "room": "global"
+      "path": "house/structure/lt-atas.png"
     },
     {
       "key": "house.structure.mezzanine-2",
+      "room": "global",
       "type": "image",
-      "path": "house/structure/mezzanine-2.png",
-      "room": "global"
+      "path": "house/structure/mezzanine-2.png"
     },
     {
       "key": "house.props.dapur.kulkas",
+      "room": "dapur",
       "type": "image",
-      "path": "house/props/dapur/kulkas.png",
-      "room": "dapur"
+      "path": "house/props/dapur/kulkas.png"
     },
     {
       "key": "house.props.ruang-keluarga.sofa",
+      "room": "ruang-keluarga",
       "type": "image",
-      "path": "house/props/ruang-keluarga/sofa.png",
-      "room": "ruang-keluarga"
+      "path": "house/props/ruang-keluarga/sofa.png"
     },
     {
       "key": "house.props.ruang-keluarga.sofa-l",
+      "room": "ruang-keluarga",
       "type": "image",
-      "path": "house/props/ruang-keluarga/sofa-l.png",
-      "room": "ruang-keluarga"
+      "path": "house/props/ruang-keluarga/sofa-l.png"
     },
     {
       "key": "house.props.ruang-keluarga.puf",
+      "room": "ruang-keluarga",
       "type": "image",
-      "path": "house/props/ruang-keluarga/puf.png",
-      "room": "ruang-keluarga"
+      "path": "house/props/ruang-keluarga/puf.png"
     },
     {
       "key": "house.props.kamar-tidur.kasur",
+      "room": "kamar-tidur",
       "type": "image",
-      "path": "house/props/kamar-tidur/kasur.png",
-      "room": "kamar-tidur"
+      "path": "house/props/kamar-tidur/kasur.png"
     },
     {
       "key": "character.theia.default",
@@ -68,71 +63,78 @@
       "path": "character/theia/default.png",
       "frame": [256, 256],
       "animations": {
-        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
-        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
-        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
-        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
-        "stairs.fr": { "frames": [24, 31], "fps": 10, "loop": true },
-        "stairs.br": { "frames": [32, 39], "fps": 10, "loop": true },
-        "celebrate.fr": { "frames": [40, 45], "fps": 12, "loop": false },
-        "sleep.fr": { "frames": [46, 49], "fps": 4, "loop": true }
+        "idle.fr": { "frames": [0, 1], "fps": 6, "loop": false },
+        "idle.br": { "frames": [2, 3], "fps": 6, "loop": false },
+        "walk.fr": { "frames": [4, 7], "fps": 8, "loop": true },
+        "walk.br": { "frames": [8, 11], "fps": 8, "loop": true },
+        "stairs.fr": { "frames": [12, 15], "fps": 8, "loop": true },
+        "stairs.br": { "frames": [16, 19], "fps": 8, "loop": true },
+        "celebrate.fr": { "frames": [20, 22], "fps": 8, "loop": false },
+        "point.fr": { "frames": [23, 24], "fps": 6, "loop": false },
+        "think.fr": { "frames": [25, 26], "fps": 6, "loop": false },
+        "sleep.fr": { "frames": [27, 28], "fps": 1, "loop": true }
       },
       "room": "global"
     },
     {
       "key": "companion.bubu.default",
+      "room": "global",
       "type": "spritesheet",
       "path": "companion/bubu/default.png",
       "frame": [192, 160],
       "animations": {
-        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
-        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
-        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
-        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
-        "point.fr": { "frames": [24, 27], "fps": 8, "loop": false },
-        "demo.fr": { "frames": [28, 33], "fps": 10, "loop": true }
-      },
-      "room": "global"
+        "idle.fr": { "frames": [0, 1], "fps": 6, "loop": false },
+        "idle.br": { "frames": [2, 3], "fps": 6, "loop": false },
+        "walk.fr": { "frames": [4, 7], "fps": 6, "loop": true },
+        "walk.br": { "frames": [8, 11], "fps": 6, "loop": true },
+        "point.fr": { "frames": [12, 13], "fps": 6, "loop": false },
+        "demo.fr": { "frames": [14, 17], "fps": 6, "loop": true },
+        "celebrate.fr": { "frames": [18, 20], "fps": 6, "loop": false },
+        "sleep.fr": { "frames": [21, 22], "fps": 6, "loop": true }
+      }
     },
     {
       "key": "companion.ocica.default",
+      "room": "global",
       "type": "spritesheet",
       "path": "companion/ocica/default.png",
       "frame": [192, 160],
       "animations": {
-        "idle.fr": { "frames": [0, 3], "fps": 6, "loop": true },
-        "idle.br": { "frames": [4, 7], "fps": 6, "loop": true },
-        "walk.fr": { "frames": [8, 15], "fps": 12, "loop": true },
-        "walk.br": { "frames": [16, 23], "fps": 12, "loop": true },
-        "comfort.fr": { "frames": [24, 29], "fps": 10, "loop": false }
-      },
-      "room": "global"
+        "idle.fr": { "frames": [0, 1], "fps": 6, "loop": false },
+        "idle.br": { "frames": [2, 3], "fps": 6, "loop": false },
+        "walk.fr": { "frames": [4, 7], "fps": 6, "loop": true },
+        "walk.br": { "frames": [8, 11], "fps": 6, "loop": true },
+        "comfort.fr": { "frames": [12, 14], "fps": 6, "loop": false },
+        "celebrate.fr": { "frames": [15, 17], "fps": 6, "loop": false },
+        "eat.fr": { "frames": [18, 20], "fps": 6, "loop": false },
+        "sleep.fr": { "frames": [21, 22], "fps": 6, "loop": true }
+      }
     },
     {
       "key": "parent.mama.portrait",
+      "room": "global",
       "type": "spritesheet",
       "path": "parent/mama/portrait.png",
       "frame": [384, 384],
       "animations": {
-        "idle": { "frames": [0, 3], "fps": 6, "loop": true },
-        "talk": { "frames": [4, 6], "fps": 8, "loop": false },
-        "smile": { "frames": [7, 8], "fps": 6, "loop": false },
-        "encourage": { "frames": [9, 12], "fps": 8, "loop": false }
-      },
-      "room": "global"
+        "idle": { "frames": [0, 1], "fps": 6, "loop": false },
+        "talk": { "frames": [2, 4], "fps": 6, "loop": false },
+        "smile": { "frames": [5, 5], "fps": 6, "loop": false },
+        "encourage": { "frames": [6, 7], "fps": 6, "loop": false }
+      }
     },
     {
       "key": "parent.papa.portrait",
+      "room": "global",
       "type": "spritesheet",
       "path": "parent/papa/portrait.png",
       "frame": [384, 384],
       "animations": {
-        "idle": { "frames": [0, 3], "fps": 6, "loop": true },
-        "talk": { "frames": [4, 6], "fps": 8, "loop": false },
-        "smile": { "frames": [7, 8], "fps": 6, "loop": false },
-        "encourage": { "frames": [9, 12], "fps": 8, "loop": false }
-      },
-      "room": "global"
+        "idle": { "frames": [0, 1], "fps": 6, "loop": false },
+        "talk": { "frames": [2, 4], "fps": 6, "loop": false },
+        "smile": { "frames": [5, 5], "fps": 6, "loop": false },
+        "encourage": { "frames": [6, 7], "fps": 6, "loop": false }
+      }
     }
   ]
 }
