@@ -11,10 +11,12 @@ import { isPhone, tapSize } from '../engine/camera/device';
 import { boundsOf } from '../engine/camera/focus';
 import { fitView, HouseCamera, type Ease } from '../engine/camera/houseCamera';
 import { Companions } from '../engine/nav/companions';
-import { buildNavGraph, samePoint } from '../engine/nav/graph';
+import { buildNavGraph, roomRoute, samePoint, type NavGraph } from '../engine/nav/graph';
 import { roomAt } from '../engine/nav/hit';
+import { IdleNudge, nextNudgeRoom } from '../engine/nav/nudge';
 import { NavWalker } from '../engine/nav/walker';
 import { markActiveScene, servicesOf } from '../game/services';
+import { roomsToVisit } from '../game/visits';
 import type { Logger } from '../log';
 import { buildPlaceholderHouse, type PlaceholderHouse } from '../placeholder/house';
 import { placeholderMotion } from '../placeholder/motion';
@@ -33,6 +35,9 @@ const OCICA_GAP = 90;
 /** Bubu's head tilt when a tap lands outside every room (PRD US-HOUSE-01). */
 const TILT_RAD = 0.3;
 const TILT_MS = 220;
+/** Placeholder for Bubu's `point` animation: two bounces where he stands. */
+const POINT_SCALE = 1.25;
+const POINT_MS = 180;
 
 const ROOM_ZOOM = placeholderMotion['house.room-zoom'];
 /** The grid an E2E tap point is searched on, per room, when its stand is off screen or covered. */
@@ -52,6 +57,7 @@ export class HouseScene extends Phaser.Scene {
 
   private log!: Logger;
   private layout!: HouseLayout;
+  private graph!: NavGraph;
   private walker!: NavWalker;
   private stage!: Phaser.GameObjects.Container;
   private camera!: HouseCamera;
@@ -78,6 +84,13 @@ export class HouseScene extends Phaser.Scene {
   /** Set once a drag passes the tap slop or two fingers pinch; the touch that ends it is no tap. */
   private gestured = false;
   private wasGliding = false;
+  private nudge!: IdleNudge;
+  /** Rooms with something new or due, in house order; empty until progress has loaded. */
+  private wanting: RoomId[] = [];
+  /** The room Bubu last went to show her, until he follows her again. */
+  private shownRoom: RoomId | undefined;
+  /** Set while Bubu hops to a room to show her, so he points once he gets there. */
+  private pointingAt: RoomId | undefined;
 
   constructor() {
     super(HouseScene.KEY);
@@ -94,10 +107,15 @@ export class HouseScene extends Phaser.Scene {
     this.wasGliding = false;
     this.parkingIn = undefined;
     this.spacingAt = undefined;
+    this.nudge = new IdleNudge();
+    this.wanting = [];
+    this.shownRoom = undefined;
+    this.pointingAt = undefined;
     this.cameras.main.setBackgroundColor(pal.sky);
     const house = buildPlaceholderHouse();
     this.layout = house.layout;
-    this.walker = new NavWalker(buildNavGraph(this.layout), this.layout.start, WALK_SPEED);
+    this.graph = buildNavGraph(this.layout);
+    this.walker = new NavWalker(this.graph, this.layout.start, WALK_SPEED);
     this.companions = new Companions(this.roomById(this.layout.start).parking, {
       theiaSpeed: WALK_SPEED,
       lead: BUBU_LEAD,
@@ -122,6 +140,8 @@ export class HouseScene extends Phaser.Scene {
     this.placeActors();
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
+      // Any touch, a drag or pinch included, means she is busy with the house: Bubu waits.
+      this.nudge.reset();
       this.onFingerDown(p);
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, (p: Phaser.Input.Pointer) => {
@@ -169,6 +189,27 @@ export class HouseScene extends Phaser.Scene {
 
     markActiveScene(HouseScene.KEY);
     this.log.info('scene.ready', { rooms: this.layout.rooms.length, start: this.layout.start });
+    void this.loadVisits();
+  }
+
+  /** Which rooms want a visit, from her progress (PRD US-HOUSE-02). */
+  private async loadVisits(): Promise<void> {
+    const layout = this.layout;
+    const { progress } = servicesOf(this);
+    try {
+      const [records, session, settings] = await Promise.all([
+        progress.records(),
+        progress.session(),
+        progress.settings(),
+      ]);
+      // A restart while storage answered has its own layout and loads its own visits.
+      if (this.layout !== layout) return;
+      this.wanting = roomsToVisit(layout.rooms, { records, session, settings });
+      this.log.info('house.visits', { rooms: [...this.wanting] });
+    } catch (err) {
+      // Without her progress Bubu has nothing to show; the house itself still works.
+      this.log.error('house.visits_failed', err);
+    }
   }
 
   override update(_time: number, delta: number): void {
@@ -192,6 +233,7 @@ export class HouseScene extends Phaser.Scene {
       remaining: this.walker.remaining,
       walking: this.walker.walking,
     });
+    this.updateNudge(delta);
     this.placeActors();
     if (arrival) {
       this.log.info('house.arrived', { room: arrival.room, theia: roundPoint(arrival.pos) });
@@ -212,6 +254,51 @@ export class HouseScene extends Phaser.Scene {
       this.spacingAt = undefined;
     }
     this.logParked();
+  }
+
+  /** Bubu shows her a room after a while without a touch (PRD US-HOUSE-02), and points on arrival. */
+  private updateNudge(delta: number): void {
+    // Any pointer held down counts, on every device: `fingers` only tracks touches on a phone.
+    const held = this.input.manager.pointers.some((p) => p.isDown);
+    const waiting = !this.walker.walking && !this.camera.room && !held;
+    if (this.nudge.update(delta, waiting)) this.sendBubu();
+    if (this.pointingAt && this.companions.bubuArrived) {
+      this.pointBubu(this.pointingAt);
+      this.pointingAt = undefined;
+    }
+  }
+
+  private sendBubu(): void {
+    const target = nextNudgeRoom(this.wanting, this.walker.room, this.shownRoom);
+    if (!target) return;
+    const from = this.shownRoom ?? this.walker.room;
+    const route = roomRoute(this.graph, from, target);
+    if (!route) {
+      // checkHouseLayout proves every room reachable, so this is a broken layout.
+      const err = new Error(`no route from ${from} to ${target}`);
+      this.log.error('house.route_missing', err, { room: target });
+      return;
+    }
+    const room = this.roomById(target);
+    this.companions.visit([...route, room.parking.bubu]);
+    this.shownRoom = target;
+    this.pointingAt = target;
+    this.log.info('house.bubu_nudge', { room: target, from });
+    // On a phone the room may be off screen: the view follows him, as it does her walks.
+    if (this.phone) this.camera.frame(room, ROOM_ZOOM.duration, this.zoomEase);
+  }
+
+  private pointBubu(room: RoomId): void {
+    this.log.info('house.bubu_points', { room });
+    const figure = this.restBubu();
+    this.tweens.add({
+      targets: figure,
+      scale: POINT_SCALE,
+      duration: POINT_MS,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   /** Once both stand on the spots layout.json gives the room; position, not a still frame, decides. */
@@ -410,14 +497,16 @@ export class HouseScene extends Phaser.Scene {
     // On a phone the room she is heading to comes into view, so she never needs to pinch.
     if (this.phone) this.camera.frame(room, ROOM_ZOOM.duration, this.zoomEase);
     if (this.companions.follow(this.walker.route, room.parking)) this.parkingIn = room.id;
+    // He comes back along the way he went and follows her again.
+    this.shownRoom = undefined;
+    this.pointingAt = undefined;
     const remaining = this.walker.remaining;
     this.spacingAt = remaining > 0 ? remaining / 2 : undefined;
   }
 
   private tiltBubu(): void {
-    const figure = this.bubu.root;
-    if (this.tweens.isTweening(figure)) return;
     this.log.info('house.bubu_tilt');
+    const figure = this.restBubu();
     this.tweens.add({
       targets: figure,
       rotation: this.companions.bubu.facing.flipX ? -TILT_RAD : TILT_RAD,
@@ -426,6 +515,14 @@ export class HouseScene extends Phaser.Scene {
       hold: TILT_MS,
       ease: 'Sine.easeInOut',
     });
+  }
+
+  /** The newest gesture wins: one still playing stops, and he stands straight again first. */
+  private restBubu(): Phaser.GameObjects.Container {
+    const figure = this.bubu.root;
+    this.tweens.killTweensOf(figure);
+    figure.setScale(1).setRotation(0);
+    return figure;
   }
 
   private roomById(id: RoomId): HouseRoom {

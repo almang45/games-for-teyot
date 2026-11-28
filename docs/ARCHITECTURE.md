@@ -192,7 +192,16 @@ A 3-year-old plays irregularly, so intervals count **sessions, not days**.
   - When a kind runs short, the round fills from the others, so it always has 3 items once 3
     are unlocked, and never the same one twice.
 - A level unlocks when 80% of the previous level's items reach box ≥ 3.
-- The House hub asks the scheduler which rooms have due items, and **Bubu** points at those.
+- The House hub asks the scheduler which rooms have new or due items (`src/game/visits.ts`), and
+  **Bubu** points at those (PRD US-HOUSE-02):
+  - After 5 s without a touch, he hops alone to one of those rooms along the waypoint graph and
+    points. He picks another room than hers first, and moves on to the next room with each repeat,
+    at most every 20 s.
+  - A walk, a zoom into a room or any touch, drags included, restarts the 5 s. On a phone the view
+    frames the room he went to.
+  - Her next walk brings him back the way he went, so he never cuts through a wall.
+  - Only activities with content count: tracing in M1. Coloring, tidy-up and bedtime have no
+    items to review.
 
 ## 6. Navigation (house hub)
 

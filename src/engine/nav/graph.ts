@@ -27,6 +27,20 @@ export const distance = ([ax, ay]: Point, [bx, by]: Point): number => Math.hypot
 
 export const samePoint = (a: Point, b: Point): boolean => a[0] === b[0] && a[1] === b[1];
 
+/**
+ * The path with every loop cut out: whenever it comes back to a point it already passed, the
+ * detour between the two is dropped. Same ends, still along the same segments, never longer.
+ */
+export function loopErased(points: readonly Point[]): Point[] {
+  const kept: Point[] = [];
+  for (const p of points) {
+    const seen = kept.findIndex((q) => samePoint(q, p));
+    if (seen >= 0) kept.length = seen + 1;
+    else kept.push(p);
+  }
+  return kept;
+}
+
 export const lerp = (a: Point, b: Point, t: number): Point =>
   t >= 1 ? b : [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
@@ -105,4 +119,9 @@ export function shortestPath(graph: NavGraph, from: string, to: string): string[
   const path = [to];
   for (let id = previous.get(to); id !== undefined; id = previous.get(id)) path.push(id);
   return path.reverse();
+}
+
+/** The stand-to-stand walk between two rooms as points, or undefined when `to` is unreachable. */
+export function roomRoute(graph: NavGraph, from: string, to: string): Point[] | undefined {
+  return shortestPath(graph, from, to)?.map((id) => nodeOf(graph, id).pos);
 }
