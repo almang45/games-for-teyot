@@ -93,6 +93,37 @@ test.describe('US-AUD-01: audio starts on the first tap', () => {
   });
 });
 
+test.describe('US-PARENT-04: progress stays on the device', () => {
+  test('US-PARENT-04 the log survives a reload in on-device storage', async ({ page }) => {
+    const stored = (): Promise<string[]> =>
+      page.evaluate(
+        () =>
+          new Promise<string[]>((resolve, reject) => {
+            const req = indexedDB.open('rumah-cici-theia');
+            req.onerror = () => {
+              reject(req.error ?? new Error('open failed'));
+            };
+            req.onsuccess = () => {
+              const all = req.result.transaction('log').objectStore('log').getAll();
+              all.onsuccess = () => {
+                resolve((all.result as { event: string }[]).map((e) => e.event));
+                req.result.close();
+              };
+            };
+          }),
+      );
+    await page.goto(GAME_URL);
+    await expectScene(page, 'Boot');
+    await expect.poll(stored).toContain('app.launch');
+    const before = (await stored()).filter((e) => e === 'app.launch').length;
+    await page.reload();
+    await expectScene(page, 'Boot');
+    await expect
+      .poll(async () => (await stored()).filter((e) => e === 'app.launch').length)
+      .toBe(before + 1);
+  });
+});
+
 test.describe('US-PRIV-01: nothing leaves the device', () => {
   test('US-PRIV-01 the app only requests its own origin', async ({ page, baseURL, hasTouch }) => {
     const origin = new URL(baseURL ?? '').origin;

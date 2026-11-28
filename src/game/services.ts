@@ -1,10 +1,12 @@
 import type * as Phaser from 'phaser';
 import type { Logger } from '../log';
+import type { ProgressStore } from '../storage';
 
 /** Cross-scene dependencies, injected through the game registry instead of module globals. */
 export interface GameServices {
   readonly logger: Logger;
   readonly audio: AudioContext;
+  readonly progress: ProgressStore;
 }
 
 const SERVICES_KEY = 'rct.services';
@@ -22,7 +24,13 @@ export function servicesOf(scene: Phaser.Scene): GameServices {
 }
 
 function isGameServices(value: unknown): value is GameServices {
-  return typeof value === 'object' && value !== null && 'logger' in value && 'audio' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'logger' in value &&
+    'audio' in value &&
+    'progress' in value
+  );
 }
 
 /** DOM marker for E2E tests and the parent log; carries no game state. */
