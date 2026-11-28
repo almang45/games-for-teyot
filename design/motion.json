@@ -34,6 +34,11 @@
       "duration": 240,
       "easing": "Cubic.easeOut"
     },
+    "trace.sparkle": {
+      "kind": "feedback",
+      "duration": 420,
+      "easing": "Sine.easeOut"
+    },
     "trace.miss-fade": {
       "kind": "feedback",
       "duration": 380,
