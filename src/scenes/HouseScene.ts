@@ -258,7 +258,9 @@ export class HouseScene extends Phaser.Scene {
 
   /** Bubu shows her a room after a while without a touch (PRD US-HOUSE-02), and points on arrival. */
   private updateNudge(delta: number): void {
-    const waiting = !this.walker.walking && !this.camera.room && this.fingers.size === 0;
+    // Any pointer held down counts, on every device: `fingers` only tracks touches on a phone.
+    const held = this.input.manager.pointers.some((p) => p.isDown);
+    const waiting = !this.walker.walking && !this.camera.room && !held;
     if (this.nudge.update(delta, waiting)) this.sendBubu();
     if (this.pointingAt && this.companions.bubuArrived) {
       this.pointBubu(this.pointingAt);
@@ -288,8 +290,7 @@ export class HouseScene extends Phaser.Scene {
 
   private pointBubu(room: RoomId): void {
     this.log.info('house.bubu_points', { room });
-    const figure = this.bubu.root;
-    if (this.tweens.isTweening(figure)) return;
+    const figure = this.restBubu();
     this.tweens.add({
       targets: figure,
       scale: POINT_SCALE,
@@ -504,9 +505,8 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private tiltBubu(): void {
-    const figure = this.bubu.root;
-    if (this.tweens.isTweening(figure)) return;
     this.log.info('house.bubu_tilt');
+    const figure = this.restBubu();
     this.tweens.add({
       targets: figure,
       rotation: this.companions.bubu.facing.flipX ? -TILT_RAD : TILT_RAD,
@@ -515,6 +515,14 @@ export class HouseScene extends Phaser.Scene {
       hold: TILT_MS,
       ease: 'Sine.easeInOut',
     });
+  }
+
+  /** The newest gesture wins: one still playing stops, and he stands straight again first. */
+  private restBubu(): Phaser.GameObjects.Container {
+    const figure = this.bubu.root;
+    this.tweens.killTweensOf(figure);
+    figure.setScale(1).setRotation(0);
+    return figure;
   }
 
   private roomById(id: RoomId): HouseRoom {

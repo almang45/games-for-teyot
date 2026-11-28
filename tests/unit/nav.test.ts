@@ -9,6 +9,7 @@ import {
 import {
   buildNavGraph,
   lerp,
+  loopErased,
   NavGraphError,
   nodeOf,
   pathLength,
@@ -150,6 +151,20 @@ describe('nav graph', () => {
     expect(lerp([0, 0], [10, 20], 0.5)).toEqual([5, 10]);
     const end: Point = [0.1, 0.7];
     expect(lerp([0.3, 0.2], end, 1)).toBe(end);
+  });
+});
+
+describe('loopErased', () => {
+  it('cuts out every detour that comes back to a point already passed', () => {
+    const a: Point = [0, 0];
+    const b: Point = [10, 0];
+    const c: Point = [10, 10];
+    const d: Point = [20, 0];
+    expect(loopErased([a, b, c, b, d])).toEqual([a, b, d]);
+    expect(loopErased([a, b, c, b, a, b, c])).toEqual([a, b, c]);
+    expect(loopErased([a, a, b])).toEqual([a, b]);
+    expect(loopErased([a, b, d])).toEqual([a, b, d]);
+    expect(loopErased([])).toEqual([]);
   });
 });
 

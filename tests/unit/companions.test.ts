@@ -310,6 +310,38 @@ describe('Bubu showing her a room (US-HOUSE-02)', () => {
     expect(parkedIn(r, 'kamar-tidur')).toBe(true);
   });
 
+  it('keeps the way back to her bounded however often he shows her a room', () => {
+    /** How far Bubu hops back to her after `visits` trips between the kitchen and the bedroom. */
+    const wayBack = (visits: number): number => {
+      const r = start('ruang-keluarga');
+      let at: RoomId = 'ruang-keluarga';
+      for (let i = 0; i < visits; i++) {
+        const to: RoomId = i % 2 === 0 ? 'dapur' : 'kamar-tidur';
+        show(r, at, to);
+        run(r, 900);
+        expect(r.companions.bubuArrived).toBe(true);
+        at = to;
+      }
+      const before = r.companions.bubu.travelled;
+      walkTo(r, 'ruang-keluarga');
+      run(r, 900, onFloor(r));
+      expect(parkedIn(r, 'ruang-keluarga')).toBe(true);
+      return r.companions.bubu.travelled - before;
+    };
+    expect(wayBack(20)).toBeCloseTo(wayBack(2), 6);
+  });
+
+  it('stays on the spot when he shows the room he already stands in', () => {
+    const r = start('ruang-keluarga');
+    show(r, 'ruang-keluarga', 'dapur');
+    run(r, 600);
+    const { travelled } = r.companions.bubu;
+    show(r, 'dapur', 'dapur');
+    expect(r.companions.bubuArrived).toBe(true);
+    run(r, 60);
+    expect(r.companions.bubu.travelled).toBe(travelled);
+  });
+
   it('ignores an empty route', () => {
     const r = start('ruang-keluarga');
     r.companions.visit([]);

@@ -1,5 +1,5 @@
 import type { Point } from '../../../contracts/common.ts';
-import { distance, pathLength, samePoint } from './graph.ts';
+import { distance, loopErased, pathLength, samePoint } from './graph.ts';
 import { Polyline } from './polyline.ts';
 import { facingAlong, type Facing } from './walker.ts';
 
@@ -153,13 +153,17 @@ export class Companions {
 
   /**
    * Bubu alone hops along `route`, to show Theia a room (PRD US-HOUSE-02); she and Ocica stay put.
-   * Only while she stands still. His path keeps the way back to her, so the next follow() brings
-   * him back along the way he went, never through a wall.
+   * Only while she stands still; `route` starts where his last walk ends. His path keeps the way
+   * back to her, so the next follow() brings him back along the way he went, never through a
+   * wall. Loops are cut out of both halves, so visit after visit the way back stays bounded.
    */
   visit(route: readonly Point[]): void {
     if (route.length === 0) return;
-    const toBubu = this.#bubuPath.between(this.#theiaArc, this.#bubuS);
-    this.#bubuPath = new Polyline([...toBubu, ...route]);
+    const toBubu = loopErased(this.#bubuPath.between(this.#theiaArc, this.#bubuS));
+    // Not there yet, he first finishes the walk he is on: a shortcut to `route` could cross a wall.
+    const ahead = this.#bubuPath.between(this.#bubuS, this.#bubuPath.length);
+    const onward = loopErased([...ahead, ...route]);
+    this.#bubuPath = new Polyline([...toBubu, ...onward.slice(1)]);
     this.#bubuS = pathLength(toBubu);
     this.#routeStart = 0;
     this.#routeLength = 0;
