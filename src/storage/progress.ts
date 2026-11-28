@@ -3,6 +3,7 @@ import type { ItemRecord } from '../engine/scheduler/leitner';
 import { ATTEMPTS_BY_ITEM, committed, request, STORES } from './db';
 import {
   ATTEMPTS_PER_ITEM,
+  compactAttempt,
   DEFAULT_SETTINGS,
   itemProgress,
   progressExport,
@@ -146,7 +147,7 @@ export class IndexedDbProgressStore implements ProgressStore {
   }
 
   async addAttempt(attempt: StrokeAttempt): Promise<void> {
-    const valid = checked(strokeAttempt, attempt, STORES.attempts, attempt.itemId);
+    const valid = checked(strokeAttempt, compactAttempt(attempt), STORES.attempts, attempt.itemId);
     const tx = this.db.transaction(STORES.attempts, 'readwrite');
     const store = tx.objectStore(STORES.attempts);
     store.add(valid);
@@ -280,7 +281,12 @@ export class MemoryProgressStore implements ProgressStore {
 
   addAttempt(attempt: StrokeAttempt): Promise<void> {
     return this.run(() => {
-      const valid = checked(strokeAttempt, attempt, STORES.attempts, attempt.itemId);
+      const valid = checked(
+        strokeAttempt,
+        compactAttempt(attempt),
+        STORES.attempts,
+        attempt.itemId,
+      );
       this.log = trimAttempts([...this.log, valid]);
     });
   }

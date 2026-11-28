@@ -5,7 +5,9 @@ import { createAppLog, Logger, type LogEntry, type LogSink } from '../../src/log
 import { readStoredLog, StoredLogSink } from '../../src/log/storedLog';
 import {
   ATTEMPTS_PER_ITEM,
+  compactAttempt,
   CorruptRecordError,
+  MAX_ATTEMPT_POINTS,
   DEFAULT_SETTINGS,
   exportFileName,
   IndexedDbProgressStore,
@@ -20,7 +22,15 @@ import {
   type ProgressStore,
   type StrokeAttempt,
 } from '../../src/storage';
-import { committed, DB_NAME, openDatabase, request, STORES } from '../../src/storage/db';
+import {
+  closeNow,
+  committed,
+  DB_NAME,
+  DB_VERSION,
+  openDatabase,
+  request,
+  STORES,
+} from '../../src/storage/db';
 import { MAX_IMPORT_BYTES } from '../../src/storage/transfer';
 
 const NOW = new Date('2026-11-27T08:00:00.000Z');
@@ -51,7 +61,8 @@ const attempt = (itemId: string, n: number, extra: Partial<StrokeAttempt> = {}):
   ...extra,
 });
 
-const open = (factory = new IDBFactory()): Promise<IDBDatabase> => openDatabase(factory, ignore);
+const open = (factory = new IDBFactory()): Promise<IDBDatabase> =>
+  openDatabase(factory, { onVersionChange: closeNow });
 
 const stores: [string, () => Promise<ProgressStore>][] = [
   ['IndexedDbProgressStore', async () => new IndexedDbProgressStore(await open())],
@@ -168,15 +179,33 @@ describe('db helpers', () => {
     await expect(request(items.add({ id: 'digit.4' }))).rejects.toThrow(/ConstraintError|exists/i);
     await expect(done).rejects.toThrow();
     db.close();
-    await expect(openDatabase(factory, ignore, DB_NAME)).resolves.toBeDefined();
+    await expect(
+      openDatabase(factory, { onVersionChange: closeNow }, DB_NAME),
+    ).resolves.toBeDefined();
+  });
+
+  it('opens a database a newer build upgraded as it is, after a rollback (§8.4)', async () => {
+    const factory = new IDBFactory();
+    (await open(factory)).close();
+    // A later build adds a store and a field this one doesn't know.
     const newer = await new Promise<IDBDatabase>((resolve) => {
-      const req = factory.open('later', 3);
+      const req = factory.open(DB_NAME, DB_VERSION + 2);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore('stickers');
+      };
       req.onsuccess = () => {
         resolve(req.result);
       };
     });
+    const tx = newer.transaction(STORES.items, 'readwrite');
+    tx.objectStore(STORES.items).put({ id: 'digit.4', ...record(), shine: 3 });
+    await committed(tx);
     newer.close();
-    await expect(openDatabase(factory, ignore, 'later')).rejects.toThrow();
+
+    const onNewerVersion = vi.fn();
+    const db = await openDatabase(factory, { onVersionChange: closeNow, onNewerVersion }, DB_NAME);
+    expect(onNewerVersion).toHaveBeenCalledWith(DB_VERSION + 2);
+    expect((await new IndexedDbProgressStore(db).records()).get('digit.4')).toEqual(record());
   });
 });
 
@@ -225,8 +254,8 @@ describe('IndexedDbProgressStore', () => {
 
   it('closes when a newer app version upgrades the database', async () => {
     const factory = new IDBFactory();
-    const onVersionChange = vi.fn();
-    const db = await openDatabase(factory, onVersionChange);
+    const onVersionChange = vi.fn(closeNow);
+    const db = await openDatabase(factory, { onVersionChange });
     await new Promise<void>((resolve, reject) => {
       const req = factory.open(DB_NAME, 2);
       req.onsuccess = () => {
@@ -283,10 +312,8 @@ describe('parseImport (US-PARENT-04)', () => {
       ok: false,
       problem: { detail: expect.stringMatching(/after the last session 1/) as string },
     });
-    expect(parseImport(JSON.stringify({ ...data, extra: true }))).toMatchObject({
-      ok: false,
-      problem: { kind: 'invalid' },
-    });
+    // A field from a newer build at the same schema version is ignored, as in storage (§8.4).
+    expect(parseImport(JSON.stringify({ ...data, extra: true }))).toEqual({ ok: true, data });
   });
 
   it('fills settings a parent never changed with their defaults', async () => {
@@ -331,6 +358,27 @@ describe('openStorage', () => {
     const opened = await openStorage(new IDBFactory(), logger, ignore);
     expect(opened.progress).toBeInstanceOf(IndexedDbProgressStore);
     expect(opened.db).toBeDefined();
+  });
+
+  it('plays from memory when IndexedDB never answers, and closes a late connection', async () => {
+    const req: Record<string, unknown> = {};
+    const factory = { open: () => req } as unknown as IDBFactory;
+    const { entries, logger } = logged();
+    const pending = openStorage(factory, logger, closeNow, 20);
+    (req.onblocked as () => void)();
+    const opened = await pending;
+    expect(opened).toMatchObject({ db: undefined });
+    expect(opened.progress).toBeInstanceOf(MemoryProgressStore);
+    expect(entries.map((e) => [e.level, e.event])).toEqual([
+      ['warn', 'storage.open_blocked'],
+      ['error', 'storage.open_timeout'],
+    ]);
+    const late = { version: DB_VERSION, close: vi.fn() };
+    req.result = late;
+    (req.onsuccess as () => void)();
+    await vi.waitFor(() => {
+      expect(late.close).toHaveBeenCalledOnce();
+    });
   });
 
   it('keeps progress in memory when IndexedDB is missing or refuses', async () => {
@@ -411,5 +459,66 @@ describe('stored log (ARCHITECTURE.md §11)', () => {
     expect(() => {
       app.persistTo(sink);
     }).toThrow(/already stored/);
+  });
+});
+
+describe('stored shapes', () => {
+  it('takes uppercase item ids, as ARCHITECTURE.md §5 names them', async () => {
+    const store = new IndexedDbProgressStore(await open());
+    await store.startSession();
+    await store.saveRecord('upper.A', record());
+    await store.addAttempt(attempt('upper.A', 1));
+    const data = await store.exportAll(NOW);
+    expect(parseImport(serializeExport(data))).toMatchObject({ ok: true });
+    expect([...(await store.records()).keys()]).toEqual(['upper.A']);
+  });
+
+  it('ignores fields a newer build added, instead of calling the record corrupt (§8.4)', async () => {
+    const db = await open();
+    const tx = db.transaction(STORES.values, 'readwrite');
+    tx.objectStore(STORES.values).put({ ...DEFAULT_SETTINGS, theme: 'malam' }, 'settings');
+    await committed(tx);
+    expect(await new IndexedDbProgressStore(db).settings()).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('keeps an attempt small: evenly spread points, first and last kept, rounded', () => {
+    const long = Array.from({ length: 1000 }, (_, i): [number, number, number] => [
+      i / 999 + 1e-7,
+      0.333_333_3,
+      i * 4.17,
+    ]);
+    const { points } = compactAttempt(attempt('digit.4', 1, { points: long }));
+    expect(points).toHaveLength(MAX_ATTEMPT_POINTS);
+    expect(points[0]).toEqual([0, 0.333, 0]);
+    expect(points.at(-1)).toEqual([1, 0.333, 4166]);
+    const short = compactAttempt(attempt('digit.4', 1));
+    expect(short.points).toEqual(attempt('digit.4', 1).points);
+  });
+
+  it('keeps the largest export a device could make well within the import limit', () => {
+    const items = Array.from({ length: 200 }, (_, i) => ({
+      id: `item.n${i}`,
+      ...record({ attempts: 99_999, successes: 99_999, lastSeenSession: 9_999 }),
+    }));
+    // Worst-case digits: negative x, three decimals each, five-digit times.
+    const points = Array.from({ length: MAX_ATTEMPT_POINTS }, (): [number, number, number] => [
+      -0.123, -1.123, 99_999,
+    ]);
+    const attempts = items.flatMap((item) =>
+      Array.from({ length: ATTEMPTS_PER_ITEM }, (_, n) =>
+        attempt(item.id, n, { points, corridor: 0.123_456_789 }),
+      ),
+    );
+    const data: ProgressExport = {
+      schemaVersion: 1,
+      exportedAt: NOW.toISOString(),
+      session: 9_999,
+      settings: DEFAULT_SETTINGS,
+      items,
+      attempts,
+    };
+    const text = serializeExport(data);
+    expect(text.length).toBeLessThan(MAX_IMPORT_BYTES);
+    expect(parseImport(text)).toMatchObject({ ok: true });
   });
 });

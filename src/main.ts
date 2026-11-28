@@ -97,22 +97,26 @@ async function requestPersistentStorage(log: Logger): Promise<void> {
 
 /** Opens progress storage and, once it is there, keeps the log on the device too. */
 async function startStorage(log: Logger): Promise<OpenedStorage> {
+  let sink: StoredLogSink | undefined;
   const storage = await openStorage(
     'indexedDB' in window ? window.indexedDB : undefined,
     log,
-    () => {
-      // A newer version of the app opened in another tab and needs the database.
+    (close) => {
+      // A newer version of the app opened in another tab and needs the database. The warning is
+      // stored before the connection closes, so the log says why the app reloaded.
       log.warn('storage.version_change');
-      reload();
+      void (sink?.flush() ?? Promise.resolve()).finally(() => {
+        close();
+        reload();
+      });
     },
   );
   if (storage.db) {
-    appLog.persistTo(
-      new StoredLogSink(storage.db, (err: unknown) => {
-        // Not through `log`: its stored sink is the one failing, and would feed itself.
-        unstored.error('log.store_failed', err);
-      }),
-    );
+    sink = new StoredLogSink(storage.db, (err: unknown) => {
+      // Not through `log`: its stored sink is the one failing, and would feed itself.
+      unstored.error('log.store_failed', err);
+    });
+    appLog.persistTo(sink);
   }
   return storage;
 }

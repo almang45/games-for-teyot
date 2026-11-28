@@ -14,7 +14,7 @@ Owner: Claude (logic). Companion docs: [`PLAN.md`](PLAN.md) (what and why), [`AS
 | Game runtime | Phaser (latest stable major at implementation time) | Scenes, tweens, texture atlases, input. Mature on Android Chrome. Its sound manager is off; the app owns audio (§7). |
 | Parent UI | Svelte, mounted as a DOM overlay | Forms and dashboards are painful in canvas |
 | Offline | `vite-plugin-pwa` (Workbox) | Precached app shell plus each room's assets |
-| Storage | IndexedDB via `idb` | Structured progress and stroke replays. Larger quota than localStorage. |
+| Storage | IndexedDB, raw API (small promise helpers in `src/storage/db.ts`) | Structured progress and stroke replays. Larger quota than localStorage. No wrapper dependency. |
 | Validation | `zod` | Asset manifest, content files, and imported progress JSON are validated at load time |
 | Unit tests | Vitest | Tracing scorer, scheduler, nav graph, schema |
 | Component tests | Vitest (happy-dom) + Svelte Testing Library | `ui/*.test.ts`, every state and event (Vitest project `ui`, next to `unit`) |
@@ -363,10 +363,17 @@ Secrets:
 ## 12. Data model
 
 Implemented in `src/storage/` (zod schemas in `schema.ts`, IndexedDB `rumah-cici-theia` v1 in
-`db.ts`). A browser that refuses IndexedDB gets `MemoryProgressStore`: she can play, nothing is
-saved, and `storage.open_failed` is logged. Import is all or nothing: a file is parsed and checked
-before one transaction replaces everything. Reset clears progress, attempts and the session
-counter, and keeps the parent's settings.
+`db.ts`). Without a working IndexedDB she plays from `MemoryProgressStore` and nothing is saved:
+`storage.memory_only` when the browser has none, `storage.open_failed` when it refuses, and
+`storage.open_timeout` when it hasn't answered within 4 s (a connection that opens later is
+closed). `storage.open_blocked` means another tab holds an older version open;
+`storage.newer_version` means a newer build upgraded the database and this one, after a rollback,
+opens it as it is. Records are read with non-strict schemas, so fields a newer build added are
+ignored (§8.4). A stroke attempt is stored compact: at most 128 points, coordinates rounded to
+3 decimals, times to the ms. Export is compact JSON; import refuses files over 16 MiB, well above
+the worst case. Import is all or nothing: a file is parsed and checked before one transaction
+replaces everything. Reset clears progress, attempts and the session counter, and keeps the
+parent's settings.
 
 ```ts
 type ItemId = `${'upper' | 'lower' | 'num' | 'stroke' | 'syl' | 'word' | 'count'}.${string}`;

@@ -14,8 +14,11 @@ export type ImportResult =
   | { readonly ok: true; readonly data: ProgressExport }
   | { readonly ok: false; readonly problem: ImportProblem };
 
-/** Import files are a few hundred KB at most; anything far larger isn't one of ours. */
-export const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+/**
+ * Larger than any export of ours: 200 items with ATTEMPTS_PER_ITEM full-length attempts each come
+ * to about 12 MB (a unit test checks it), and a real one is far smaller.
+ */
+export const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
 /** The file name the parent area offers when saving an export. */
 export function exportFileName(data: ProgressExport): string {
@@ -23,7 +26,8 @@ export function exportFileName(data: ProgressExport): string {
 }
 
 export function serializeExport(data: ProgressExport): string {
-  return `${JSON.stringify(data, null, 2)}\n`;
+  // Compact: indenting puts each number of each point on its own line, several times the size.
+  return `${JSON.stringify(data)}\n`;
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>

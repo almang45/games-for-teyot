@@ -58,32 +58,62 @@ function upgrade(db: IDBDatabase, from: number): void {
   }
 }
 
+export interface DatabaseEvents {
+  /**
+   * A newer app version in another tab needs the database. `close` must be called, after any
+   * last write such as the log line saying why, so that tab's upgrade can go ahead.
+   */
+  onVersionChange(close: () => void): void;
+  /** An older tab still holds the database, so the upgrade waits for it to close. */
+  onBlocked?(): void;
+  /** A newer build already upgraded the database, and this one, rolled back, opens it as it is. */
+  onNewerVersion?(onDisk: number): void;
+}
+
+/** Closes at once: for a connection with nothing left to write. */
+export const closeNow = (close: () => void): void => {
+  close();
+};
+
 /**
- * Opens (and creates or upgrades) the database. `onVersionChange` runs when a newer app version
- * in another tab needs the database: this connection closes so that one can upgrade.
+ * Opens (and creates or upgrades) the database. Upgrades are additive only (ARCHITECTURE.md
+ * §8.4), so after a rollback an older build opens a newer database as it is: the stores it knows
+ * are there, and the fields it doesn't know are ignored when read.
  */
 export function openDatabase(
   factory: IDBFactory,
-  onVersionChange: () => void,
+  events: DatabaseEvents,
   name: string = DB_NAME,
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = factory.open(name, DB_VERSION);
-    req.onupgradeneeded = (event) => {
-      upgrade(req.result, event.oldVersion);
-    };
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => {
-        db.close();
-        onVersionChange();
+    const attempt = (version: number | undefined): void => {
+      const req = version === undefined ? factory.open(name) : factory.open(name, version);
+      req.onupgradeneeded = (event) => {
+        upgrade(req.result, event.oldVersion);
       };
-      resolve(db);
+      req.onsuccess = () => {
+        const db = req.result;
+        if (db.version > DB_VERSION) events.onNewerVersion?.(db.version);
+        db.onversionchange = () => {
+          events.onVersionChange(() => {
+            db.close();
+          });
+        };
+        resolve(db);
+      };
+      req.onblocked = () => {
+        events.onBlocked?.();
+      };
+      req.onerror = (event) => {
+        if (version !== undefined && req.error?.name === 'VersionError') {
+          // Stops the failed request's error from surfacing as an uncaught one.
+          event.preventDefault();
+          attempt(undefined);
+          return;
+        }
+        reject(req.error ?? new Error(`IndexedDB ${name} did not open`));
+      };
     };
-    // No onblocked: an older tab holding the database gets onversionchange above and closes it,
-    // and the upgrade then goes ahead.
-    req.onerror = () => {
-      reject(req.error ?? new Error(`IndexedDB ${name} did not open`));
-    };
+    attempt(DB_VERSION);
   });
 }
