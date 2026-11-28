@@ -1,0 +1,94 @@
+:root {
+  /* Palette tokens (from design/tokens.json, PR #50) */
+  --color-palette-outline: #3b2b23;
+  --color-palette-hair: #3f2e24;
+  --color-palette-skin: #f3cbaf;
+  --color-palette-blush: #eb9a86;
+  --color-palette-cream: #fcf9f0;
+  --color-palette-cream-shade: #ece5d5;
+  --color-palette-paper: #fcf8ee;
+  --color-palette-sand: #d5c8b0;
+  --color-palette-wood-warm: #c49a6c;
+  --color-palette-wood-dark: #7a5638;
+  --color-palette-sun-gold: #ffd166;
+  --color-palette-slate-calm: #6d6875;
+
+  /* 6 coloring swatches */
+  --color-swatch-0: #e05a47;
+  --color-swatch-1: #f4c430;
+  --color-swatch-2: #4a90d9;
+  --color-swatch-3: #66b266;
+  --color-swatch-4: #f29cb0;
+  --color-swatch-5: #9b72cf;
+
+  /* Semantic */
+  --color-semantic-interactive: #e76f51;
+  --color-semantic-success: #66b266;
+  --color-semantic-hint: #f4a236;
+  --color-semantic-locked: #a8a29e;
+  --color-backdrop: #f4ede0;
+
+  /* Parent UI */
+  --color-parent-surface: #faf6ee;
+  --color-parent-text: #2e221b;
+  --color-parent-accent: #3b6eb5;
+  --color-parent-accent-text: #ffffff;
+
+  /* Typography */
+  --font-family-body: 'Andika', system-ui, -apple-system, sans-serif;
+  --font-family-display: 'Andika', system-ui, -apple-system, sans-serif;
+  --font-size-sm: 14px;
+  --font-size-md: 18px;
+  --font-size-lg: 24px;
+  --font-size-xl: 32px;
+  --font-size-display: 48px;
+  --font-weight-regular: 400;
+  --font-weight-bold: 700;
+
+  /* Spacing & touch targets */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 36px;
+  --space-touch-secondary: 72px;
+  --space-touch-primary: 96px;
+  --space-touch-boot: 240px;
+  --space-border-sm: 2px;
+  --space-border-md: 4px;
+  --space-border-lg: 6px;
+  --space-dot-sm: 20px;
+  --space-dot-lg: 28px;
+  --space-portrait: 120px;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-soft: 0 4px 12px 0 rgba(59, 43, 35, 0.16);
+  --shadow-lifted: 0 8px 20px 0 rgba(59, 43, 35, 0.22);
+  --shadow-success-glow: 0 0 20px 4px rgba(102, 178, 102, 0.45);
+  --shadow-hint-glow: 0 0 22px 4px rgba(244, 162, 54, 0.55);
+
+  /* Motion */
+  --motion-boot-breathe: 2400ms;
+  --motion-hud-speaker-pulse: 1600ms;
+
+  /* #48 Parent portrait spritesheets */
+  --sprite-mama-portrait: url('/../assets/parent/mama/portrait.png');
+  --sprite-papa-portrait: url('/../assets/parent/papa/portrait.png');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-backdrop);
+  color: var(--color-parent-text);
+  font-family: var(--font-family-body);
+}
